@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Backend data (runtime)
+backend/services/data/
+backend/data/*.bak
+*.db
+*.db-wal
+*.db-shm
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Logs
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.sw?
+.DS_Store

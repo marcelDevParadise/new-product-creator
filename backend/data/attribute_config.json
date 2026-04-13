@@ -1,0 +1,661 @@
+﻿{
+    "meta_brand": {
+        "id": "meta_brand:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Marke / Brand",
+        "description": "Angezeigter Markenname des Produkts (Hersteller-, Marken- oder Linienname)."
+    },
+    "product_line": {
+        "id": "meta_product_line:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Produktlinie / Serie",
+        "description": "Konkrete Produktlinie oder Serie innerhalb einer Marke (z. B. Extreme, Classic, Men Line)."
+    },
+    "meta_type": {
+        "id": "meta_type:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Produkttyp (intern)",
+        "description": "Interner Produkttyp zur Logik-Steuerung (z. B. Dildo, Masturbator, Vibrator, Gleitgel, Lederreiniger)."
+    },
+    "color": {
+        "id": "meta_color:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Farbe",
+        "description": "Hauptfarbe des Produkts, wie sie im Shop angezeigt werden soll."
+    },
+    "meta_material": {
+        "id": "meta_material:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Material (allgemein)",
+        "description": "Allgemeine Materialangabe, wenn keine feinere Aufteilung noetig ist (z. B. Silikon, TPE)."
+    },
+    "meta_strength_value": {
+        "id": "meta_strength_value:custom:number_integer",
+        "category": "Produkt",
+        "name": "Intensitaet / Staerke (Skala)",
+        "description": "Numerische Einordnung der Intensitaet (z. B. Staerke 1-5) zur Vergleichbarkeit."
+    },
+    "suitable_materials": {
+        "id": "meta_suitable_materials:custom:multi_line_text_field",
+        "category": "Produkt",
+        "name": "Geeignet fuer (Materialien/Oberflaechen)",
+        "description": "Auflistung, fuer welche Materialien/Oberflaechen das Produkt geeignet ist (z. B. Latex, Silikon, Leder)."
+    },
+    "not_suitable_materials": {
+        "id": "meta_not_suitable_materials:custom:multi_line_text_field",
+        "category": "Produkt",
+        "name": "Nicht geeignet fuer",
+        "description": "Hinweis, fuer welche Materialien/Oberflaechen das Produkt NICHT verwendet werden soll."
+    },
+    "list_element_info_1": {
+        "id": "meta_list_element_info_1:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Eintrag 1 (Listenelement)",
+        "description": "Erster frei definierbarer Stichpunkt fuer Produkt-Highlights oder kurze Bulletpoints."
+    },
+    "list_element_info_2": {
+        "id": "meta_list_element_info_2:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Eintrag 2 (Listenelement)",
+        "description": "Zweiter frei definierbarer Stichpunkt fuer Produkt-Highlights oder kurze Bulletpoints."
+    },
+    "list_element_info_3": {
+        "id": "meta_list_element_info_3:custom:single_line_text_field",
+        "category": "Produkt",
+        "name": "Eintrag 3 (Listenelement)",
+        "description": "Dritter frei definierbarer Stichpunkt fuer Produkt-Highlights oder kurze Bulletpoints."
+    },
+    "dildo_type": {
+        "id": "meta_dildo_type:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Dildo-Typ",
+        "description": "Bauart des Dildos (z. B. Realistisch, Doppel-Dildo, Strap-On-Einsatz)."
+    },
+    "vibe_type": {
+        "id": "meta_vibe_type:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Vibrator-Typ",
+        "description": "Typ des Vibrators (z. B. Rabbit, Bullet, Auflegevibrator, Wand-Massager)."
+    },
+    "masturbator_type": {
+        "id": "meta_masturbator_type:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Masturbator-Typ",
+        "description": "Bauart des Masturbators (z. B. Taschenmasturbator, Auflege-Masturbator, Tiefenstimulation)."
+    },
+    "opening_type": {
+        "id": "meta_opening_type:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Oeffnungstyp",
+        "description": "Beschreibung der Oeffnung, z. B. neutral, Mund, Anus, Vagina-Design."
+    },
+    "flexibility": {
+        "id": "meta_flexibility:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Flexibilitaet / Haertegrad",
+        "description": "Einordnung, wie flexibel oder fest das Produkt ist (z. B. weich, mittel, fest)."
+    },
+    "base_type": {
+        "id": "meta_base_type:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Basis / Fuss (z. B. Saugnapf)",
+        "description": "Art der Basis, z. B. flache Basis, Saugnapf, breiter Fuss fuer anale Sicherheit."
+    },
+    "texture_inside": {
+        "id": "meta_texture_inside:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Innenstruktur / Textur",
+        "description": "Kurzbeschreibung der inneren Struktur (z. B. genoppt, gerippt, wellig)."
+    },
+    "harness_compatible": {
+        "id": "meta_harness_compatible:custom:boolean",
+        "category": "Produkttyp & Bauart",
+        "name": "Mit Harness kompatibel",
+        "description": "Gibt an, ob das Produkt in einem Strap-On-Harness verwendet werden kann."
+    },
+    "anal_safe": {
+        "id": "meta_anal_safe:custom:boolean",
+        "category": "Produkttyp & Bauart",
+        "name": "Fuer anale Nutzung geeignet",
+        "description": "Kennzeichnet, ob das Produkt fuer anale Nutzung geeignet ist (z. B. mit breiter Basis)."
+    },
+    "temperature_play": {
+        "id": "meta_temperature_play:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Fuer Temperaturspiel geeignet",
+        "description": "Hinweis, ob das Produkt fuer Waerme-/Kaelte-Spiel geeignet ist (z. B. mit Wasser erwaermbar)."
+    },
+    "experience_level": {
+        "id": "meta_experience_level:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Niveau / Erfahrungslevel",
+        "default_value": "Einsteiger",
+        "suggested_values": [
+            "Einsteiger",
+            "Fortgeschritten",
+            "Experten"
+        ],
+        "smart_defaults": [
+            {
+                "title_contains": "XL",
+                "value": "Fortgeschritten"
+            },
+            {
+                "title_contains": "Pro",
+                "value": "Experten"
+            }
+        ],
+        "description": "Zielgruppe nach Erfahrung, z. B. Einsteiger, Fortgeschritten oder sehr erfahrene Nutzer."
+    },
+    "handling": {
+        "id": "meta_handling:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Handhabung / Grip",
+        "description": "Beschreibung von Handhabung und Griffigkeit (z. B. ergonomischer Griff, rutschfest)."
+    },
+    "discreet_look": {
+        "id": "meta_discreet_look:custom:single_line_text_field",
+        "category": "Produkttyp & Bauart",
+        "name": "Diskrete Optik",
+        "description": "Hinweis, ob das Produkt optisch diskret wirkt oder deutlich als Erotikartikel erkennbar ist."
+    },
+    "total_length": {
+        "id": "meta_total_length:custom:single_line_text_field",
+        "category": "Masse & Gewicht",
+        "name": "Gesamtlaenge",
+        "description": "Gesamtlaenge des Produkts in cm, gemessen von einem Ende zum anderen."
+    },
+    "inner_length": {
+        "id": "meta_inner_length:custom:single_line_text_field",
+        "category": "Masse & Gewicht",
+        "name": "Nutzbare Innenlaenge / Einfuehrtiefe",
+        "description": "Maximal nutzbare Innenlaenge oder Einfuehrtiefe in cm."
+    },
+    "inner_diameter": {
+        "id": "meta_inner_diameter:custom:single_line_text_field",
+        "category": "Masse & Gewicht",
+        "name": "Innendurchmesser",
+        "description": "Innendurchmesser an der relevantesten Stelle in cm."
+    },
+    "outer_diameter": {
+        "id": "meta_outer_diameter:custom:single_line_text_field",
+        "category": "Masse & Gewicht",
+        "name": "Aussendurchmesser / Breite",
+        "description": "Maximaler Aussendurchmesser bzw. die breiteste Stelle in cm."
+    },
+    "item_weight": {
+        "id": "meta_item_weight:custom:single_line_text_field",
+        "category": "Masse & Gewicht",
+        "name": "Gewicht (Produkt)",
+        "description": "Gewicht des Produkts ohne Verpackung, ueblicherweise in Gramm."
+    },
+    "shipping_weight": {
+        "id": "meta_shipping_weight:custom:single_line_text_field",
+        "category": "Masse & Gewicht",
+        "name": "Versandgewicht",
+        "description": "Gesamtgewicht inkl. Verpackung in Gramm, relevant fuer Versandkosten-Berechnung."
+    },
+    "package_dimensions": {
+        "id": "meta_package_dimensions:custom:single_line_text_field",
+        "category": "Masse & Gewicht",
+        "name": "Paketmasse (LxBxH)",
+        "description": "Masse der Verpackung in cm (Laenge x Breite x Hoehe), relevant fuer Versandlogistik."
+    },
+    "material_main": {
+        "id": "meta_material_main:custom:single_line_text_field",
+        "category": "Material & Sicherheit",
+        "name": "Material (Kontaktflaeche / innen)",
+        "description": "Material, das direkt mit Koerper oder Schleimhaut in Kontakt kommt (z. B. Silikon, TPE)."
+    },
+    "material_case": {
+        "id": "meta_material_case:custom:single_line_text_field",
+        "category": "Material & Sicherheit",
+        "name": "Material (Aussenhuelle)",
+        "description": "Material der aeusseren Huelle oder des Gehaeuses (z. B. ABS-Kunststoff)."
+    },
+    "surface": {
+        "id": "meta_surface:custom:single_line_text_field",
+        "category": "Material & Sicherheit",
+        "name": "Oberflaeche",
+        "description": "Beschreibung der Oberflaeche, z. B. glatt, strukturiert, soft-touch."
+    },
+    "body_safe": {
+        "id": "meta_body_safe:custom:single_line_text_field",
+        "category": "Material & Sicherheit",
+        "name": "Koerpervertraeglichkeit",
+        "description": "Hinweis zur Koerpervertraeglichkeit, z. B. phthalatfrei, koerperfreundlich, latexfrei."
+    },
+    "ce_marking": {
+        "id": "meta_ce_marking:custom:boolean",
+        "category": "Material & Sicherheit",
+        "name": "CE-Kennzeichnung",
+        "description": "Gibt an, ob das Produkt eine CE-Kennzeichnung traegt."
+    },
+    "rohs_compliant": {
+        "id": "meta_rohs_compliant:custom:boolean",
+        "category": "Material & Sicherheit",
+        "name": "RoHS-konform",
+        "description": "Gibt an, ob das Produkt der RoHS-Richtlinie (Beschraenkung gefaehrlicher Stoffe) entspricht."
+    },
+    "features": {
+        "id": "meta_features:custom:multi_line_text_field",
+        "category": "Funktionen & Technik",
+        "name": "Funktionen (Kurzbeschreibung)",
+        "description": "Freitext fuer eine kompakte Zusammenfassung besonderer Produktfunktionen."
+    },
+    "vibrations": {
+        "id": "meta_vibrations:custom:single_line_text_field",
+        "category": "Funktionen & Technik",
+        "name": "Vibrationsmodi / Intensitaeten",
+        "description": "Kurzinfo zu Vibrationsmodi oder Intensitaeten (z. B. 10 Programme, stufenlos regelbar)."
+    },
+    "vibration_modes": {
+        "id": "meta_vibration_modes:custom:number_integer",
+        "category": "Funktionen & Technik",
+        "name": "Anzahl Vibrationsprogramme",
+        "description": "Zahl der verfuegbaren Vibrationsprogramme."
+    },
+    "intensity_levels": {
+        "id": "meta_intensity_levels:custom:number_integer",
+        "category": "Funktionen & Technik",
+        "name": "Anzahl Intensitaetsstufen",
+        "description": "Anzahl der unterschiedlichen Intensitaetsstufen fuer Vibration oder Pulsfunktionen."
+    },
+    "vibration_character": {
+        "id": "meta_vibration_character:custom:single_line_text_field",
+        "category": "Funktionen & Technik",
+        "name": "Charakter der Vibration",
+        "description": "Beschreibung der Vibration, z. B. tief, brummend, punktuell, intensiv."
+    },
+    "heating": {
+        "id": "meta_heating:custom:single_line_text_field",
+        "category": "Funktionen & Technik",
+        "name": "Heizfunktion",
+        "description": "Hinweis auf vorhandene Heizfunktion inkl. Besonderheiten (z. B. bis ca. 40 Grad C)."
+    },
+    "suction": {
+        "id": "meta_suction:custom:single_line_text_field",
+        "category": "Funktionen & Technik",
+        "name": "Saug- / Pulsfunktion",
+        "description": "Informationen zu Saug- oder Luftdruckfunktionen (z. B. Anzahl der Pulsstufen)."
+    },
+    "waterproof": {
+        "id": "meta_waterproof:custom:single_line_text_field",
+        "category": "Funktionen & Technik",
+        "name": "Wasserdichtigkeit / Schutzklasse",
+        "default_value": "Wasserdicht (IPX7)",
+        "suggested_values": [
+            "Nicht wasserdicht",
+            "Spritzwassergeschuetzt (IPX4)",
+            "Wasserdicht (IPX7)"
+        ],
+        "description": "Angabe zur Wasserdichtigkeit oder Schutzklasse (z. B. IPX4, IPX7 oder Textbeschreibung)."
+    },
+    "noise_level": {
+        "id": "meta_noise_level:custom:single_line_text_field",
+        "category": "Funktionen & Technik",
+        "name": "Lautstaerke",
+        "description": "Beschreibung der Betriebslautstaerke (z. B. fluesterleise, unter 50 dB)."
+    },
+    "travel_lock": {
+        "id": "meta_travel_lock:custom:boolean",
+        "category": "Funktionen & Technik",
+        "name": "Reisesicherung / Travel Lock",
+        "description": "Gibt an, ob das Produkt ueber eine Reisesicherung/Travel Lock verfuegt."
+    },
+    "control_type": {
+        "id": "meta_control_type:custom:single_line_text_field",
+        "category": "Steuerung & Konnektivitaet",
+        "name": "Steuerung / Bedienung",
+        "description": "Art der Bedienung, z. B. Tasten am Geraet, One-Touch-Bedienung, App-Steuerung."
+    },
+    "app_control": {
+        "id": "meta_app_control:custom:single_line_text_field",
+        "category": "Steuerung & Konnektivitaet",
+        "name": "App- / Fernbedienungssteuerung",
+        "description": "Hinweis auf App- oder Fernbedienungssteuerung, inkl. kurzer Info (z. B. Bluetooth-App)."
+    },
+    "bluetooth_version": {
+        "id": "meta_bluetooth_version:custom:single_line_text_field",
+        "category": "Steuerung & Konnektivitaet",
+        "name": "Bluetooth-Version",
+        "description": "Bluetooth-Version fuer App-kompatible Produkte (z. B. BLE 5.0)."
+    },
+    "compatible_apps": {
+        "id": "meta_compatible_apps:custom:single_line_text_field",
+        "category": "Steuerung & Konnektivitaet",
+        "name": "Kompatible Apps",
+        "description": "Auflistung kompatibler Apps (z. B. Lovense Remote, FeelConnect, Handy-App)."
+    },
+    "remote_control": {
+        "id": "meta_remote_control:custom:boolean",
+        "category": "Steuerung & Konnektivitaet",
+        "name": "Interaktiv / Fernsteuerbar",
+        "description": "Gibt an, ob das Produkt aus der Ferne steuerbar ist (z. B. per App oder Partner-Steuerung)."
+    },
+    "power_supply": {
+        "id": "meta_power_supply:custom:single_line_text_field",
+        "category": "Stromversorgung",
+        "name": "Stromversorgung",
+        "description": "Grundlegende Art der Stromversorgung (z. B. Akku, USB, Batterie)."
+    },
+    "power_supply_detail": {
+        "id": "meta_power_supply_detail:custom:single_line_text_field",
+        "category": "Stromversorgung",
+        "name": "Stromversorgung (Details)",
+        "description": "Detailangaben zur Stromversorgung (z. B. Batterietyp, Ladekabel, Ladeanschluss)."
+    },
+    "runtime_minutes": {
+        "id": "meta_runtime_minutes:custom:number_integer",
+        "category": "Stromversorgung",
+        "name": "Laufzeit (Minuten)",
+        "description": "Ungefaehre Nutzungsdauer pro Akkuladung, in Minuten."
+    },
+    "charge_minutes": {
+        "id": "meta_charge_minutes:custom:number_integer",
+        "category": "Stromversorgung",
+        "name": "Ladezeit (Minuten)",
+        "description": "Ungefaehre Ladezeit bis zur vollen Akkuladung, in Minuten."
+    },
+    "runtime_charge": {
+        "id": "meta_runtime_charge:custom:single_line_text_field",
+        "category": "Stromversorgung",
+        "name": "Laufzeit & Ladezeit",
+        "description": "Kombinierte Kurzinfo zu Laufzeit und Ladezeit in Satzform."
+    },
+    "lube_hint": {
+        "id": "meta_lube_hint:custom:multi_line_text_field",
+        "category": "Gleitmittel",
+        "name": "Gleitmittel-Empfehlung",
+        "description": "Empfehlung, welche Gleitmittel mit diesem Produkt verwendet werden sollten.",
+        "default_value": "Empfohlenes Gleitmittel: Wasserbasiert",
+        "suggested_values": [
+            "Empfohlenes Gleitmittel: Wasserbasiert",
+            "Empfohlenes Gleitmittel: Silikonbasiert",
+            "Empfohlenes Gleitmittel: Oelbasiert",
+            "Empfohlenes Gleitmittel: Hybrid"
+        ]
+    },
+    "lube_type": {
+        "id": "meta_lube_type:custom:single_line_text_field",
+        "category": "Gleitmittel",
+        "name": "Gleitmittel-Typ",
+        "description": "Art des Gleitmittels, z. B. wasserbasiert, silikonbasiert, Hybrid.",
+        "default_value": "Wasserbasiertes Gleitmittel",
+        "suggested_values": [
+            "Wasserbasiertes Gleitmittel",
+            "Silikonbasiertes Gleitmittel",
+            "Oelbasiertes Gleitmittel",
+            "Hybrid Gleitmittel (Wasser- und Silikonbasiert)"
+        ]
+    },
+    "lube_features": {
+        "id": "meta_lube_features:custom:multi_line_text_field",
+        "category": "Gleitmittel",
+        "name": "Besondere Eigenschaften (Gleitgel)",
+        "description": "Besondere Eigenschaften von Gleitmitteln (z. B. langanhaltend, waermend, parfuemfrei)."
+    },
+    "condom_compatibility": {
+        "id": "meta_condom_compatibility:custom:single_line_text_field",
+        "category": "Gleitmittel",
+        "name": "Kondomvertraeglichkeit",
+        "description": "Hinweis, ob das Produkt mit Kondomen verwendet werden kann und ggf. welche Art."
+    },
+    "toy_compatibility": {
+        "id": "meta_toy_compatibility:custom:single_line_text_field",
+        "category": "Gleitmittel",
+        "name": "Toy-Kompatibilitaet",
+        "description": "Hinweis, mit welchen Toy-Materialien das Gleitmittel oder der Cleaner kompatibel ist."
+    },
+    "care_hint": {
+        "id": "meta_care_hint:custom:multi_line_text_field",
+        "category": "Pflege & Lagerung",
+        "name": "Reinigung & Pflege (Kurztext)",
+        "description": "Kurze Anleitung zur Reinigung und Pflege des Produkts nach der Nutzung."
+    },
+    "storage_hint_short": {
+        "id": "meta_storage_hint_short:custom:single_line_text_field",
+        "category": "Pflege & Lagerung",
+        "name": "Lagerhinweis (Kurztext)",
+        "description": "Allgemeiner kurzer Lagerhinweis, z. B. kuehl und trocken lagern."
+    },
+    "storage_hint_lube": {
+        "id": "meta_storage_hint_lube:custom:single_line_text_field",
+        "category": "Pflege & Lagerung",
+        "name": "Lagerhinweis (Gleitgel)",
+        "description": "Spezifischer Lagerhinweis fuer Gleitgele oder Fluessigkeiten."
+    },
+    "removable_sleeve": {
+        "id": "meta_removable_sleeve:custom:single_line_text_field",
+        "category": "Pflege & Lagerung",
+        "name": "Huelle / Sleeve entnehmbar",
+        "description": "Hinweis, ob die Innenhuelle bzw. das Sleeve zur Reinigung entnehmbar ist.",
+        "default_value": "Sleeve entnehmbar",
+        "suggested_values": [
+            "Sleeve entnehmbar",
+            "Sleeve festverbaut"
+        ]
+    },
+    "ingredients": {
+        "id": "meta_ingredients:custom:list.single_line_text_field",
+        "category": "Inhaltsstoffe",
+        "name": "Inhaltsstoffe",
+        "required": false,
+        "required_for_types": [
+            "Gleitgel",
+            "Lederreiniger",
+            "Fluessigkeit"
+        ],
+        "description": "Liste der Inhaltsstoffe (INCI oder Klartext), v. a. fuer Gleitgele und Fluessigkeiten."
+    },
+    "base_formula": {
+        "id": "meta_base_formula:custom:single_line_text_field",
+        "category": "Inhaltsstoffe",
+        "name": "Basis / Formulierung (Kurztext)",
+        "description": "Kurzbeschreibung der Basisformulierung, z. B. wasserbasiert, silikonbasiert, Hybrid."
+    },
+    "ph_value": {
+        "id": "meta_ph_value:custom:single_line_text_field",
+        "category": "Inhaltsstoffe",
+        "name": "pH-Wert / pH-Hinweis",
+        "description": "Hinweis zum pH-Wert oder pH-Bereich (z. B. pH-hautneutral)."
+    },
+    "vegan": {
+        "id": "meta_vegan:custom:boolean",
+        "category": "Inhaltsstoffe",
+        "name": "Vegan",
+        "description": "Kennzeichnet, ob das Produkt vegan ist (ohne Inhaltsstoffe tierischen Ursprungs)."
+    },
+    "free_from": {
+        "id": "meta_free_from:custom:multi_line_text_field",
+        "category": "Inhaltsstoffe",
+        "name": "Frei von (z. B. Parabenen)",
+        "description": "Auflistung unerwuenschter Stoffe, die NICHT enthalten sind (z. B. Parabene, Zucker, Duftstoffe)."
+    },
+    "scope_of_delivery": {
+        "id": "meta_scope_of_delivery:custom:multi_line_text_field",
+        "category": "Verpackung & Versand",
+        "name": "Lieferumfang",
+        "description": "Auflistung aller Bestandteile des Lieferumfangs (z. B. Toy, USB-Kabel, Aufbewahrungsbeutel)."
+    },
+    "packaging_type": {
+        "id": "meta_packaging_type:custom:single_line_text_field",
+        "category": "Verpackung & Versand",
+        "name": "Verpackungsart",
+        "description": "Kurzbeschreibung der Produktverpackung (z. B. Faltschachtel, Flasche, Dose)."
+    },
+    "discreet_shipping": {
+        "id": "meta_discreet_shipping:custom:single_line_text_field",
+        "category": "Verpackung & Versand",
+        "name": "Diskreter Versand / Verpackung",
+        "description": "Hinweis auf neutrale, diskrete Verpackung und Versand ohne Hinweis auf den Inhalt."
+    },
+    "country_of_origin": {
+        "id": "meta_country_of_origin:custom:single_line_text_field",
+        "category": "Verpackung & Versand",
+        "name": "Herkunftsland",
+        "required": false,
+        "required_for_types": [
+            "Masturbator",
+            "Dildo",
+            "Vibrator",
+            "Gleitgel"
+        ],
+        "description": "Angabe zum Herstellungs- oder Herkunftsland des Produkts (z. B. Deutschland, EU)."
+    },
+    "best_before": {
+        "id": "meta_best_before:custom:single_line_text_field",
+        "category": "Verpackung & Versand",
+        "name": "Mindesthaltbarkeit / Haltbarkeit",
+        "description": "Angabe zur Mindesthaltbarkeit bzw. Haltbarkeit von Fluessigkeiten oder Gleitgelen."
+    },
+    "shelf_life": {
+        "id": "meta_shelf_life:custom:single_line_text_field",
+        "category": "Verpackung & Versand",
+        "name": "Haltbarkeit nach Oeffnung",
+        "description": "Hinweis, wie lange das Produkt nach dem Oeffnen verwendet werden kann (z. B. 6M, 12M)."
+    },
+    "child_safe_closure": {
+        "id": "meta_child_safe_closure:custom:single_line_text_field",
+        "category": "Verpackung & Versand",
+        "name": "Kindersicherer Verschluss",
+        "description": "Hinweis, ob ein kindersicherer Verschluss vorhanden ist (z. B. Dreh-Drueck-Verschluss)."
+    },
+    "hazard_pictograms": {
+        "id": "meta_hazard_pictograms:custom:list.single_line_text_field",
+        "category": "Sicherheit & Warnhinweise",
+        "name": "Gefahrensymbole (Codes)",
+        "description": "Codes der relevanten Gefahrensymbole (z. B. GHS02, GHS07) fuer Kennzeichnungen."
+    },
+    "safety_short": {
+        "id": "meta_safety_short:custom:multi_line_text_field",
+        "category": "Sicherheit & Warnhinweise",
+        "name": "Sicherheitshinweise (Kurztext)",
+        "description": "Kurzform wichtiger Sicherheitshinweise zum Produkt, z. B. Warnungen und Vorsichtsmassnahmen."
+    },
+    "emergency_hint": {
+        "id": "meta_emergency_hint:custom:multi_line_text_field",
+        "category": "Sicherheit & Warnhinweise",
+        "name": "Notfallhinweis / Giftnotruf",
+        "description": "Hinweise fuer den Notfall inkl. Giftnotruf-Informationen oder Kontaktdaten."
+    },
+    "meta_gpsr_hersteller": {
+        "id": "meta_gpsr_hersteller:custom:single_line_text_field",
+        "category": "GPSR",
+        "name": "Hersteller (GPSR)",
+        "required": true,
+        "description": "Vollstaendiger Name des Herstellers oder Inverkehrbringers laut GPSR-Kennzeichnung."
+    },
+    "meta_gpsr_strase": {
+        "id": "meta_gpsr_strase:custom:single_line_text_field",
+        "category": "GPSR",
+        "name": "Strasse (GPSR)",
+        "required": true,
+        "description": "Strasse und Hausnummer der Hersteller- bzw. Inverkehrbringeranschrift laut GPSR."
+    },
+    "meta_gpsr_ort": {
+        "id": "meta_gpsr_ort:custom:single_line_text_field",
+        "category": "GPSR",
+        "name": "Ort (GPSR)",
+        "required": true,
+        "description": "PLZ und Ort der Hersteller- bzw. Inverkehrbringeranschrift laut GPSR."
+    },
+    "meta_gpsr_land": {
+        "id": "meta_gpsr_land:custom:single_line_text_field",
+        "category": "GPSR",
+        "name": "Land (GPSR)",
+        "required": true,
+        "description": "Laenderangabe des Herstellers bzw. Inverkehrbringers (z. B. Deutschland, EU)."
+    },
+    "meta_gpsr_mail": {
+        "id": "meta_gpsr_mail:custom:single_line_text_field",
+        "category": "GPSR",
+        "name": "E-Mail (GPSR)",
+        "required": true,
+        "description": "Kontakt-E-Mail-Adresse fuer die GPSR-Kennzeichnung."
+    },
+    "ean": {
+        "id": "meta_ean:custom:single_line_text_field",
+        "category": "Identifikation & Handel",
+        "name": "EAN / Barcode",
+        "description": "European Article Number (EAN/GTIN) fuer Bestandsverwaltung und Marktplaetze."
+    },
+    "weee_reg_nr": {
+        "id": "meta_weee_reg_nr:custom:single_line_text_field",
+        "category": "Identifikation & Handel",
+        "name": "WEEE-Registrierungsnummer",
+        "description": "Elektronik-spezifische WEEE-Registrierungsnummer des Herstellers oder Inverkehrbringers."
+    },
+    "warranty": {
+        "id": "meta_warranty:custom:single_line_text_field",
+        "category": "Identifikation & Handel",
+        "name": "Garantie",
+        "description": "Garantiezeitraum des Produkts (z. B. 1 Jahr, 2 Jahre, 10 Jahre Herstellergarantie).",
+        "suggested_values": [
+            "1 Jahr",
+            "2 Jahre",
+            "5 Jahre",
+            "10 Jahre"
+        ]
+    },
+    "age_restriction": {
+        "id": "meta_age_restriction:custom:single_line_text_field",
+        "category": "Identifikation & Handel",
+        "name": "Altersfreigabe",
+        "default_value": "Ab 18 Jahren",
+        "description": "Altersbeschraenkung fuer den Verkauf (z. B. Ab 18 Jahren)."
+    },
+    "seo_title": {
+        "id": "seo_title",
+        "category": "SEO",
+        "name": "SEO-Titel",
+        "description": "Optimierter Seitentitel fuer Suchmaschinen, max. 60 Zeichen empfohlen."
+    },
+    "seo_description": {
+        "id": "seo_description",
+        "category": "SEO",
+        "name": "Meta-Beschreibung",
+        "description": "Kurze Beschreibung fuer das Google-Suchergebnis, max. 155 Zeichen empfohlen."
+    },
+    "url_handle": {
+        "id": "url_handle",
+        "category": "SEO",
+        "name": "URL-Handle",
+        "description": "Shopify-URL-Pfad des Produkts (z. B. lovense-lush-3)."
+    },
+    "tags": {
+        "id": "tags",
+        "category": "Shopify",
+        "name": "Schlagwoerter",
+        "description": "Kommaseparierte Tags fuer Kategorisierung und Filterung.",
+        "suggested_values": [
+            "cat-app-toy",
+            "cat-auto-toy",
+            "cat-vibratoren",
+            "cat-anal-plugs",
+            "cat-masturbatoren",
+            "cat-dilatoren",
+            "cat-penispumpen",
+            "cat-zubehoer-masturbatoren",
+            "cat-penisringe",
+            "neu",
+            "him",
+            "her",
+            "brand-lovense",
+            "brand-the-handy",
+            "brand-kiiroo",
+            "brand-fleshlight",
+            "brand-private",
+            "klein",
+            "mittel",
+            "gross"
+        ]
+    },
+    "sales_channel": {
+        "id": "sales_channel",
+        "category": "Shopify",
+        "name": "Vertriebskanal",
+        "description": "Auf welchem Vertriebskanal das Produkt verfuegbar ist (z. B. Online-Shop, Amazon, eBay)."
+    }
+}
+
