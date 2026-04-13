@@ -4,13 +4,6 @@ __pycache__/
 *.pyo
 .pytest_cache/
 
-# Backend data (runtime)
-backend/services/data/
-backend/data/*.bak
-*.db
-*.db-wal
-*.db-shm
-
 # Node / Frontend
 node_modules/
 dist/
