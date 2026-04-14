@@ -8,7 +8,7 @@ export function CsvPreview({ products }: Props) {
   if (products.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-gray-200 bg-gray-50">
         <h3 className="text-sm font-medium text-gray-700">
           Importierte Produkte ({products.length})

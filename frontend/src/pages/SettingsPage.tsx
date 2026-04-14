@@ -78,7 +78,7 @@ export function SettingsPage() {
         description="VK-Preisberechnung konfigurieren."
       />
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="max-w-2xl bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-gray-900">VK-Berechnung</h3>
           <p className="text-xs text-gray-500 mt-0.5">

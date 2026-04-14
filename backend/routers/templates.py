@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from state import state
+from services.database import log_product_history_batch
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
 
@@ -64,14 +65,21 @@ def apply_template(name: str, body: ApplyBody):
         raise HTTPException(400, "Template enthält keine ausgefüllten Attribute.")
 
     updated = 0
+    all_history: list[tuple] = []
     for sku in body.artikelnummern:
         product = state.get_product(sku)
         if product is None:
             continue
         for key, value in filled.items():
             if key in state.attribute_config:
+                old = product.attributes.get(key)
+                if str(old) != str(value):
+                    all_history.append((sku, "template_applied", key, str(old) if old is not None else None, str(value), name))
                 product.attributes[key] = value
         state.save_product_changes(product)
         updated += 1
+
+    if all_history:
+        log_product_history_batch(all_history)
 
     return {"updated": updated, "attributes_applied": len(filled)}

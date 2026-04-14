@@ -22,7 +22,7 @@ export function ConfirmDialog({
   const isDanger = variant === 'danger';
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
         <div className="flex items-start gap-4">
           {isDanger && (

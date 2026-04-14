@@ -217,7 +217,7 @@ export function AttributesPage() {
         </div>
 
         {/* Main content — Attribute list */}
-        <div className="flex-1 min-w-0 rounded-lg border bg-card">
+        <div className="flex-1 min-w-0 rounded-lg border bg-card shadow-sm">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />

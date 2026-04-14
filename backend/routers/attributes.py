@@ -11,6 +11,7 @@ from models.attribute import (
     AttributeUpdate,
     BulkAttributeUpdate,
 )
+from services.database import log_product_history, log_product_history_batch
 
 router = APIRouter(prefix="/api/attributes", tags=["attributes"])
 
@@ -107,14 +108,20 @@ def reorder_attribute_definitions(body: ReorderRequest):
 def bulk_update_attributes(body: BulkAttributeUpdate):
     """Apply the same attributes to multiple products at once."""
     updated = []
+    all_history: list[tuple] = []
     for sku in body.artikelnummern:
         product = state.get_product(sku)
         if product is None:
             continue
         for key, value in body.attributes.items():
+            old = product.attributes.get(key)
+            if str(old) != str(value):
+                all_history.append((sku, "bulk_attribute", key, str(old) if old is not None else None, str(value), None))
             product.attributes[key] = value
         state.save_product_changes(product)
         updated.append(product)
+    if all_history:
+        log_product_history_batch(all_history)
     return {"updated": len(updated)}
 
 
@@ -127,22 +134,26 @@ def apply_smart_defaults(artikelnummer: str):
 
     title_lower = product.artikelname.lower()
     applied = 0
+    history_entries: list[tuple] = []
     for key, attr_def in state.attribute_config.items():
         if key in product.attributes:
             continue  # don't overwrite existing
         for sd in attr_def.smart_defaults:
             if sd.title_contains.lower() in title_lower:
                 product.attributes[key] = sd.value
+                history_entries.append((artikelnummer, "smart_default", key, None, str(sd.value), None))
                 applied += 1
                 break
         else:
             # If no smart default matched, apply default_value if present and not already set
             if attr_def.default_value and key not in product.attributes:
                 product.attributes[key] = attr_def.default_value
+                history_entries.append((artikelnummer, "smart_default", key, None, str(attr_def.default_value), None))
                 applied += 1
 
     if applied:
         state.save_product_changes(product)
+        log_product_history_batch(history_entries)
     return {"applied": applied, "product": product}
 
 
@@ -152,9 +163,23 @@ def update_attributes(artikelnummer: str, body: AttributeUpdate):
     if product is None:
         raise HTTPException(404, "Produkt nicht gefunden")
 
-    product.attributes = dict(body.attributes)
+    old_attrs = dict(product.attributes)
+    new_attrs = dict(body.attributes)
+    history_entries: list[tuple] = []
+    # Detect changed / added attributes
+    for key, value in new_attrs.items():
+        old = old_attrs.get(key)
+        if str(old) != str(value):
+            history_entries.append((artikelnummer, "attribute_update", key, str(old) if old is not None else None, str(value), None))
+    # Detect removed attributes
+    for key in old_attrs:
+        if key not in new_attrs:
+            history_entries.append((artikelnummer, "attribute_removed", key, str(old_attrs[key]), None, None))
 
+    product.attributes = new_attrs
     state.save_product_changes(product)
+    if history_entries:
+        log_product_history_batch(history_entries)
     return product
 
 
@@ -164,8 +189,10 @@ def delete_attribute(artikelnummer: str, attr_key: str):
     if product is None:
         raise HTTPException(404, "Produkt nicht gefunden")
 
+    old_value = product.attributes.get(attr_key)
     if attr_key in product.attributes:
         del product.attributes[attr_key]
+        log_product_history(artikelnummer, "attribute_removed", attr_key, str(old_value) if old_value is not None else None, None)
 
     state.save_product_changes(product)
     return product

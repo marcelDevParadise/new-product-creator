@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity } from 'lucide-react';
+import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck } from 'lucide-react';
 
 interface NavItem {
   to: string;
@@ -19,6 +19,7 @@ const sections: NavSection[] = [
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/activity', label: 'Aktivitäten', icon: Activity },
+      { to: '/quality', label: 'Datenqualität', icon: ShieldCheck },
     ],
   },
   {
@@ -46,30 +47,30 @@ interface Props {
 
 export function Sidebar({ collapsed, onToggle }: Props) {
   return (
-    <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex flex-col transition-all duration-200`}>
-      <div className={`${collapsed ? 'p-3' : 'p-6'} border-b border-gray-200`}>
+    <aside className={`${collapsed ? 'w-16' : 'w-60'} bg-gray-950 flex flex-col transition-all duration-200`}>
+      <div className={`${collapsed ? 'p-3' : 'px-5 py-5'} border-b border-white/10`}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-            <Layers className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center shrink-0">
+            <Layers className="w-4.5 h-4.5 text-white" />
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <h1 className="text-sm font-semibold text-gray-900 truncate">Attribut Generator</h1>
-              <p className="text-xs text-gray-500">Shopify · JTL Ameise</p>
+              <h1 className="text-sm font-semibold text-white truncate">Attribut Generator</h1>
+              <p className="text-[11px] text-gray-500">Shopify · JTL Ameise</p>
             </div>
           )}
         </div>
       </div>
-      <nav className={`flex-1 ${collapsed ? 'p-2' : 'px-4 py-3'} overflow-y-auto`}>
+      <nav className={`flex-1 ${collapsed ? 'p-2' : 'px-3 py-4'} overflow-y-auto`}>
         {sections.map((section, si) => (
-          <div key={section.header} className={si > 0 ? 'mt-5' : ''}>
+          <div key={section.header} className={si > 0 ? 'mt-6' : ''}>
             {!collapsed && (
-              <p className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+              <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
                 {section.header}
               </p>
             )}
             {collapsed && si > 0 && (
-              <div className="mx-2 mb-2 border-t border-gray-200" />
+              <div className="mx-2 mb-3 border-t border-white/10" />
             )}
             <div className="space-y-0.5">
               {section.items.map(({ to, label, icon: Icon, end }) => (
@@ -81,8 +82,8 @@ export function Sidebar({ collapsed, onToggle }: Props) {
                   className={({ isActive }) =>
                     `flex items-center ${collapsed ? 'justify-center' : ''} gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${
                       isActive
-                        ? 'bg-indigo-50 text-indigo-700'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        ? 'bg-indigo-500/15 text-indigo-400'
+                        : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
                     }`
                   }
                 >
@@ -94,10 +95,10 @@ export function Sidebar({ collapsed, onToggle }: Props) {
           </div>
         ))}
       </nav>
-      <div className="p-2 border-t border-gray-200">
+      <div className="p-2 border-t border-white/10">
         <button
           onClick={onToggle}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 rounded-lg hover:bg-white/5 transition-colors"
           title={collapsed ? 'Sidebar einblenden' : 'Sidebar einklappen'}
         >
           {collapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}

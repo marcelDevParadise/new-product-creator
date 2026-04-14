@@ -15,7 +15,7 @@ const selectCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
         <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
       </div>
@@ -44,6 +44,7 @@ type Form = {
   lieferant_name: string; lieferant_artikelnummer: string; lieferant_artikelname: string; lieferant_netto_ek: string;
   bild_1: string; bild_2: string; bild_3: string; bild_4: string; bild_5: string; bild_6: string; bild_7: string; bild_8: string; bild_9: string;
   kategorie_1: string; kategorie_2: string; kategorie_3: string; kategorie_4: string; kategorie_5: string; kategorie_6: string;
+  url_pfad: string; title_tag: string; meta_description: string;
 };
 
 function initForm(p: Product): Form {
@@ -58,6 +59,7 @@ function initForm(p: Product): Form {
     lieferant_name: s(p.lieferant_name), lieferant_artikelnummer: s(p.lieferant_artikelnummer), lieferant_artikelname: s(p.lieferant_artikelname), lieferant_netto_ek: n(p.lieferant_netto_ek),
     bild_1: s(p.bild_1), bild_2: s(p.bild_2), bild_3: s(p.bild_3), bild_4: s(p.bild_4), bild_5: s(p.bild_5), bild_6: s(p.bild_6), bild_7: s(p.bild_7), bild_8: s(p.bild_8), bild_9: s(p.bild_9),
     kategorie_1: s(p.kategorie_1), kategorie_2: s(p.kategorie_2), kategorie_3: s(p.kategorie_3), kategorie_4: s(p.kategorie_4), kategorie_5: s(p.kategorie_5), kategorie_6: s(p.kategorie_6),
+    url_pfad: s(p.url_pfad), title_tag: s(p.title_tag), meta_description: s(p.meta_description),
   };
 }
 
@@ -73,7 +75,7 @@ export function StammdatenEditPage() {
 
   const markDirty = () => setDirty(true);
 
-  const set = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const set = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setF((prev) => prev ? { ...prev, [key]: e.target.value } : prev);
     markDirty();
   };
@@ -141,6 +143,7 @@ export function StammdatenEditPage() {
         bild_6: str(f.bild_6), bild_7: str(f.bild_7), bild_8: str(f.bild_8), bild_9: str(f.bild_9),
         kategorie_1: str(f.kategorie_1), kategorie_2: str(f.kategorie_2), kategorie_3: str(f.kategorie_3),
         kategorie_4: str(f.kategorie_4), kategorie_5: str(f.kategorie_5), kategorie_6: str(f.kategorie_6),
+        url_pfad: str(f.url_pfad), title_tag: str(f.title_tag), meta_description: str(f.meta_description),
         stammdaten_complete: true,
       };
       await api.updateStammdaten(product.artikelnummer, payload);
@@ -202,7 +205,7 @@ export function StammdatenEditPage() {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-auto px-8 pb-8">
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* ───── Allgemein ───── */}
           <Section title="Allgemein">
             <Field label="Artikelname">
@@ -318,17 +321,43 @@ export function StammdatenEditPage() {
                     <div className="flex gap-2 items-start">
                       <input className={`${inputCls} font-mono text-xs flex-1`} value={url} onChange={set(key)} placeholder="https:// oder C:\..." />
                       {isUrl && (
-                        <img
-                          src={url}
-                          alt={`Bild ${i}`}
-                          className="w-10 h-10 rounded border border-gray-200 object-cover shrink-0"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
+                        <div className="group relative shrink-0">
+                          <img
+                            src={url}
+                            alt={`Bild ${i}`}
+                            className="w-10 h-10 rounded border border-gray-200 object-cover cursor-pointer"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                          <div className="hidden w-10 h-10 rounded border border-red-200 bg-red-50 flex items-center justify-center text-red-400 text-xs">✗</div>
+                          <div className="hidden group-hover:block absolute z-50 right-0 top-12 p-1 bg-white rounded-lg shadow-xl border border-gray-200">
+                            <img
+                              src={url}
+                              alt={`Bild ${i} Vorschau`}
+                              className="max-w-[240px] max-h-[240px] rounded object-contain"
+                              onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {url && !isUrl && (
+                        <div className="w-10 h-10 rounded border border-amber-200 bg-amber-50 flex items-center justify-center shrink-0" title="Kein gültiger URL">
+                          <span className="text-amber-500 text-xs">⚠</span>
+                        </div>
                       )}
                     </div>
                   </Field>
                 );
               })}
+            </div>
+            {/* Image summary */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-500">
+                {([1,2,3,4,5,6,7,8,9] as const).filter((i) => (f[`bild_${i}` as keyof Form] as string)?.trim()).length} von 9 Bildern hinterlegt
+              </p>
             </div>
           </Section>
 
@@ -345,10 +374,38 @@ export function StammdatenEditPage() {
               })}
             </div>
           </Section>
+
+          {/* ───── SEO ───── */}
+          <Section title="SEO">
+            <div className="space-y-3">
+              <Field label="URL-Pfad">
+                <input className={`${inputCls} font-mono text-xs`} value={f.url_pfad} onChange={set('url_pfad')} placeholder="z. B. lovense-lush-3" />
+              </Field>
+              <Field label="Title Tag (SEO)">
+                <div className="space-y-1">
+                  <input className={inputCls} value={f.title_tag} onChange={set('title_tag')} placeholder="Max. 60 Zeichen empfohlen" />
+                  <p className={`text-xs ${f.title_tag.length > 60 ? 'text-red-500 font-medium' : 'text-gray-400'}`}>{f.title_tag.length}/60 Zeichen</p>
+                </div>
+              </Field>
+              <Field label="Meta-Description (SEO)">
+                <div className="space-y-1">
+                  <textarea className={`${inputCls} resize-y`} rows={2} value={f.meta_description} onChange={set('meta_description')} placeholder="Max. 155 Zeichen empfohlen" />
+                  <p className={`text-xs ${f.meta_description.length > 155 ? 'text-red-500 font-medium' : 'text-gray-400'}`}>{f.meta_description.length}/155 Zeichen</p>
+                </div>
+              </Field>
+              <div className="pt-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/content/${encodeURIComponent(product.artikelnummer)}`)}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 transition-colors"
+                >
+                  Beschreibungen bearbeiten (HTML-Editor) →
+                </button>
+              </div>
+            </div>
+          </Section>
         </div>
       </div>
-
-      {/* Sticky footer */}
       <div className="shrink-0 flex items-center justify-between px-8 py-4 bg-white border-t border-gray-200">
         <button
           onClick={() => handleSave(false)}

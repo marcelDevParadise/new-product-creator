@@ -1,4 +1,4 @@
-"""Pydantic models for dashboard statistics."""
+"""Pydantic models for dashboard statistics and product history."""
 
 from pydantic import BaseModel
 
@@ -7,6 +7,17 @@ class ActivityLog(BaseModel):
     event_type: str
     detail: str | None = None
     count: int = 0
+    created_at: str
+
+
+class ProductHistoryEntry(BaseModel):
+    id: int
+    artikelnummer: str
+    event_type: str
+    field: str | None = None
+    old_value: str | None = None
+    new_value: str | None = None
+    detail: str | None = None
     created_at: str
 
 

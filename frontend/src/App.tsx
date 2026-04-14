@@ -12,13 +12,15 @@ import { AttributesPage } from './pages/AttributesPage';
 import { ExportPage } from './pages/ExportPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ActivityLogPage } from './pages/ActivityLogPage';
+import { DataQualityPage } from './pages/DataQualityPage';
+import { ContentEditPage } from './pages/ContentEditPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen bg-gray-50/80">
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} />
         <main className="flex-1 overflow-auto">
           <Outlet />
@@ -38,10 +40,12 @@ const router = createBrowserRouter([
       { path: '/products/:sku', element: <ProductDetailPage /> },
       { path: '/stammdaten', element: <StammdatenPage /> },
       { path: '/stammdaten/:sku', element: <StammdatenEditPage /> },
+      { path: '/content/:sku', element: <ContentEditPage /> },
       { path: '/attributes', element: <AttributesPage /> },
       { path: '/export', element: <ExportPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/activity', element: <ActivityLogPage /> },
+      { path: '/quality', element: <DataQualityPage /> },
     ],
   },
 ]);

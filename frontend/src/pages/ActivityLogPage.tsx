@@ -90,7 +90,7 @@ export function ActivityLogPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-white overflow-hidden">
+      <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>

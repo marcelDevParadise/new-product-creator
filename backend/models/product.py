@@ -42,6 +42,12 @@ class Product(BaseModel):
     kategorie_4: str | None = None
     kategorie_5: str | None = None
     kategorie_6: str | None = None
+    # SEO & Content
+    kurzbeschreibung: str | None = None
+    beschreibung: str | None = None
+    url_pfad: str | None = None
+    title_tag: str | None = None
+    meta_description: str | None = None
     #
     attributes: dict[str, str | int | bool] = {}
     exported: bool = False

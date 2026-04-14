@@ -86,7 +86,7 @@ export function ProductList({ products, selectedSkus, onSelectionChange, archive
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 sticky top-0 z-10">

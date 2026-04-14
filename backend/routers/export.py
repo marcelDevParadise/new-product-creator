@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from fastapi.responses import Response
 
 from state import state
-from services.csv_handler import build_ameise_csv, build_stammdaten_csv
+from services.csv_handler import build_ameise_csv, build_stammdaten_csv, build_seo_csv
 from services.database import log_activity
 
 router = APIRouter(prefix="/api/export", tags=["export"])
@@ -128,5 +128,39 @@ def stammdaten_preview():
             "kategorie_4": p.kategorie_4 or "",
             "kategorie_5": p.kategorie_5 or "",
             "kategorie_6": p.kategorie_6 or "",
+        })
+    return {"rows": rows, "total_products": len(products)}
+
+
+# --- SEO & Content Export ---
+
+@router.post("/seo")
+def export_seo():
+    """Download a CSV with SEO & Content fields (one row per product). Does NOT archive."""
+    products = state.get_active_products()
+    csv_content = build_seo_csv(products)
+    log_activity("export_seo", f"{len(products)} Produkte exportiert", len(products))
+    filename = f"seo_export_{date.today().isoformat()}.csv"
+    return Response(
+        content=csv_content.encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/seo/preview")
+def seo_preview():
+    """Return a JSON preview of the SEO & Content export."""
+    products = state.get_active_products()
+    rows = []
+    for p in products:
+        rows.append({
+            "artikelnummer": p.artikelnummer,
+            "artikelname": p.artikelname,
+            "kurzbeschreibung": p.kurzbeschreibung or "",
+            "beschreibung": p.beschreibung or "",
+            "url_pfad": p.url_pfad or "",
+            "title_tag": p.title_tag or "",
+            "meta_description": p.meta_description or "",
         })
     return {"rows": rows, "total_products": len(products)}

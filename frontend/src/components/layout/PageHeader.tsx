@@ -6,12 +6,12 @@ interface Props {
 
 export function PageHeader({ title, description, actions }: Props) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-start justify-between gap-4">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-        {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+        <h2 className="text-xl font-semibold tracking-tight text-gray-900">{title}</h2>
+        {description && <p className="mt-0.5 text-sm text-gray-500">{description}</p>}
       </div>
-      {actions && <div className="flex gap-3">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
     </div>
   );
 }

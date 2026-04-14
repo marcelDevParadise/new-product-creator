@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from state import state
 from models.product import Product
 from services.csv_handler import parse_csv
-from services.database import log_activity
+from services.database import log_activity, log_product_history, log_product_history_batch, get_product_history
 
 
 class DeleteRequest(BaseModel):
@@ -43,6 +43,7 @@ def create_product(body: Product):
         raise HTTPException(409, "Artikelnummer existiert bereits.")
     state.add_product(body)
     log_activity("product_created", body.artikelname, 1)
+    log_product_history(body.artikelnummer, "created", detail=body.artikelname)
     return body
 
 
@@ -68,13 +69,25 @@ async def import_csv(file: UploadFile):
 
     content = await file.read()
     try:
-        products = parse_csv(content)
+        result = parse_csv(content)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+    products = result.products
+    merged = 0
+    created = 0
 
     for p in products:
         existing = state.get_product(p.artikelnummer)
         if existing:
+            # Track field changes for history
+            history_entries = []
+            for field in ("artikelname", "ek", "preis", "gewicht", "hersteller", "ean"):
+                new_val = getattr(p, field)
+                if new_val is not None:
+                    old_val = getattr(existing, field)
+                    if str(old_val) != str(new_val):
+                        history_entries.append((p.artikelnummer, "import_update", field, str(old_val) if old_val is not None else None, str(new_val), None))
             existing.artikelname = p.artikelname
             if p.ek is not None:
                 existing.ek = p.ek
@@ -87,12 +100,24 @@ async def import_csv(file: UploadFile):
             if p.ean is not None:
                 existing.ean = p.ean
             state.save_product_changes(existing)
+            if history_entries:
+                log_product_history_batch(history_entries)
+            merged += 1
         else:
             state.add_product(p)
+            log_product_history(p.artikelnummer, "created", detail=f"Import: {p.artikelname}")
+            created += 1
 
     imported_count = len(products)
     log_activity("import", f"{imported_count} Produkte importiert", imported_count)
-    return {"imported": imported_count, "total": len(state.products)}
+    return {
+        "imported": imported_count,
+        "total": len(state.products),
+        "created": created,
+        "merged": merged,
+        "skipped": result.skipped_rows,
+        "warnings": [w.to_dict() for w in result.warnings],
+    }
 
 
 @router.delete("")
@@ -107,6 +132,7 @@ def delete_products(body: DeleteRequest):
     deleted = 0
     for sku in body.artikelnummern:
         if state.delete_product(sku):
+            log_product_history(sku, "deleted")
             deleted += 1
     if deleted:
         log_activity("product_deleted", f"{deleted} Produkte gelöscht", deleted)
@@ -121,6 +147,7 @@ def archive_products(body: DeleteRequest):
         p = state.get_product(sku)
         if p:
             state.archive_product(sku)
+            log_product_history(sku, "archived")
             archived += 1
     return {"archived": archived}
 
@@ -166,6 +193,12 @@ class StammdatenUpdate(BaseModel):
     kategorie_4: str | None = None
     kategorie_5: str | None = None
     kategorie_6: str | None = None
+    # SEO & Content
+    kurzbeschreibung: str | None = None
+    beschreibung: str | None = None
+    url_pfad: str | None = None
+    title_tag: str | None = None
+    meta_description: str | None = None
 
 
 @router.patch("/{artikelnummer}/stammdaten")
@@ -175,9 +208,19 @@ def update_stammdaten(artikelnummer: str, body: StammdatenUpdate):
     if product is None:
         raise HTTPException(404, "Produkt nicht gefunden")
     data = body.model_dump(exclude_unset=True)
+    history_entries = []
     for field, value in data.items():
+        if field == "stammdaten_complete":
+            continue
+        old_value = getattr(product, field)
+        if str(old_value) != str(value):
+            history_entries.append((artikelnummer, "stammdaten_update", field,
+                                    str(old_value) if old_value is not None else None,
+                                    str(value) if value is not None else None, None))
         setattr(product, field, value)
     state.save_product_changes(product)
+    if history_entries:
+        log_product_history_batch(history_entries)
     return product
 
 
@@ -187,4 +230,58 @@ def unarchive_product(artikelnummer: str):
     if product is None:
         raise HTTPException(404, "Produkt nicht gefunden")
     state.unarchive_product(artikelnummer)
+    log_product_history(artikelnummer, "unarchived")
     return product
+
+
+@router.get("/{artikelnummer}/history")
+def product_history(artikelnummer: str, limit: int = 100):
+    """Return change history for a specific product."""
+    product = state.get_product(artikelnummer)
+    if product is None:
+        raise HTTPException(404, "Produkt nicht gefunden")
+    return get_product_history(artikelnummer, limit)
+
+
+class BulkStammdatenUpdate(BaseModel):
+    artikelnummern: List[str]
+    fields: dict
+
+
+@router.patch("/bulk/stammdaten")
+def bulk_update_stammdaten(body: BulkStammdatenUpdate):
+    """Update Stammdaten fields for multiple products at once."""
+    ALLOWED_FIELDS = {
+        "hersteller", "ean", "ek", "preis", "gewicht",
+        "laenge", "breite", "hoehe",
+        "verkaufseinheit", "inhalt_menge", "inhalt_einheit",
+        "grundpreis_ausweisen", "bezugsmenge", "bezugsmenge_einheit",
+        "lieferant_name", "lieferant_artikelnummer", "lieferant_artikelname", "lieferant_netto_ek",
+        "bild_1", "bild_2", "bild_3", "bild_4", "bild_5", "bild_6", "bild_7", "bild_8", "bild_9",
+        "kategorie_1", "kategorie_2", "kategorie_3", "kategorie_4", "kategorie_5", "kategorie_6",
+        "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description",
+    }
+    # Filter to only allowed fields
+    fields = {k: v for k, v in body.fields.items() if k in ALLOWED_FIELDS}
+    if not fields:
+        raise HTTPException(400, "Keine gültigen Felder angegeben")
+
+    updated = 0
+    for sku in body.artikelnummern:
+        product = state.get_product(sku)
+        if not product:
+            continue
+        history_entries = []
+        for field, value in fields.items():
+            old_value = getattr(product, field)
+            if str(old_value) != str(value):
+                history_entries.append((sku, "bulk_stammdaten", field, str(old_value) if old_value is not None else None, str(value) if value is not None else None, None))
+            setattr(product, field, value)
+        state.save_product_changes(product)
+        if history_entries:
+            log_product_history_batch(history_entries)
+        updated += 1
+
+    if updated:
+        log_activity("bulk_stammdaten", f"{updated} Produkte aktualisiert: {', '.join(fields.keys())}", updated)
+    return {"updated": updated, "fields": list(fields.keys())}

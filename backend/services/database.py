@@ -63,6 +63,22 @@ def init_db() -> None:
             created_at TEXT NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS product_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            artikelnummer TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            field TEXT,
+            old_value TEXT,
+            new_value TEXT,
+            detail TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_product_history_sku
+        ON product_history (artikelnummer, created_at DESC)
+    """)
     # Migrate existing DB: add Stammdaten columns if missing
     _migrate_product_columns(conn)
     conn.commit()
@@ -113,6 +129,12 @@ def _migrate_product_columns(conn: sqlite3.Connection) -> None:
         ("kategorie_4", "TEXT"),
         ("kategorie_5", "TEXT"),
         ("kategorie_6", "TEXT"),
+        # SEO & Content
+        ("kurzbeschreibung", "TEXT"),
+        ("beschreibung", "TEXT"),
+        ("url_pfad", "TEXT"),
+        ("title_tag", "TEXT"),
+        ("meta_description", "TEXT"),
     ]
     for col_name, col_type in migrations:
         if col_name not in existing:
@@ -129,7 +151,8 @@ def load_all_products() -> dict[str, Product]:
         "verkaufseinheit, inhalt_menge, inhalt_einheit, grundpreis_ausweisen, bezugsmenge, bezugsmenge_einheit, "
         "lieferant_name, lieferant_artikelnummer, lieferant_artikelname, lieferant_netto_ek, "
         "bild_1, bild_2, bild_3, bild_4, bild_5, bild_6, bild_7, bild_8, bild_9, "
-        "kategorie_1, kategorie_2, kategorie_3, kategorie_4, kategorie_5, kategorie_6 "
+        "kategorie_1, kategorie_2, kategorie_3, kategorie_4, kategorie_5, kategorie_6, "
+        "kurzbeschreibung, beschreibung, url_pfad, title_tag, meta_description "
         "FROM products"
     ).fetchall()
     conn.close()
@@ -174,6 +197,11 @@ def load_all_products() -> dict[str, Product]:
             kategorie_4=row[35],
             kategorie_5=row[36],
             kategorie_6=row[37],
+            kurzbeschreibung=row[38],
+            beschreibung=row[39],
+            url_pfad=row[40],
+            title_tag=row[41],
+            meta_description=row[42],
         )
     return products
 
@@ -189,6 +217,7 @@ def save_product(product: Product) -> None:
         "lieferant_name", "lieferant_artikelnummer", "lieferant_artikelname", "lieferant_netto_ek",
         "bild_1", "bild_2", "bild_3", "bild_4", "bild_5", "bild_6", "bild_7", "bild_8", "bild_9",
         "kategorie_1", "kategorie_2", "kategorie_3", "kategorie_4", "kategorie_5", "kategorie_6",
+        "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description",
     ]
     placeholders = ", ".join(["?"] * len(cols))
     col_list = ", ".join(cols)
@@ -202,6 +231,7 @@ def save_product(product: Product) -> None:
         product.lieferant_name, product.lieferant_artikelnummer, product.lieferant_artikelname, product.lieferant_netto_ek,
         product.bild_1, product.bild_2, product.bild_3, product.bild_4, product.bild_5, product.bild_6, product.bild_7, product.bild_8, product.bild_9,
         product.kategorie_1, product.kategorie_2, product.kategorie_3, product.kategorie_4, product.kategorie_5, product.kategorie_6,
+        product.kurzbeschreibung, product.beschreibung, product.url_pfad, product.title_tag, product.meta_description,
     )
     conn.execute(
         f"INSERT INTO products ({col_list}) VALUES ({placeholders}) ON CONFLICT(artikelnummer) DO UPDATE SET {updates}",
@@ -358,5 +388,51 @@ def get_recent_activities(limit: int = 10) -> list[dict]:
     conn.close()
     return [
         {"event_type": r[0], "detail": r[1], "count": r[2], "created_at": r[3]}
+        for r in rows
+    ]
+
+
+# --- Product History ---
+
+def log_product_history(artikelnummer: str, event_type: str, field: str | None = None,
+                        old_value: str | None = None, new_value: str | None = None,
+                        detail: str | None = None) -> None:
+    """Append a change entry to the product history."""
+    conn = _get_connection()
+    conn.execute(
+        "INSERT INTO product_history (artikelnummer, event_type, field, old_value, new_value, detail, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+        (artikelnummer, event_type, field, old_value, new_value, detail),
+    )
+    conn.commit()
+    conn.close()
+
+
+def log_product_history_batch(entries: list[tuple]) -> None:
+    """Batch-insert multiple history entries. Each tuple: (sku, event_type, field, old, new, detail)."""
+    if not entries:
+        return
+    conn = _get_connection()
+    conn.executemany(
+        "INSERT INTO product_history (artikelnummer, event_type, field, old_value, new_value, detail, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+        entries,
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_product_history(artikelnummer: str, limit: int = 100) -> list[dict]:
+    """Return history entries for a specific product."""
+    conn = _get_connection()
+    rows = conn.execute(
+        "SELECT id, artikelnummer, event_type, field, old_value, new_value, detail, created_at "
+        "FROM product_history WHERE artikelnummer = ? ORDER BY id DESC LIMIT ?",
+        (artikelnummer, limit),
+    ).fetchall()
+    conn.close()
+    return [
+        {"id": r[0], "artikelnummer": r[1], "event_type": r[2], "field": r[3],
+         "old_value": r[4], "new_value": r[5], "detail": r[6], "created_at": r[7]}
         for r in rows
     ]

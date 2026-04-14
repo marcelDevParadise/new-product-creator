@@ -7,10 +7,32 @@ import io
 from models.product import Product
 
 
-def parse_csv(content: bytes) -> list[Product]:
+class ImportWarning:
+    """A non-fatal issue found during CSV import."""
+    __slots__ = ("row", "field", "message")
+
+    def __init__(self, row: int, field: str, message: str):
+        self.row = row
+        self.field = field
+        self.message = message
+
+    def to_dict(self) -> dict:
+        return {"row": self.row, "field": self.field, "message": self.message}
+
+
+class ParseResult:
+    """Result of CSV parsing with products and warnings."""
+    def __init__(self, products: list[Product], warnings: list[ImportWarning], skipped_rows: int):
+        self.products = products
+        self.warnings = warnings
+        self.skipped_rows = skipped_rows
+
+
+def parse_csv(content: bytes) -> ParseResult:
     """Parse a semicolon-separated CSV with Artikelnummer and Artikelname columns.
 
     Also recognises optional Stammdaten columns: Preis, Gewicht, Hersteller, EAN.
+    Returns a ParseResult with products, warnings, and skipped row count.
     """
     text = content.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(text), delimiter=";")
@@ -26,16 +48,34 @@ def parse_csv(content: bytes) -> list[Product]:
         raise ValueError(f"Fehlende Spalten: {', '.join(missing)}")
 
     products: list[Product] = []
-    for row in reader:
+    warnings: list[ImportWarning] = []
+    skipped = 0
+
+    for row_idx, row in enumerate(reader, start=2):  # row 1 = header
         cleaned = {k.strip(): (v.strip() if v else "") for k, v in row.items()}
         sku = cleaned.get("Artikelnummer", "")
         name = cleaned.get("Artikelname", "")
+
         if not sku:
+            skipped += 1
+            warnings.append(ImportWarning(row_idx, "Artikelnummer", "Zeile übersprungen: Artikelnummer fehlt"))
             continue
 
+        if not name:
+            warnings.append(ImportWarning(row_idx, "Artikelname", f"Artikelname leer für {sku}"))
+
         ek = _parse_float(cleaned.get("EK", ""))
+        if cleaned.get("EK", "").strip() and ek is None:
+            warnings.append(ImportWarning(row_idx, "EK", f"EK ungültig für {sku}: '{cleaned.get('EK', '')}'"))
+
         preis = _parse_float(cleaned.get("Preis", ""))
+        if cleaned.get("Preis", "").strip() and preis is None:
+            warnings.append(ImportWarning(row_idx, "Preis", f"Preis ungültig für {sku}: '{cleaned.get('Preis', '')}'"))
+
         gewicht = _parse_float(cleaned.get("Gewicht", ""))
+        if cleaned.get("Gewicht", "").strip() and gewicht is None:
+            warnings.append(ImportWarning(row_idx, "Gewicht", f"Gewicht ungültig für {sku}: '{cleaned.get('Gewicht', '')}'"))
+
         hersteller = cleaned.get("Hersteller", "") or None
         ean = cleaned.get("EAN", "") or None
 
@@ -49,7 +89,7 @@ def parse_csv(content: bytes) -> list[Product]:
             ean=ean,
         ))
 
-    return products
+    return ParseResult(products=products, warnings=warnings, skipped_rows=skipped)
 
 
 def _parse_float(value: str) -> float | None:
@@ -179,6 +219,35 @@ def build_stammdaten_csv(products: list[Product]) -> str:
             p.kategorie_4 or "",
             p.kategorie_5 or "",
             p.kategorie_6 or "",
+        ])
+
+    return output.getvalue()
+
+
+def build_seo_csv(products: list[Product]) -> str:
+    """Build a CSV with SEO & Content fields (one row per product)."""
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+
+    writer.writerow([
+        "Artikelnummer",
+        "Artikelname",
+        "Kurzbeschreibung",
+        "Beschreibung",
+        "URL-Pfad",
+        "Title Tag (SEO)",
+        "Meta-Description (SEO)",
+    ])
+
+    for p in products:
+        writer.writerow([
+            p.artikelnummer,
+            p.artikelname,
+            p.kurzbeschreibung or "",
+            p.beschreibung or "",
+            p.url_pfad or "",
+            p.title_tag or "",
+            p.meta_description or "",
         ])
 
     return output.getvalue()

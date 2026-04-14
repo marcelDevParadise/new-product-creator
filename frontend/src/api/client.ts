@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, DashboardStats, ActivityLog } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry } from '../types';
 
 const BASE = '/api';
 
@@ -37,7 +37,7 @@ export const api = {
   importCsv: async (file: File) => {
     const form = new FormData();
     form.append('file', file);
-    return request<{ imported: number; total: number }>('/products/import', {
+    return request<ImportResult>('/products/import', {
       method: 'POST',
       body: form,
     });
@@ -69,6 +69,8 @@ export const api = {
     }),
   unarchiveProduct: (sku: string) =>
     request<Product>(`/products/${encodeURIComponent(sku)}/unarchive`, { method: 'POST' }),
+  getProductHistory: (sku: string, limit = 100) =>
+    request<ProductHistoryEntry[]>(`/products/${encodeURIComponent(sku)}/history?limit=${limit}`),
 
   // Attributes
   getAttributeConfig: () => request<AttributeConfig>('/attributes/config'),
@@ -151,6 +153,23 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
+  // SEO & Content Export
+  getSeoPreview: () => request<SeoPreview>('/export/seo/preview'),
+  downloadSeoExport: async () => {
+    const res = await fetch(`${BASE}/export/seo`, { method: 'POST' });
+    if (!res.ok) throw new Error('SEO-Export fehlgeschlagen');
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename=([^\s;]+)/);
+    const filename = filenameMatch ? filenameMatch[1] : 'seo_export.csv';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
   // Templates
   getTemplates: () => request<Record<string, Template>>('/templates'),
   createTemplate: (name: string, attributes: Record<string, string | number | boolean>) =>
@@ -190,5 +209,19 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ek }),
+    }),
+
+  // Validation
+  getValidation: (severity?: string) =>
+    request<ValidationResult>(`/validation${severity ? `?severity=${severity}` : ''}`),
+  getProductValidation: (sku: string) =>
+    request<ProductValidation>(`/validation/${encodeURIComponent(sku)}`),
+
+  // Bulk Stammdaten
+  bulkUpdateStammdaten: (skus: string[], fields: Record<string, string | number | boolean | null>) =>
+    request<{ updated: number; fields: string[] }>('/products/bulk/stammdaten', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artikelnummern: skus, fields }),
     }),
 };

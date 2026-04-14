@@ -145,10 +145,10 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards — Z-Pattern: top row scanned left→right */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Products */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Produkte</CardTitle>
             <Package className="w-4 h-4 text-gray-400" />
@@ -167,7 +167,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Card 2: Stammdaten */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Stammdaten</CardTitle>
             <ClipboardCheck className="w-4 h-4 text-gray-400" />
@@ -182,7 +182,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Card 3: Attribute Coverage */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Attribut-Abdeckung</CardTitle>
             <Tags className="w-4 h-4 text-gray-400" />
@@ -197,7 +197,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Card 4: Export Readiness */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Export-Bereit</CardTitle>
             <Rocket className="w-4 h-4 text-gray-400" />
@@ -212,10 +212,10 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Bottom row: two content tables — eye scans left→right again (Z-pattern lower) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Bottom row */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* Left: Incomplete Products */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Unvollständige Produkte</CardTitle>
           </CardHeader>
@@ -306,8 +306,11 @@ export function DashboardPage() {
         </Card>
 
         {/* Right: Activity Log */}
-        <Card>
-          <CardHeader>
+        <Card className="shadow-sm">
+          <CardHeader
+            className="cursor-pointer hover:bg-gray-50 rounded-t-lg transition-colors"
+            onClick={() => navigate('/activity')}
+          >
             <CardTitle className="text-base">Letzte Aktivitäten</CardTitle>
           </CardHeader>
           <CardContent>

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Download, Eye, Package, FileText, Archive } from 'lucide-react';
+import { Download, Eye, Package, FileText, Archive, Globe } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useToast } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { api } from '../api/client';
-import type { ExportPreview, StammdatenPreview, ExportValidation } from '../types';
+import type { ExportPreview, StammdatenPreview, SeoPreview, ExportValidation } from '../types';
 
 export function ExportPage() {
   const [ameisePreview, setAmeisePreview] = useState<ExportPreview | null>(null);
@@ -15,6 +15,9 @@ export function ExportPage() {
   const [stammdatenPreview, setStammdatenPreview] = useState<StammdatenPreview | null>(null);
   const [stammdatenLoading, setStammdatenLoading] = useState(false);
   const [stammdatenExporting, setStammdatenExporting] = useState(false);
+  const [seoPreview, setSeoPreview] = useState<SeoPreview | null>(null);
+  const [seoLoading, setSeoLoading] = useState(false);
+  const [seoExporting, setSeoExporting] = useState(false);
   const { toast } = useToast();
 
   const loadAmeisePreview = async () => {
@@ -80,6 +83,30 @@ export function ExportPage() {
     }
   };
 
+  const loadSeoPreview = async () => {
+    setSeoLoading(true);
+    try {
+      const data = await api.getSeoPreview();
+      setSeoPreview(data);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Vorschau konnte nicht geladen werden', 'error');
+    } finally {
+      setSeoLoading(false);
+    }
+  };
+
+  const handleSeoExport = async () => {
+    setSeoExporting(true);
+    try {
+      await api.downloadSeoExport();
+      toast('SEO-Export erfolgreich', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');
+    } finally {
+      setSeoExporting(false);
+    }
+  };
+
   return (
     <div className="p-8 space-y-6">
       <PageHeader
@@ -88,7 +115,7 @@ export function ExportPage() {
       />
 
       {/* --- Stammdaten Export --- */}
-      <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -188,7 +215,7 @@ export function ExportPage() {
       </section>
 
       {/* --- Ameise Attribut-Export --- */}
-      <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center">
@@ -280,6 +307,85 @@ export function ExportPage() {
           onCancel={() => setShowExportConfirm(false)}
         />
       )}
+
+      {/* --- SEO & Content Export --- */}
+      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center">
+              <Globe className="w-5 h-5 text-violet-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">SEO & Content Export</h3>
+              <p className="text-xs text-gray-500">Kurzbeschreibung, Beschreibung, URL-Pfad, Title Tag, Meta-Description</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={loadSeoPreview}
+              disabled={seoLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              {seoLoading ? 'Lade...' : 'Vorschau'}
+            </button>
+            <button
+              onClick={handleSeoExport}
+              disabled={seoExporting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {seoExporting ? 'Exportiere...' : 'CSV exportieren'}
+            </button>
+          </div>
+        </div>
+
+        {seoPreview && (
+          <div>
+            <div className="px-6 py-3 bg-gray-50 border-b border-gray-100">
+              <span className="text-xs text-gray-500">
+                {seoPreview.total_products} Produkte
+              </span>
+            </div>
+            {seoPreview.rows.length > 0 ? (
+              <div className="overflow-x-auto max-h-[20rem]">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">Artikelnr.</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">Artikelname</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">Kurzbeschreibung</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">URL-Pfad</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">Title Tag</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 whitespace-nowrap">Meta-Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {seoPreview.rows.slice(0, 50).map((row, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 font-mono text-gray-700 whitespace-nowrap">{row.artikelnummer}</td>
+                        <td className="px-4 py-2 text-gray-600 max-w-[180px] truncate">{row.artikelname}</td>
+                        <td className="px-4 py-2 text-gray-600 max-w-[200px] truncate">{row.kurzbeschreibung || '—'}</td>
+                        <td className="px-4 py-2 font-mono text-gray-500 max-w-[150px] truncate">{row.url_pfad || '—'}</td>
+                        <td className="px-4 py-2 text-gray-700 max-w-[180px] truncate">
+                          <span className={row.title_tag.length > 60 ? 'text-red-600' : ''}>{row.title_tag || '—'}</span>
+                        </td>
+                        <td className="px-4 py-2 text-gray-600 max-w-[220px] truncate">
+                          <span className={row.meta_description.length > 155 ? 'text-red-600' : ''}>{row.meta_description || '—'}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-sm">Keine aktiven Produkte vorhanden.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

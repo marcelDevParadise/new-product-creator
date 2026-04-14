@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
-import { Upload, FileText, AlertCircle } from 'lucide-react';
+import { Upload, FileText, AlertCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../../api/client';
 import { useToast } from '../ui/Toast';
+import type { ImportResult } from '../../types';
 
 interface Props {
   onImported: () => void;
@@ -11,7 +12,8 @@ export function CsvUpload({ onImported }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ imported: number; total: number } | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [showWarnings, setShowWarnings] = useState(false);
   const { toast } = useToast();
 
   const handleFile = useCallback(
@@ -99,9 +101,44 @@ export function CsvUpload({ onImported }: Props) {
       )}
 
       {result && (
-        <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-          <FileText className="w-4 h-4 flex-shrink-0" />
-          {result.imported} Produkte importiert · {result.total} Produkte gesamt
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+            <FileText className="w-4 h-4 flex-shrink-0" />
+            <div className="flex-1">
+              <span className="font-medium">{result.imported} Produkte importiert</span>
+              <span className="text-green-600 ml-1">· {result.total} Produkte gesamt</span>
+              <div className="flex gap-3 mt-0.5 text-xs text-green-600">
+                <span>{result.created} neu</span>
+                <span>{result.merged} aktualisiert</span>
+                {result.skipped > 0 && <span className="text-amber-600">{result.skipped} übersprungen</span>}
+              </div>
+            </div>
+          </div>
+          {result.warnings.length > 0 && (
+            <div className="border border-amber-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setShowWarnings(!showWarnings)}
+                className="w-full flex items-center gap-2 p-3 bg-amber-50 text-sm text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1 text-left font-medium">{result.warnings.length} Hinweis{result.warnings.length !== 1 ? 'e' : ''} beim Import</span>
+                {showWarnings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showWarnings && (
+                <div className="divide-y divide-amber-100 max-h-48 overflow-auto">
+                  {result.warnings.map((w, i) => (
+                    <div key={i} className="px-3 py-2 text-xs text-amber-800 bg-amber-50/50">
+                      <span className="font-mono text-amber-600">Zeile {w.row}</span>
+                      <span className="mx-1.5">·</span>
+                      <span className="font-medium">{w.field}</span>
+                      <span className="mx-1.5">—</span>
+                      {w.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
