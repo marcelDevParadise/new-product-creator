@@ -1054,3 +1054,292 @@ Das Projekt ist bereits auf einem guten Fundament aufgebaut. Der größte Hebel 
 - **Skalierbarkeit**
 
 Wenn die nächsten Schritte klug priorisiert werden, kann aus dem aktuellen Tool sehr gut ein zentrales Produktdaten- und Attributmanagement-System für E-Commerce entstehen.
+
+---
+
+## 15. KI-Integration
+
+## 15.1 LLM-Produkttext-Werkstatt
+
+### Ziel
+OpenAI/Claude-API-Anbindung mit konfigurierbaren Prompt-Templates zum automatisierten Generieren von Produkttexten.
+
+### Features
+- Komplette Produktbeschreibungen aus Stammdaten + Attributen generieren
+- SEO-optimierte Title Tags & Meta Descriptions
+- Kurzbeschreibungen in einstellbarem Stil (sachlich, emotional, Premium)
+- Batch-Generierung für mehrere Produkte gleichzeitig
+- Tone-of-Voice-Profile (konfigurierbar)
+- Accept/Reject-Workflow pro generiertem Text
+- Token-Budget und Kostenanzeige
+
+### Technischer Vorschlag
+- Neuer Router `backend/routers/ai.py` mit Endpunkten: `/api/ai/generate-description`, `/api/ai/generate-seo`, `/api/ai/batch-generate`
+- Settings-Erweiterung: API-Key (verschlüsselt), Modell-Wahl, Max-Tokens, Temperatur
+- Prompt-Templates als DB-Tabelle (editierbar im UI)
+- Frontend: „KI-Assistent"-Panel im ContentEditPage + Batch-Modal auf StammdatenPage
+
+### Aufwand
+5–7 Tage
+
+---
+
+## 15.2 KI-Bildanalyse für automatische Attributerkennung
+
+### Ziel
+Vision-AI (GPT-4V / Claude Vision) analysiert Produktbilder und schlägt automatisch Attributwerte vor.
+
+### Mögliche Erkennungen
+- Farbe
+- Material
+- Produkttyp
+- Verpackungsinhalt aus Packshot
+- Größenkategorie aus Bildproportionen
+
+### Workflow
+Bild-URL → API-Aufruf → Vorschläge als „KI-Empfehlung" mit Accept/Reject → Attribut übernehmen
+
+### Technischer Vorschlag
+- Neuer Endpunkt `POST /api/ai/analyze-image`
+- Bildanalyse-Queue mit Rate-Limiting
+- Frontend: „Bild analysieren"-Button bei jedem Produktbild im StammdatenEditPage
+- Ergebnis als Orange-Badge „KI-Vorschlag" neben Attributfeldern
+
+### Voraussetzung
+Setzt LLM-Infrastruktur aus 15.1 voraus (API-Key-Verwaltung)
+
+### Aufwand
+7–10 Tage
+
+---
+
+## 15.3 Predictive Auto-Complete
+
+### Ziel
+Während der User Attributwerte tippt, Vorschläge basierend auf Pattern-Matching über existierende Produktdaten anzeigen — ohne externe API.
+
+### Beispiel
+Bei Eingabe „Sili..." → Vorschlag „Silikon" (weil 85 % der Produkte diesen Wert haben)
+
+### Technischer Vorschlag
+- Backend: `GET /api/attributes/suggestions?field=material&prefix=sili` — Aggregation über bestehende Werte
+- Frontend: Autocomplete-Dropdown in AttributeEditor.tsx
+- Kein LLM nötig — rein statistische Vorschläge aus eigenen Daten
+
+### Aufwand
+2–3 Tage
+
+---
+
+## 15.4 KI-gestützte Datenbereinigung
+
+### Ziel
+Batch-Job der automatisch inkonsistente Daten findet und Korrekturen vorschlägt.
+
+### Erkennungen
+- Inkonsistente Schreibweisen („silikon" vs. „Silikon" vs. „SILIKON")
+- Unnötige Leerzeichen und Sonderzeichen
+- Produktnamen normalisieren (Reihenfolge: Marke + Produkttyp + Variante)
+- Herstellernamen-Vereinheitlichung
+
+### Workflow
+`POST /api/ai/cleanup` mit Dry-Run → Vorschau-Report mit Diff pro Feld → Accept/Reject pro Änderung
+
+### Technischer Vorschlag
+- Regelbasiert für einfache Fälle (Trim, Case-Normalisierung)
+- LLM für komplexe Fälle (Namens-Normalisierung, Kontext-Erkennung)
+- Frontend: Cleanup-Report-Seite mit Diff-Ansicht, Accept/Reject pro Zeile
+
+### Aufwand
+3–5 Tage
+
+---
+
+## 16. Workflow und Zeitersparnis
+
+## 16.1 Produkt-Klonen mit Differenz-Editor
+
+### Ziel
+Produkt duplizieren und nur die Unterschiede bearbeiten — massiv zeitsparend bei ähnlichen Produkten (z. B. gleicher Artikel in 3 Farben).
+
+### Workflow
+Produkt auswählen → „Klonen" → neue SKU wird automatisch generiert → Editor öffnet sich mit allen Daten vorausgefüllt → User ändert nur was abweicht
+
+### Technischer Vorschlag
+- Backend: `POST /api/products/{sku}/clone` — kopiert alle Felder, generiert neue SKU via next-sku
+- Frontend: Clone-Button in ProductDetailPage + StammdatenEditPage
+- History-Eintrag: „Geklont von CYL-00123"
+
+### Aufwand
+1–2 Tage
+
+---
+
+## 16.2 Clipboard Smart-Import
+
+### Ziel
+Produktdaten aus beliebiger Quelle (Website, E-Mail, PDF-Text, Lieferanten-Excel) per Copy-Paste einfügen — KI parst und mappt Felder automatisch.
+
+### Workflow
+Ctrl+V in ein Textfeld → Backend erkennt Struktur → Vorschau der gemappten Felder → User bestätigt → Produkt angelegt/aktualisiert
+
+### Technischer Vorschlag
+- Neuer Endpunkt `POST /api/ai/parse-clipboard` — sendet Freitext an LLM mit Schema
+- Frontend: „Smart Einfügen"-Dialog auf ImportPage (Textarea + Vorschau-Tabelle)
+- Fallback: Strukturerkennung per Regex für Tab-separierte / Key:Value-Texte
+
+### Voraussetzung
+Setzt LLM-Infrastruktur aus 15.1 voraus
+
+### Aufwand
+3–5 Tage
+
+---
+
+## 16.3 Schnellerfassungs-Modus / Turbo-Mode
+
+### Ziel
+Streamlined Eingabe-Flow ohne Seitenwechsel: Produkt für Produkt abarbeiten mit Tab-Navigation, Auto-Save und automatischem Weiter zum nächsten unvollständigen Produkt.
+
+### Workflow
+„Turbo-Modus starten" → Filter wählen (z. B. „ohne Beschreibung") → Erstes Produkt wird angezeigt → Felder ausfüllen → Enter/Tab → nächstes Produkt
+
+### Technischer Vorschlag
+- Neue Page `TurboModePage.tsx` mit Route `/turbo`
+- Konfigurierbare Feldauswahl (welche Felder im Turbo-Modus angezeigt werden)
+- Backend: `GET /api/products/queue?filter=incomplete_seo&offset=0` — liefert nächstes Produkt
+- Fortschrittsbalken: „12/47 Produkte bearbeitet"
+
+### Aufwand
+3–4 Tage
+
+---
+
+## 16.4 Lieferanten-Preislisten-Import mit Diff
+
+### Ziel
+Lieferanten-Preisliste (CSV) importieren, Diff zu bestehenden EK-Preisen anzeigen und Bulk-Update mit Bestätigung durchführen.
+
+### Workflow
+CSV hochladen → Matching über Lieferanten-Artikelnummer oder EAN → Diff-Ansicht (alt vs. neu) → Auswahl welche Preise übernommen werden → Update
+
+### Technischer Vorschlag
+- Neuer Endpunkt `POST /api/products/price-import` mit Preview-Modus
+- Frontend: Neue Sektion auf ImportPage oder eigene Route `/price-import`
+- Diff-Tabelle mit farblicher Hervorhebung (grün = günstiger, rot = teurer)
+- VK automatisch neu berechnen basierend auf Settings (EK × Faktor)
+
+### Aufwand
+3–5 Tage
+
+---
+
+## 17. Erweiterte Datenqualität
+
+## 17.1 Live-Bild-Validierung mit URL-Check
+
+### Ziel
+Tatsächlich prüfen ob Bild-URLs erreichbar sind und den Anforderungen entsprechen.
+
+### Prüfungen
+- HTTP HEAD Request → Status 200? Richtiger Content-Type?
+- Bildgröße (Breite/Höhe) prüfen gegen Mindestanforderungen
+- Duplicate-Check: gleiches Bild bei mehreren Produkten?
+
+### Technischer Vorschlag
+- Backend: `POST /api/validation/check-images` — async HEAD-Requests mit `httpx`
+- Ergebnisse in Validation-Service integrieren (neue Severity: „image_broken", „image_too_small")
+- Frontend: Bild-Status-Badge auf StammdatenEditPage (✓ / ⚠ / ✗ neben jedem Bild)
+
+### Aufwand
+1–2 Tage
+
+---
+
+## 17.2 Datenqualitäts-Score mit Fortschritts-Tracking
+
+### Ziel
+Jedes Produkt bekommt einen 0–100 % Score basierend auf gewichteten Kriterien. Globaler Fortschritt über Zeit trackbar.
+
+### Scoring-Modell
+- Stammdaten vollständig: 30 Punkte
+- Pflichtattribute gesetzt: 25 Punkte
+- Bilder ≥ 3 + URLs valide: 15 Punkte
+- SEO-Felder ausgefüllt: 15 Punkte
+- Keine Validierungsfehler: 15 Punkte
+
+### Technischer Vorschlag
+- Backend: Scoring-Logik in `services/validation.py`, Score wird bei jeder Änderung neu berechnet
+- Neues DB-Feld `quality_score` in products, historisch in `activity_log` tracken
+- Frontend: Score-Badge auf ProductList + StammdatenPage, Trend-Chart auf DashboardPage
+- Sortierung nach Score ermöglichen
+
+### Aufwand
+2–3 Tage
+
+---
+
+## 17.3 GPSR & EU-Compliance-Assistent
+
+### Ziel
+Automatische Prüfung gegen EU-Produktsicherheitsverordnung (GPSR) basierend auf Produkttyp.
+
+### Prüfungen
+- Herstellerangaben vollständig? (Name, Adresse, Kontakt)
+- CE-Kennzeichnung vorhanden wo nötig?
+- Warnhinweise für bestimmte Produkttypen?
+- WEEE-Registrierung bei Elektronik?
+- Materialdeklaration bei Hautkontakt-Produkten?
+
+### Technischer Vorschlag
+- Compliance-Regeln als JSON-Config (`backend/data/compliance_rules.json`)
+- Neuer Validation-Typ „compliance" in `services/validation.py`
+- Produkt-Typ → benötigte Compliance-Felder Mapping
+- Frontend: Compliance-Tab auf DataQualityPage mit Checkliste pro Produkt
+
+### Aufwand
+3–5 Tage
+
+---
+
+## 17.4 Regex-basierte benutzerdefinierte Feldvalidierung
+
+### Ziel
+Admins können eigene Validierungsregeln pro Feld definieren.
+
+### Beispielregeln
+- EAN: `^\d{13}$`
+- Bild-URL: `^https://.*\.(jpg|png|webp)$`
+- Artikelnummer: `^CYL-\d{5}$`
+- Freitext-Felder: Min/Max-Länge
+
+### Technischer Vorschlag
+- Neue DB-Tabelle `field_validation_rules` (field, pattern, message, severity)
+- CRUD-Endpunkte in validation-Router
+- Integration in bestehenden Validation-Service
+- Frontend: Regel-Editor auf SettingsPage (Tabelle mit Feld, Regex, Fehlermeldung)
+
+### Aufwand
+2 Tage
+
+---
+
+## 18. Erweiterte Roadmap (Neue Features 2026-04)
+
+### Sofort umsetzen (Quick Wins)
+- 16.1 Produkt-Klonen (1–2 Tage)
+- 15.3 Predictive Auto-Complete (2–3 Tage)
+- 17.1 Live-Bild-Validierung (1–2 Tage)
+- 17.4 Regex-Feldvalidierung (2 Tage)
+
+### Phase 2 — Mittlere Features
+- 17.2 Datenqualitäts-Score (2–3 Tage)
+- 15.1 LLM-Produkttext-Werkstatt (5–7 Tage)
+- 16.3 Turbo-Mode (3–4 Tage)
+- 15.4 KI-Datenbereinigung (3–5 Tage)
+
+### Phase 3 — Größere Erweiterungen
+- 16.4 Lieferanten-Preisimport (3–5 Tage)
+- 16.2 Clipboard Smart-Import (3–5 Tage)
+- 17.3 GPSR-Compliance (3–5 Tage)
+- 15.2 KI-Bildanalyse (7–10 Tage)

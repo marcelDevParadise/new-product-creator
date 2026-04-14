@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import products, attributes, export, templates, settings, stats, validation
+from routers import products, attributes, export, templates, settings, stats, validation, categories
 
 app = FastAPI(title="Attribut Generator", version="1.0.0")
 
@@ -21,6 +21,7 @@ app.include_router(templates.router)
 app.include_router(settings.router)
 app.include_router(stats.router)
 app.include_router(validation.router)
+app.include_router(categories.router)
 
 
 @app.get("/api/health")

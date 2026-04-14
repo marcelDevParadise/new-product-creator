@@ -105,10 +105,12 @@ def _parse_float(value: str) -> float | None:
 def build_ameise_csv(
     products: list[Product],
     attribute_config: dict,
+    delimiter: str = ";",
+    attributgruppe: str = "Shopify-Attribute",
 ) -> str:
     """Build a JTL Ameise compatible CSV string from products with assigned attributes."""
     output = io.StringIO()
-    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    writer = csv.writer(output, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
 
     writer.writerow([
         "Artikelnummer",
@@ -127,7 +129,7 @@ def build_ameise_csv(
             writer.writerow([
                 product.artikelnummer,
                 product.artikelname,
-                "Shopify-Attribute",
+                attributgruppe,
                 config.id,
                 config.name,
                 str(attr_value),
@@ -136,10 +138,10 @@ def build_ameise_csv(
     return output.getvalue()
 
 
-def build_stammdaten_csv(products: list[Product]) -> str:
+def build_stammdaten_csv(products: list[Product], delimiter: str = ";", decimal_sep: str = ",") -> str:
     """Build a flat CSV with one row per product containing Stammdaten fields."""
     output = io.StringIO()
-    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    writer = csv.writer(output, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
 
     writer.writerow([
         "Artikelnummer",
@@ -180,7 +182,12 @@ def build_stammdaten_csv(products: list[Product]) -> str:
     ])
 
     def _fmt(v: float | None, decimals: int = 2) -> str:
-        return f"{v:.{decimals}f}".replace(".", ",") if v is not None else ""
+        if v is None:
+            return ""
+        formatted = f"{v:.{decimals}f}"
+        if decimal_sep != ".":
+            formatted = formatted.replace(".", decimal_sep)
+        return formatted
 
     for p in products:
         writer.writerow([
@@ -224,10 +231,10 @@ def build_stammdaten_csv(products: list[Product]) -> str:
     return output.getvalue()
 
 
-def build_seo_csv(products: list[Product]) -> str:
+def build_seo_csv(products: list[Product], delimiter: str = ";") -> str:
     """Build a CSV with SEO & Content fields (one row per product)."""
     output = io.StringIO()
-    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    writer = csv.writer(output, delimiter=delimiter, quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
 
     writer.writerow([
         "Artikelnummer",

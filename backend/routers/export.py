@@ -8,8 +8,15 @@ from fastapi.responses import Response
 from state import state
 from services.csv_handler import build_ameise_csv, build_stammdaten_csv, build_seo_csv
 from services.database import log_activity
+from routers.settings import get_export_settings
 
 router = APIRouter(prefix="/api/export", tags=["export"])
+
+
+def _make_filename(typ: str) -> str:
+    """Build export filename from settings pattern."""
+    es = get_export_settings()
+    return es.dateiname_muster.format(typ=typ, datum=date.today().isoformat()) + ".csv"
 
 
 @router.get("/validate")
@@ -32,7 +39,12 @@ def validate_export():
 @router.post("/ameise")
 def export_ameise():
     products = [p for p in state.get_active_products() if p.attributes]
-    csv_content = build_ameise_csv(products, state.attribute_config)
+    es = get_export_settings()
+    csv_content = build_ameise_csv(
+        products, state.attribute_config,
+        delimiter=es.csv_trennzeichen,
+        attributgruppe=es.attributgruppe,
+    )
 
     # Archive exported products
     for p in products:
@@ -40,7 +52,7 @@ def export_ameise():
 
     log_activity("export_ameise", f"{len(products)} Produkte exportiert", len(products))
 
-    filename = f"ameise_export_{date.today().isoformat()}.csv"
+    filename = _make_filename("ameise")
 
     return Response(
         content=csv_content.encode("utf-8-sig"),
@@ -62,7 +74,7 @@ def export_preview():
             rows.append({
                 "artikelnummer": product.artikelnummer,
                 "artikelname": product.artikelname,
-                "attributgruppe": "Shopify-Attribute",
+            "attributgruppe": get_export_settings().attributgruppe,
                 "funktionsattribut": config.id,
                 "attributname": config.name,
                 "attributwert": str(attr_value),
@@ -76,9 +88,10 @@ def export_preview():
 def export_stammdaten():
     """Download a flat CSV with Stammdaten (one row per product). Does NOT archive."""
     products = state.get_active_products()
-    csv_content = build_stammdaten_csv(products)
+    es = get_export_settings()
+    csv_content = build_stammdaten_csv(products, delimiter=es.csv_trennzeichen, decimal_sep=es.dezimalformat)
     log_activity("export_stammdaten", f"{len(products)} Produkte exportiert", len(products))
-    filename = f"stammdaten_export_{date.today().isoformat()}.csv"
+    filename = _make_filename("stammdaten")
     return Response(
         content=csv_content.encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",
@@ -138,9 +151,10 @@ def stammdaten_preview():
 def export_seo():
     """Download a CSV with SEO & Content fields (one row per product). Does NOT archive."""
     products = state.get_active_products()
-    csv_content = build_seo_csv(products)
+    es = get_export_settings()
+    csv_content = build_seo_csv(products, delimiter=es.csv_trennzeichen)
     log_activity("export_seo", f"{len(products)} Produkte exportiert", len(products))
-    filename = f"seo_export_{date.today().isoformat()}.csv"
+    filename = _make_filename("seo")
     return Response(
         content=csv_content.encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",

@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry, CategoryTree } from '../types';
 
 const BASE = '/api';
 
@@ -211,6 +211,36 @@ export const api = {
       body: JSON.stringify({ ek }),
     }),
 
+  // All Settings (combined)
+  getAllSettings: () => request<AllSettings>('/settings'),
+
+  // Export Settings
+  getExportSettings: () => request<ExportSettings>('/settings/export'),
+  updateExportSettings: (data: ExportSettings) =>
+    request<ExportSettings>('/settings/export', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  // Einheiten
+  getEinheiten: () => request<string[]>('/settings/einheiten'),
+  updateEinheiten: (units: string[]) =>
+    request<string[]>('/settings/einheiten', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(units),
+    }),
+
+  // Standard-Werte
+  getDefaultValues: () => request<DefaultValues>('/settings/defaults'),
+  updateDefaultValues: (data: DefaultValues) =>
+    request<DefaultValues>('/settings/defaults', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
   // Validation
   getValidation: (severity?: string) =>
     request<ValidationResult>(`/validation${severity ? `?severity=${severity}` : ''}`),
@@ -223,5 +253,34 @@ export const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artikelnummern: skus, fields }),
+    }),
+
+  // Categories
+  getCategoryTree: () => request<CategoryTree>('/categories/tree'),
+  getCategoryChildren: (parent: string) =>
+    request<string[]>(`/categories/children?parent=${encodeURIComponent(parent)}`),
+  saveCategoryTree: (tree: CategoryTree) =>
+    request<CategoryTree>('/categories/tree', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tree),
+    }),
+  addCategoryNode: (path: string[], name: string) =>
+    request<CategoryTree>('/categories/node', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, name }),
+    }),
+  renameCategoryNode: (path: string[], newName: string) =>
+    request<CategoryTree>('/categories/node', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, new_name: newName }),
+    }),
+  deleteCategoryNode: (path: string[], name: string) =>
+    request<CategoryTree>('/categories/node', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, name }),
     }),
 };

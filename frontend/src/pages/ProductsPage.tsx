@@ -252,6 +252,7 @@ export function ProductsPage() {
         <TemplateModal
           selectedSkus={Array.from(selectedSkus)}
           attributeConfig={attributeConfig}
+          totalActiveProducts={products.length}
           onClose={() => setShowTemplateModal(false)}
           onApplied={() => { setSelectedSkus(new Set()); reload(); }}
         />

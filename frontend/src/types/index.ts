@@ -185,6 +185,25 @@ export interface PricingSettings {
   rundung: number;
 }
 
+export interface ExportSettings {
+  attributgruppe: string;
+  csv_trennzeichen: string;
+  dezimalformat: string;
+  dateiname_muster: string;
+}
+
+export interface DefaultValues {
+  hersteller: string;
+  lieferant_name: string;
+}
+
+export interface AllSettings {
+  pricing: PricingSettings;
+  export: ExportSettings;
+  einheiten: string[];
+  standard_werte: DefaultValues;
+}
+
 // Dashboard
 
 export interface ActivityLog {
@@ -279,4 +298,10 @@ export interface ProductHistoryEntry {
   new_value: string | null;
   detail: string | null;
   created_at: string;
+}
+
+// Categories
+
+export interface CategoryTree {
+  [name: string]: CategoryTree;
 }

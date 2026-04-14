@@ -22,11 +22,13 @@ class AppState:
         self.products: dict[str, Product] = {}
         self.attribute_config: dict[str, AttributeDefinition] = {}
         self.templates: dict[str, dict[str, str | int | bool]] = {}
+        self._category_tree: dict = {}
         init_db()
         self._load_attribute_config()
         self.products = load_all_products()
         self.templates = load_all_templates()
         self._seed_default_templates()
+        self._load_category_tree()
 
     def _load_attribute_config(self) -> None:
         """Load attributes from DB, seeding from JSON on first run."""
@@ -165,6 +167,31 @@ class AppState:
             db_delete_template(name)
             return True
         return False
+
+    # --- Category tree ---
+
+    def _load_category_tree(self) -> None:
+        path = DATA_DIR / "category_tree.json"
+        if path.exists():
+            self._category_tree = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            self._category_tree = {}
+
+    def get_category_tree(self) -> dict:
+        return self._category_tree
+
+    def save_category_tree(self, tree: dict) -> None:
+        self._category_tree = tree
+        path = DATA_DIR / "category_tree.json"
+        path.write_text(json.dumps(tree, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def get_category_children(self, path: list[str]) -> list[str] | None:
+        node = self._category_tree
+        for segment in path:
+            if segment not in node:
+                return None
+            node = node[segment]
+        return sorted(node.keys())
 
 
 state = AppState()

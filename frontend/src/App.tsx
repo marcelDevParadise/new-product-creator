@@ -14,6 +14,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ActivityLogPage } from './pages/ActivityLogPage';
 import { DataQualityPage } from './pages/DataQualityPage';
 import { ContentEditPage } from './pages/ContentEditPage';
+import { CategoriesPage } from './pages/CategoriesPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -42,6 +43,7 @@ const router = createBrowserRouter([
       { path: '/stammdaten/:sku', element: <StammdatenEditPage /> },
       { path: '/content/:sku', element: <ContentEditPage /> },
       { path: '/attributes', element: <AttributesPage /> },
+      { path: '/categories', element: <CategoriesPage /> },
       { path: '/export', element: <ExportPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/activity', element: <ActivityLogPage /> },

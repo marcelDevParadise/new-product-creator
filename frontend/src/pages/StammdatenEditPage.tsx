@@ -4,11 +4,12 @@ import { Save, ArrowRight, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { CategoryCascader } from '../components/ui/CategoryCascader';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
-import type { Product } from '../types';
+import type { Product, CategoryTree } from '../types';
 
-const EINHEITEN = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
+const EINHEITEN_FALLBACK = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
 
 const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
 const selectCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
@@ -72,6 +73,8 @@ export function StammdatenEditPage() {
   const [saving, setSaving] = useState(false);
   const [f, setF] = useState<Form | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [categoryTree, setCategoryTree] = useState<CategoryTree>({});
+  const [einheiten, setEinheiten] = useState<string[]>(EINHEITEN_FALLBACK);
 
   const markDirty = () => setDirty(true);
 
@@ -110,6 +113,11 @@ export function StammdatenEditPage() {
       .then((p) => { setProduct(p); setF(initForm(p)); })
       .catch((e) => setError(e.message));
   }, [sku]);
+
+  useEffect(() => {
+    api.getCategoryTree().then(setCategoryTree).catch(() => {});
+    api.getEinheiten().then(setEinheiten).catch(() => {});
+  }, []);
 
   const handleEkChange = async (value: string) => {
     setF((prev) => prev ? { ...prev, ek: value } : prev);
@@ -233,13 +241,13 @@ export function StammdatenEditPage() {
               <input className={inputCls} value={f.gewicht} onChange={set('gewicht')} placeholder="0" />
             </Field>
             <div className="grid grid-cols-3 gap-4">
-              <Field label="Länge (mm)">
+              <Field label="Länge (cm)">
                 <input className={inputCls} value={f.laenge} onChange={set('laenge')} placeholder="0" />
               </Field>
-              <Field label="Breite (mm)">
+              <Field label="Breite (cm)">
                 <input className={inputCls} value={f.breite} onChange={set('breite')} placeholder="0" />
               </Field>
-              <Field label="Höhe (mm)">
+              <Field label="Höhe (cm)">
                 <input className={inputCls} value={f.hoehe} onChange={set('hoehe')} placeholder="0" />
               </Field>
             </div>
@@ -257,7 +265,7 @@ export function StammdatenEditPage() {
               <Field label="Maßeinheit">
                 <select className={selectCls} value={f.inhalt_einheit} onChange={set('inhalt_einheit')}>
                   <option value="">– wählen –</option>
-                  {EINHEITEN.map((e) => <option key={e} value={e}>{e}</option>)}
+                  {einheiten.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </Field>
             </div>
@@ -278,7 +286,7 @@ export function StammdatenEditPage() {
               <Field label="Maßeinheit">
                 <select className={selectCls} value={f.bezugsmenge_einheit} onChange={set('bezugsmenge_einheit')}>
                   <option value="">– wählen –</option>
-                  {EINHEITEN.map((e) => <option key={e} value={e}>{e}</option>)}
+                  {einheiten.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </Field>
             </div>
@@ -363,16 +371,27 @@ export function StammdatenEditPage() {
 
           {/* ───── Kategorien ───── */}
           <Section title="Kategorien">
-            <div className="space-y-3">
-              {([1,2,3,4,5,6] as const).map((i) => {
-                const key = `kategorie_${i}` as keyof Form;
-                return (
-                  <Field key={i} label={`Kategorie Ebene ${i}`}>
-                    <input className={inputCls} value={f[key] as string} onChange={set(key)} />
-                  </Field>
-                );
-              })}
-            </div>
+            <CategoryCascader
+              tree={categoryTree}
+              values={[
+                f.kategorie_1, f.kategorie_2, f.kategorie_3,
+                f.kategorie_4, f.kategorie_5, f.kategorie_6,
+              ]}
+              onChange={(level, value) => {
+                setF((prev) => {
+                  if (!prev) return prev;
+                  const updated = { ...prev };
+                  const keys: (keyof Form)[] = ['kategorie_1', 'kategorie_2', 'kategorie_3', 'kategorie_4', 'kategorie_5', 'kategorie_6'];
+                  updated[keys[level]] = value as never;
+                  // Reset all levels below the changed one
+                  for (let i = level + 1; i < 6; i++) {
+                    updated[keys[i]] = '' as never;
+                  }
+                  return updated;
+                });
+                markDirty();
+              }}
+            />
           </Section>
 
           {/* ───── SEO ───── */}

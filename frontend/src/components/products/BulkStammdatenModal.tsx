@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../../api/client';
 import { useToast } from '../ui/Toast';
+import type { CategoryTree } from '../../types';
+
+function getCategoryOptions(tree: CategoryTree, path: string[]): string[] {
+  let node = tree;
+  for (const segment of path) {
+    if (!segment || !node[segment]) return [];
+    node = node[segment];
+  }
+  return Object.keys(node).sort();
+}
 
 const BULK_FIELDS = [
   { key: 'hersteller', label: 'Hersteller', type: 'text' },
@@ -9,19 +19,19 @@ const BULK_FIELDS = [
   { key: 'preis', label: 'VK (Brutto)', type: 'number' },
   { key: 'gewicht', label: 'Gewicht (g)', type: 'number' },
   { key: 'ean', label: 'EAN', type: 'text' },
-  { key: 'laenge', label: 'Länge (mm)', type: 'number' },
-  { key: 'breite', label: 'Breite (mm)', type: 'number' },
-  { key: 'hoehe', label: 'Höhe (mm)', type: 'number' },
+  { key: 'laenge', label: 'Länge (cm)', type: 'number' },
+  { key: 'breite', label: 'Breite (cm)', type: 'number' },
+  { key: 'hoehe', label: 'Höhe (cm)', type: 'number' },
   { key: 'lieferant_name', label: 'Lieferant Name', type: 'text' },
   { key: 'lieferant_artikelnummer', label: 'Lieferant Artikelnummer', type: 'text' },
   { key: 'lieferant_artikelname', label: 'Lieferant Artikelname', type: 'text' },
   { key: 'lieferant_netto_ek', label: 'Lieferant Netto-EK', type: 'number' },
-  { key: 'kategorie_1', label: 'Kategorie 1', type: 'text' },
-  { key: 'kategorie_2', label: 'Kategorie 2', type: 'text' },
-  { key: 'kategorie_3', label: 'Kategorie 3', type: 'text' },
-  { key: 'kategorie_4', label: 'Kategorie 4', type: 'text' },
-  { key: 'kategorie_5', label: 'Kategorie 5', type: 'text' },
-  { key: 'kategorie_6', label: 'Kategorie 6', type: 'text' },
+  { key: 'kategorie_1', label: 'Kategorie 1', type: 'category', level: 0 },
+  { key: 'kategorie_2', label: 'Kategorie 2', type: 'category', level: 1 },
+  { key: 'kategorie_3', label: 'Kategorie 3', type: 'category', level: 2 },
+  { key: 'kategorie_4', label: 'Kategorie 4', type: 'category', level: 3 },
+  { key: 'kategorie_5', label: 'Kategorie 5', type: 'category', level: 4 },
+  { key: 'kategorie_6', label: 'Kategorie 6', type: 'category', level: 5 },
 ] as const;
 
 interface Props {
@@ -34,7 +44,12 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [categoryTree, setCategoryTree] = useState<CategoryTree>({});
   const { toast } = useToast();
+
+  useEffect(() => {
+    api.getCategoryTree().then(setCategoryTree).catch(() => {});
+  }, []);
 
   const toggleField = (key: string) => {
     setSelectedFields((prev) => {
@@ -100,6 +115,17 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
           </p>
           {BULK_FIELDS.map((field) => {
             const isSelected = selectedFields.has(field.key);
+            const isCategoryField = field.type === 'category';
+            let categoryOptions: string[] = [];
+            if (isCategoryField) {
+              const path: string[] = [];
+              for (let i = 0; i < (field as { level: number }).level; i++) {
+                const parentKey = `kategorie_${i + 1}`;
+                if (values[parentKey]) path.push(values[parentKey]);
+                else break;
+              }
+              categoryOptions = getCategoryOptions(categoryTree, path);
+            }
             return (
               <div key={field.key} className="flex items-center gap-3">
                 <input
@@ -109,16 +135,32 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
                   className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <label className="text-sm text-gray-700 w-40 shrink-0">{field.label}</label>
-                <input
-                  type={field.type === 'number' ? 'text' : 'text'}
-                  value={values[field.key] ?? ''}
-                  onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                  disabled={!isSelected}
-                  placeholder={field.type === 'number' ? '0' : ''}
-                  className={`flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-                    isSelected ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 text-gray-400'
-                  }`}
-                />
+                {isCategoryField && categoryOptions.length > 0 ? (
+                  <select
+                    value={values[field.key] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    disabled={!isSelected}
+                    className={`flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      isSelected ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 text-gray-400'
+                    }`}
+                  >
+                    <option value="">– wählen –</option>
+                    {categoryOptions.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={values[field.key] ?? ''}
+                    onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    disabled={!isSelected}
+                    placeholder={field.type === 'number' ? '0' : ''}
+                    className={`flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      isSelected ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 text-gray-400'
+                    }`}
+                  />
+                )}
               </div>
             );
           })}

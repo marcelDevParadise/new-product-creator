@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck } from 'lucide-react';
+import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree } from 'lucide-react';
 
 interface NavItem {
   to: string;
@@ -34,6 +34,7 @@ const sections: NavSection[] = [
     header: 'Konfiguration',
     items: [
       { to: '/attributes', label: 'Attribut Verwaltung', icon: Settings2 },
+      { to: '/categories', label: 'Kategorien', icon: FolderTree },
       { to: '/export', label: 'Export', icon: Download },
       { to: '/settings', label: 'Einstellungen', icon: SlidersHorizontal },
     ],
