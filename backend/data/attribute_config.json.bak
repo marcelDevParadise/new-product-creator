@@ -566,8 +566,8 @@
             "groß"
         ]
     },
-    "sales_channel": {
-        "id": "sales_channel",
+    "sales_channels": {
+        "id": "sales_channels",
         "category": "Shopify Exclusives",
         "name": "Vertriebskanal",
         "description": "Auf welchem Vertriebskanal das Produkt verfügbar ist (z. B. Online-Shop, Amazon, eBay)."

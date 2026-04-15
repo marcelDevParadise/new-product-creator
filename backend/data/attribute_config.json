@@ -653,8 +653,8 @@
             "waterbased"
         ]
     },
-    "sales_channel": {
-        "id": "sales_channel",
+    "sales_channels": {
+        "id": "sales_channels",
         "category": "Shopify",
         "name": "Vertriebskanal",
         "description": "Auf welchem Vertriebskanal das Produkt verfuegbar ist (z. B. Online-Shop, Amazon, eBay)."
