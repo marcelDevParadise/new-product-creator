@@ -8,7 +8,7 @@ import { api } from '../api/client';
 import type { Product } from '../types';
 import { BulkStammdatenModal } from '../components/products/BulkStammdatenModal';
 import { VariantGroupModal } from '../components/products/VariantGroupModal';
-import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Archive, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy, Check } from 'lucide-react';
+import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Archive, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy } from 'lucide-react';
 
 type SortKey = 'artikelnummer' | 'artikelname' | 'ek' | 'preis' | 'gewicht' | 'hersteller' | 'ean' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -359,16 +359,16 @@ export function StammdatenPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="SKU, Name, Hersteller oder GTIN suchen…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-white/5 dark:text-gray-200 dark:placeholder-gray-500"
           />
         </div>
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1">
           <button
             onClick={() => { setShowArchive(false); setSelectedSkus(new Set()); }}
             className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
               !showArchive
-                ? 'bg-white text-gray-900 font-medium shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-white dark:bg-white/10 text-gray-900 dark:text-gray-100 font-medium shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
             }`}
           >
             Aktiv ({products.length})
@@ -377,8 +377,8 @@ export function StammdatenPage() {
             onClick={() => { setShowArchive(true); setSelectedSkus(new Set()); }}
             className={`flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-md transition-colors ${
               showArchive
-                ? 'bg-white text-gray-900 font-medium shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-white dark:bg-white/10 text-gray-900 dark:text-gray-100 font-medium shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
             }`}
           >
             <Archive className="w-3.5 h-3.5" />
@@ -389,7 +389,7 @@ export function StammdatenPage() {
 
       {/* Inline Add Product Form */}
       {showAddForm && (
-        <div className="bg-white rounded-xl border border-indigo-200 shadow-sm p-4 space-y-3">
+        <div className="bg-white dark:bg-white/5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 shadow-sm p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Artikelnummer *</label>
@@ -460,9 +460,9 @@ export function StammdatenPage() {
       {loading ? (
         <LoadingSpinner className="py-16" />
       ) : products.length === 0 && !showArchive ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-gray-200 shadow-sm">
-          <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <p className="text-sm text-gray-500 mb-4">Keine aktiven Produkte vorhanden.</p>
+        <div className="text-center py-16 bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm">
+          <Upload className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Keine aktiven Produkte vorhanden.</p>
           <button
             onClick={() => navigate('/import')}
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
@@ -472,10 +472,10 @@ export function StammdatenPage() {
           </button>
         </div>
       ) : !showArchive ? (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+              <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10">
                 <tr>
                   <th className="w-8 px-4 py-3">
                     <input
@@ -485,34 +485,34 @@ export function StammdatenPage() {
                       className="rounded border-gray-300"
                     />
                   </th>
-                  <th className="w-8 px-4 py-3 cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('status')}>
+                  <th className="w-8 px-4 py-3 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('status')}>
                     <SortIcon col="status" />
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 w-[140px] cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('artikelnummer')}>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('artikelnummer')}>
                     <span className="inline-flex items-center gap-1">Artikelnr. <SortIcon col="artikelnummer" /></span>
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('artikelname')}>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('artikelname')}>
                     <span className="inline-flex items-center gap-1">Artikelname <SortIcon col="artikelname" /></span>
                   </th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 w-[100px] cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('ek')}>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('ek')}>
                     <span className="inline-flex items-center gap-1 justify-end">EK (Netto) <SortIcon col="ek" /></span>
                   </th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 w-[100px] cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('preis')}>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('preis')}>
                     <span className="inline-flex items-center gap-1 justify-end">VK (Brutto) <SortIcon col="preis" /></span>
                   </th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 w-[100px] cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('gewicht')}>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('gewicht')}>
                     <span className="inline-flex items-center gap-1 justify-end">Gewicht (g) <SortIcon col="gewicht" /></span>
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 w-[140px] cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('hersteller')}>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('hersteller')}>
                     <span className="inline-flex items-center gap-1">Hersteller <SortIcon col="hersteller" /></span>
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 w-[140px] cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('ean')}>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('ean')}>
                     <span className="inline-flex items-center gap-1">GTIN <SortIcon col="ean" /></span>
                   </th>
                   <th className="px-4 py-3 w-[80px]" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                 {groupedRows.map((row) => {
                   const p = row.product;
                   const isChild = row.type === 'child';
@@ -521,7 +521,7 @@ export function StammdatenPage() {
                   return (
                   <tr
                     key={p.artikelnummer}
-                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${selectedSkus.has(p.artikelnummer) ? 'bg-indigo-50/50' : ''} ${isChild ? 'bg-purple-50/30' : ''}`}
+                    className={`hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors ${selectedSkus.has(p.artikelnummer) ? 'bg-indigo-50/50 dark:bg-indigo-500/10' : ''} ${isChild ? 'bg-purple-50/30 dark:bg-purple-500/5' : ''}`}
                     onClick={() => navigate(`/stammdaten/${encodeURIComponent(p.artikelnummer)}`)}
                   >
                     <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -539,21 +539,21 @@ export function StammdatenPage() {
                         <AlertCircle className="w-4 h-4 text-amber-400" />
                       )}
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs text-gray-700">
+                    <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">
                       <span className={`inline-flex items-center gap-1 ${isChild ? 'pl-6' : ''}`}>
                         {isParent && (
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleGroupExpand(p.artikelnummer); }}
-                            className="p-0.5 rounded hover:bg-gray-200 transition-colors"
+                            className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
                           >
                             {expanded ? <ChevronDown className="w-3.5 h-3.5 text-purple-500" /> : <ChevronRight className="w-3.5 h-3.5 text-purple-500" />}
                           </button>
                         )}
-                        {isChild && <span className="w-3 border-l-2 border-b-2 border-purple-200 h-3 mr-1 rounded-bl-sm" />}
+                        {isChild && <span className="w-3 border-l-2 border-b-2 border-purple-200 dark:border-purple-700 h-3 mr-1 rounded-bl-sm" />}
                         {p.artikelnummer}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-gray-700 truncate max-w-[250px]">
+                    <td className="px-4 py-2 text-gray-700 dark:text-gray-200 truncate max-w-[250px]">
                       <span className="inline-flex items-center gap-2">
                         {p.artikelname}
                         {isParent && (
@@ -569,64 +569,64 @@ export function StammdatenPage() {
                         ))}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-600 tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'ek', p.ek != null ? p.ek.toFixed(2) : ''); }}>
+                    <td className="px-4 py-2 text-right text-gray-600 dark:text-gray-400 tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'ek', p.ek != null ? p.ek.toFixed(2) : ''); }}>
                       {editingCell?.sku === p.artikelnummer && editingCell.field === 'ek' ? (
                         <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                           onBlur={saveEdit}
-                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:border-indigo-600 dark:text-gray-100" />
                       ) : (
-                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.ek != null ? `${p.ek.toFixed(2)} €` : <span className="text-gray-300">—</span>}</span>
+                        <span className="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline decoration-dashed underline-offset-2">{p.ek != null ? `${p.ek.toFixed(2)} €` : <span className="text-gray-300 dark:text-gray-600">—</span>}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-900 font-medium tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'preis', p.preis != null ? p.preis.toFixed(2) : ''); }}>
+                    <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100 font-medium tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'preis', p.preis != null ? p.preis.toFixed(2) : ''); }}>
                       {editingCell?.sku === p.artikelnummer && editingCell.field === 'preis' ? (
                         <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                           onBlur={saveEdit}
-                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:border-indigo-600 dark:text-gray-100" />
                       ) : (
-                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.preis != null ? `${p.preis.toFixed(2)} €` : <span className="text-gray-300">—</span>}</span>
+                        <span className="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline decoration-dashed underline-offset-2">{p.preis != null ? `${p.preis.toFixed(2)} €` : <span className="text-gray-300 dark:text-gray-600">—</span>}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-900 tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'gewicht', p.gewicht != null ? String(p.gewicht) : ''); }}>
+                    <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100 tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'gewicht', p.gewicht != null ? String(p.gewicht) : ''); }}>
                       {editingCell?.sku === p.artikelnummer && editingCell.field === 'gewicht' ? (
                         <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                           onBlur={saveEdit}
-                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:border-indigo-600 dark:text-gray-100" />
                       ) : (
-                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.gewicht != null ? `${p.gewicht} g` : <span className="text-gray-300">—</span>}</span>
+                        <span className="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline decoration-dashed underline-offset-2">{p.gewicht != null ? `${p.gewicht} g` : <span className="text-gray-300 dark:text-gray-600">—</span>}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-gray-600" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'hersteller', p.hersteller || ''); }}>
+                    <td className="px-4 py-2 text-gray-600 dark:text-gray-400" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'hersteller', p.hersteller || ''); }}>
                       {editingCell?.sku === p.artikelnummer && editingCell.field === 'hersteller' ? (
                         <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                           onBlur={saveEdit}
-                          className="w-full px-1.5 py-0.5 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                          className="w-full px-1.5 py-0.5 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:border-indigo-600 dark:text-gray-100" />
                       ) : (
-                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.hersteller || <span className="text-gray-300">—</span>}</span>
+                        <span className="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline decoration-dashed underline-offset-2">{p.hersteller || <span className="text-gray-300 dark:text-gray-600">—</span>}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs text-gray-500" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'ean', p.ean || ''); }}>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-500 dark:text-gray-400" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'ean', p.ean || ''); }}>
                       {editingCell?.sku === p.artikelnummer && editingCell.field === 'ean' ? (
                         <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
                           onBlur={saveEdit}
-                          className="w-full px-1.5 py-0.5 text-sm font-mono border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                          className="w-full px-1.5 py-0.5 text-sm font-mono border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:border-indigo-600 dark:text-gray-100" />
                       ) : (
-                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.ean || <span className="text-gray-300">—</span>}</span>
+                        <span className="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline decoration-dashed underline-offset-2">{p.ean || <span className="text-gray-300 dark:text-gray-600">—</span>}</span>
                       )}
                     </td>
                     <td className="px-4 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <span className="inline-flex items-center gap-0.5">
                         <button
                           onClick={(e) => handleClone(p.artikelnummer, e)}
-                          className="p-1 rounded hover:bg-indigo-50 transition-colors"
-                          title="Produkt klonen"
+                          className="p-1 rounded hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                          title="Produkt duplizieren"
                         >
-                          <Copy className="w-4 h-4 text-gray-400 hover:text-indigo-500" />
+                          <Copy className="w-4 h-4 text-gray-400 dark:text-gray-500 hover:text-indigo-500" />
                         </button>
                         {isParent ? (
                           <button
@@ -640,18 +640,18 @@ export function StammdatenPage() {
                                 toast(err instanceof Error ? err.message : 'Fehler', 'error');
                               }
                             }}
-                            className="p-1 rounded hover:bg-red-50 transition-colors"
+                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                             title="Gruppe auflösen"
                           >
-                            <Unlink className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                            <Unlink className="w-4 h-4 text-gray-400 dark:text-gray-500 hover:text-red-500" />
                           </button>
                         ) : (
                           <button
                             onClick={() => navigate(`/stammdaten/${encodeURIComponent(p.artikelnummer)}`)}
-                            className="p-1 rounded hover:bg-gray-100 transition-colors"
+                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                             title="Bearbeiten"
                           >
-                            <Pencil className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                            <Pencil className="w-4 h-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300" />
                           </button>
                         )}
                       </span>
@@ -661,7 +661,7 @@ export function StammdatenPage() {
                 })}
                 {groupedRows.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-sm text-gray-400">
+                    <td colSpan={10} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
                       Keine Treffer für „{searchQuery}"
                     </td>
                   </tr>
@@ -672,21 +672,21 @@ export function StammdatenPage() {
         </div>
       ) : (
         /* Archive view */
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+              <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 w-[140px]">Artikelnr.</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Artikelname</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px]">Artikelnr.</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">Artikelname</th>
                   <th className="px-4 py-3 w-[120px]" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                 {filteredArchived.map((p) => (
-                  <tr key={p.artikelnummer} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-2 font-mono text-xs text-gray-700">{p.artikelnummer}</td>
-                    <td className="px-4 py-2 text-gray-700">{p.artikelname}</td>
+                  <tr key={p.artikelnummer} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">{p.artikelnummer}</td>
+                    <td className="px-4 py-2 text-gray-700 dark:text-gray-200">{p.artikelname}</td>
                     <td className="px-4 py-2 text-right">
                       <button
                         onClick={() => handleUnarchive(p.artikelnummer)}
@@ -699,7 +699,7 @@ export function StammdatenPage() {
                 ))}
                 {filteredArchived.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="text-center py-8 text-sm text-gray-400">
+                    <td colSpan={3} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
                       Keine archivierten Produkte.
                     </td>
                   </tr>
