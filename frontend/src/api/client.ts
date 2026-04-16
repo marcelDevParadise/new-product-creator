@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry, CategoryTree } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff } from '../types';
 
 const BASE = '/api';
 
@@ -28,6 +28,7 @@ export const api = {
   // Stats
   getStats: () => request<DashboardStats>('/stats'),
   getActivities: (limit = 50) => request<ActivityLog[]>(`/stats/activities?limit=${limit}`),
+  globalSearch: (q: string) => request<GlobalSearchResult>(`/stats/search?q=${encodeURIComponent(q)}`),
 
   // Products
   getProducts: (archived = false) =>
@@ -71,6 +72,8 @@ export const api = {
     request<Product>(`/products/${encodeURIComponent(sku)}/unarchive`, { method: 'POST' }),
   getProductHistory: (sku: string, limit = 100) =>
     request<ProductHistoryEntry[]>(`/products/${encodeURIComponent(sku)}/history?limit=${limit}`),
+  cloneProduct: (sku: string) =>
+    request<Product>(`/products/${encodeURIComponent(sku)}/clone`, { method: 'POST' }),
 
   // Attributes
   getAttributeConfig: () => request<AttributeConfig>('/attributes/config'),
@@ -109,7 +112,7 @@ export const api = {
     }),
   bulkUpdateAttributes: (skus: string[], attributes: Record<string, string | number | boolean>) =>
     request<{ updated: number }>('/attributes/products/bulk', {
-      method: 'PUT',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artikelnummern: skus, attributes }),
     }),
@@ -152,6 +155,8 @@ export const api = {
     a.click();
     URL.revokeObjectURL(url);
   },
+  archiveExported: () =>
+    request<{ archived: number }>('/export/archive-exported', { method: 'POST' }),
 
   // SEO & Content Export
   getSeoPreview: () => request<SeoPreview>('/export/seo/preview'),
@@ -250,7 +255,7 @@ export const api = {
   // Bulk Stammdaten
   bulkUpdateStammdaten: (skus: string[], fields: Record<string, string | number | boolean | null>) =>
     request<{ updated: number; fields: string[] }>('/products/bulk/stammdaten', {
-      method: 'PATCH',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artikelnummern: skus, fields }),
     }),
@@ -282,5 +287,56 @@ export const api = {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, name }),
+    }),
+
+  // Variants
+  getVariantGroups: () => request<VariantGroup[]>('/variants/groups'),
+  getVariantGroup: (parentSku: string) =>
+    request<VariantGroup>(`/variants/groups/${encodeURIComponent(parentSku)}`),
+  createVariantGroup: (parentSku: string, childSkus: string[], variantAttributes?: Record<string, Record<string, string>>) =>
+    request<{ parent_sku: string; children: number }>('/variants/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_sku: parentSku, child_skus: childSkus, variant_attributes: variantAttributes || {} }),
+    }),
+  deleteVariantGroup: (parentSku: string) =>
+    request<{ dissolved: boolean; children_released: number }>(`/variants/groups/${encodeURIComponent(parentSku)}`, {
+      method: 'DELETE',
+    }),
+  addVariantChild: (parentSku: string, sku: string, variantAttributes?: Record<string, string>) =>
+    request<{ added: boolean; sku: string }>(`/variants/groups/${encodeURIComponent(parentSku)}/children`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sku, variant_attributes: variantAttributes || {} }),
+    }),
+  removeVariantChild: (parentSku: string, childSku: string) =>
+    request<{ removed: boolean; sku: string }>(`/variants/groups/${encodeURIComponent(parentSku)}/children/${encodeURIComponent(childSku)}`, {
+      method: 'DELETE',
+    }),
+  updateVariantChild: (parentSku: string, childSku: string, variantAttributes: Record<string, string>) =>
+    request<{ updated: boolean; sku: string }>(`/variants/groups/${encodeURIComponent(parentSku)}/children/${encodeURIComponent(childSku)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variant_attributes: variantAttributes }),
+    }),
+  suggestVariantGroups: () => request<VariantSuggestion[]>('/variants/suggest'),
+  getResolvedProduct: (sku: string) =>
+    request<ResolvedProduct>(`/variants/resolved/${encodeURIComponent(sku)}`),
+  getVariantDiff: (parentSku: string) =>
+    request<VariantDiff>(`/variants/groups/${encodeURIComponent(parentSku)}/diff`),
+  createVariantChild: (parentSku: string, variantAttributes: Record<string, string>, artikelname?: string) =>
+    request<Product>(`/variants/groups/${encodeURIComponent(parentSku)}/children/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variant_attributes: variantAttributes, artikelname: artikelname || null }),
+    }),
+
+  // Varianten Settings
+  getVariantenSettings: () => request<VariantenSettings>('/settings/varianten'),
+  updateVariantenSettings: (data: VariantenSettings) =>
+    request<VariantenSettings>('/settings/varianten', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     }),
 };

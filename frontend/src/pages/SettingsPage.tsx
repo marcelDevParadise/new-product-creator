@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
-import type { PricingSettings, ExportSettings, DefaultValues } from '../types';
-import { Save, Plus, X, FileSpreadsheet, Calculator, Ruler, Building2 } from 'lucide-react';
+import type { PricingSettings, ExportSettings, DefaultValues, VariantenSettings } from '../types';
+import { Save, Plus, X, FileSpreadsheet, Calculator, Ruler, Building2, GitBranch } from 'lucide-react';
 
 const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
 const selectCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
@@ -69,11 +69,19 @@ export function SettingsPage() {
   const [defaults, setDefaults] = useState<DefaultValues>({ hersteller: '', lieferant_name: '' });
   const [savingDefaults, setSavingDefaults] = useState(false);
 
+  // Varianten
+  const [variantenSettings, setVariantenSettings] = useState<VariantenSettings>({ inherit_fields: [], variant_axes: [] });
+  const [newAxis, setNewAxis] = useState('');
+  const [savingVarianten, setSavingVarianten] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    api.getAllSettings().then((s) => {
+    Promise.all([
+      api.getAllSettings(),
+      api.getVariantenSettings(),
+    ]).then(([s, v]) => {
       setMwst(String(s.pricing.mwst_prozent));
       setFaktor(String(s.pricing.faktor));
       setRundung(String(s.pricing.rundung));
@@ -83,6 +91,7 @@ export function SettingsPage() {
       setDateinameMuster(s.export.dateiname_muster);
       setEinheiten(s.einheiten);
       setDefaults(s.standard_werte);
+      setVariantenSettings(v);
       setLoading(false);
     }).catch((e) => { toast(e.message, 'error'); setLoading(false); });
   }, []);
@@ -167,6 +176,39 @@ export function SettingsPage() {
     } finally {
       setSavingDefaults(false);
     }
+  };
+
+  const saveVarianten = async () => {
+    setSavingVarianten(true);
+    try {
+      await api.updateVariantenSettings(variantenSettings);
+      toast('Varianten-Einstellungen gespeichert', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Speichern fehlgeschlagen', 'error');
+    } finally {
+      setSavingVarianten(false);
+    }
+  };
+
+  const addAxis = () => {
+    const trimmed = newAxis.trim();
+    if (trimmed && !variantenSettings.variant_axes.includes(trimmed)) {
+      setVariantenSettings(prev => ({ ...prev, variant_axes: [...prev.variant_axes, trimmed] }));
+      setNewAxis('');
+    }
+  };
+
+  const removeAxis = (idx: number) => {
+    setVariantenSettings(prev => ({ ...prev, variant_axes: prev.variant_axes.filter((_, i) => i !== idx) }));
+  };
+
+  const toggleInheritField = (field: string) => {
+    setVariantenSettings(prev => {
+      const fields = prev.inherit_fields.includes(field)
+        ? prev.inherit_fields.filter(f => f !== field)
+        : [...prev.inherit_fields, field];
+      return { ...prev, inherit_fields: fields };
+    });
   };
 
   const addUnit = () => {
@@ -356,6 +398,79 @@ export function SettingsPage() {
                 onChange={(e) => setDefaults({ ...defaults, lieferant_name: e.target.value })}
                 placeholder="z.B. Großhändler XY"
               />
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Varianten */}
+        <SectionCard
+          icon={GitBranch}
+          title="Varianten"
+          description="Varianten-Achsen und Feld-Vererbung für Parent/Child-Gruppierung konfigurieren."
+          onSave={saveVarianten}
+          saving={savingVarianten}
+        >
+          {/* Variant axes */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-2">Varianten-Achsen</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {variantenSettings.variant_axes.map((axis, idx) => (
+                <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-50 text-sm text-purple-700 rounded-lg border border-purple-200">
+                  {axis}
+                  <button onClick={() => removeAxis(idx)} className="text-purple-400 hover:text-red-500 transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className={inputCls}
+                placeholder="Neue Achse (z.B. Länge, Härtegrad)…"
+                value={newAxis}
+                onChange={(e) => setNewAxis(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAxis(); } }}
+              />
+              <button
+                onClick={addAxis}
+                disabled={!newAxis.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                Hinzufügen
+              </button>
+            </div>
+          </div>
+
+          {/* Inherit fields */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-2">Vererbbare Felder</label>
+            <p className="text-xs text-gray-400 mb-3">Felder die von Parent-Produkten an Varianten vererbt werden, wenn bei der Variante kein eigener Wert gesetzt ist.</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { key: 'hersteller', label: 'Hersteller' },
+                { key: 'beschreibung', label: 'Beschreibung' },
+                { key: 'kurzbeschreibung', label: 'Kurzbeschreibung' },
+                { key: 'url_pfad', label: 'URL-Pfad' },
+                { key: 'title_tag', label: 'Title Tag' },
+                { key: 'meta_description', label: 'Meta Description' },
+                { key: 'lieferant_name', label: 'Lieferant' },
+                { key: 'lieferant_artikelnummer', label: 'Lieferant-Art.Nr.' },
+                { key: 'lieferant_artikelname', label: 'Lieferant-Art.Name' },
+                ...Array.from({ length: 9 }, (_, i) => ({ key: `bild_${i + 1}`, label: `Bild ${i + 1}` })),
+                ...Array.from({ length: 6 }, (_, i) => ({ key: `kategorie_${i + 1}`, label: `Kategorie ${i + 1}` })),
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={variantenSettings.inherit_fields.includes(key)}
+                    onChange={() => toggleInheritField(key)}
+                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  {label}
+                </label>
+              ))}
             </div>
           </div>
         </SectionCard>

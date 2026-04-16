@@ -45,6 +45,10 @@ export interface Product {
   url_pfad: string | null;
   title_tag: string | null;
   meta_description: string | null;
+  // Varianten
+  parent_sku: string | null;
+  is_parent: boolean;
+  variant_attributes: Record<string, string>;
   //
   attributes: Record<string, string | number | boolean>;
   exported: boolean;
@@ -234,6 +238,14 @@ export interface DashboardStats {
   export_ready: number;
   export_not_ready: number;
   export_ready_percent: number;
+  // Extended KPIs
+  products_without_images: number;
+  products_without_ean: number;
+  products_with_errors: number;
+  seo_complete: number;
+  seo_percent: number;
+  avg_attributes_per_product: number;
+  recently_updated: IncompleteProduct[];
   incomplete_products: IncompleteProduct[];
   recent_activities: ActivityLog[];
 }
@@ -305,3 +317,38 @@ export interface ProductHistoryEntry {
 export interface CategoryTree {
   [name: string]: CategoryTree;
 }
+
+// Global Search
+
+export interface GlobalSearchResult {
+  products: { artikelnummer: string; artikelname: string; archived: boolean }[];
+  attributes: { key: string; name: string; category: string }[];
+  templates: { name: string; attribute_count: number }[];
+}
+
+// Variants
+
+export interface VariantGroup {
+  parent: Product;
+  children: Product[];
+  variant_axes: string[];
+}
+
+export interface VariantSuggestion {
+  suggested_parent: string;
+  members: string[];
+  common_name: string;
+  differences: string[];
+}
+
+export interface VariantenSettings {
+  inherit_fields: string[];
+  variant_axes: string[];
+}
+
+export interface ResolvedProduct {
+  product: Product;
+  inherited_fields: string[];
+}
+
+export type VariantDiff = Record<string, Record<string, { parent_value: string | null; child_value: string | null }>>;

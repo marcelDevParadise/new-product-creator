@@ -104,7 +104,7 @@ def reorder_attribute_definitions(body: ReorderRequest):
 
 # --- Per-product attribute management ---
 
-@router.put("/products/bulk")
+@router.post("/products/bulk")
 def bulk_update_attributes(body: BulkAttributeUpdate):
     """Apply the same attributes to multiple products at once."""
     updated = []
@@ -130,7 +130,7 @@ def apply_smart_defaults(artikelnummer: str):
     """Auto-fill attributes based on smart_defaults matching the product title."""
     product = state.get_product(artikelnummer)
     if product is None:
-        raise HTTPException(404, "Produkt nicht gefunden")
+        raise HTTPException(404, f"Produkt '{artikelnummer}' nicht gefunden")
 
     title_lower = product.artikelname.lower()
     applied = 0
@@ -161,7 +161,7 @@ def apply_smart_defaults(artikelnummer: str):
 def update_attributes(artikelnummer: str, body: AttributeUpdate):
     product = state.get_product(artikelnummer)
     if product is None:
-        raise HTTPException(404, "Produkt nicht gefunden")
+        raise HTTPException(404, f"Produkt '{artikelnummer}' nicht gefunden")
 
     old_attrs = dict(product.attributes)
     new_attrs = dict(body.attributes)
@@ -187,7 +187,7 @@ def update_attributes(artikelnummer: str, body: AttributeUpdate):
 def delete_attribute(artikelnummer: str, attr_key: str):
     product = state.get_product(artikelnummer)
     if product is None:
-        raise HTTPException(404, "Produkt nicht gefunden")
+        raise HTTPException(404, f"Produkt '{artikelnummer}' nicht gefunden")
 
     old_value = product.attributes.get(attr_key)
     if attr_key in product.attributes:

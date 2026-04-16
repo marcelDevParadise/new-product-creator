@@ -48,6 +48,10 @@ class Product(BaseModel):
     url_pfad: str | None = None
     title_tag: str | None = None
     meta_description: str | None = None
+    # Varianten
+    parent_sku: str | None = None
+    is_parent: bool = False
+    variant_attributes: dict[str, str] = {}
     #
     attributes: dict[str, str | int | bool] = {}
     exported: bool = False

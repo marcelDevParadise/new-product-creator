@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
-import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree } from 'lucide-react';
+import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../../lib/use-theme';
 
 interface NavItem {
   to: string;
@@ -44,11 +45,14 @@ const sections: NavSection[] = [
 interface Props {
   collapsed: boolean;
   onToggle: () => void;
+  onSearch?: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: Props) {
+export function Sidebar({ collapsed, onToggle, onSearch }: Props) {
+  const { theme, setTheme } = useTheme();
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   return (
-    <aside className={`${collapsed ? 'w-16' : 'w-60'} bg-gray-950 flex flex-col transition-all duration-200`}>
+    <aside className={`${collapsed ? 'w-16' : 'w-60'} bg-gray-950 dark:bg-gray-900/80 dark:border-r dark:border-white/10 flex flex-col transition-all duration-200`}>
       <div className={`${collapsed ? 'p-3' : 'px-5 py-5'} border-b border-white/10`}>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center shrink-0">
@@ -61,6 +65,22 @@ export function Sidebar({ collapsed, onToggle }: Props) {
             </div>
           )}
         </div>
+      </div>
+      {/* Search button */}
+      <div className={`${collapsed ? 'px-2 pt-3' : 'px-3 pt-4'}`}>
+        <button
+          onClick={onSearch}
+          className={`w-full flex items-center gap-2 ${collapsed ? 'justify-center px-2' : 'px-3'} py-2 rounded-lg text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-colors border border-white/10`}
+          title="Suche (Ctrl+K)"
+        >
+          <Search className="w-4 h-4 shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left text-[13px]">Suche…</span>
+              <kbd className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded border border-white/10">⌘K</kbd>
+            </>
+          )}
+        </button>
       </div>
       <nav className={`flex-1 ${collapsed ? 'p-2' : 'px-3 py-4'} overflow-y-auto`}>
         {sections.map((section, si) => (
@@ -96,7 +116,15 @@ export function Sidebar({ collapsed, onToggle }: Props) {
           </div>
         ))}
       </nav>
-      <div className="p-2 border-t border-white/10">
+      <div className="p-2 border-t border-white/10 space-y-1">
+        <button
+          onClick={(e) => setTheme(isDark ? 'light' : 'dark', e.nativeEvent)}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 rounded-lg hover:bg-white/5 transition-colors"
+          title={isDark ? 'Light Mode' : 'Dark Mode'}
+        >
+          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {!collapsed && <span className="text-xs">{isDark ? 'Light Mode' : 'Dark Mode'}</span>}
+        </button>
         <button
           onClick={onToggle}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-gray-500 hover:text-gray-300 rounded-lg hover:bg-white/5 transition-colors"

@@ -19,6 +19,11 @@ def _make_filename(typ: str) -> str:
     return es.dateiname_muster.format(typ=typ, datum=date.today().isoformat()) + ".csv"
 
 
+def _resolve_products(products: list) -> list:
+    """Return products with inherited parent fields resolved for children."""
+    return [state.resolve_product(p) if p.parent_sku else p for p in products]
+
+
 @router.get("/validate")
 def validate_export():
     """Check which products are missing required attributes before export."""
@@ -38,17 +43,13 @@ def validate_export():
 
 @router.post("/ameise")
 def export_ameise():
-    products = [p for p in state.get_active_products() if p.attributes]
+    products = _resolve_products([p for p in state.get_active_products() if p.attributes])
     es = get_export_settings()
     csv_content = build_ameise_csv(
         products, state.attribute_config,
         delimiter=es.csv_trennzeichen,
         attributgruppe=es.attributgruppe,
     )
-
-    # Archive exported products
-    for p in products:
-        state.archive_product(p.artikelnummer)
 
     log_activity("export_ameise", f"{len(products)} Produkte exportiert", len(products))
 
@@ -74,9 +75,9 @@ def export_preview():
             rows.append({
                 "artikelnummer": product.artikelnummer,
                 "artikelname": product.artikelname,
-            "attributgruppe": get_export_settings().attributgruppe,
+                "attributgruppe": get_export_settings().attributgruppe,
                 "funktionsattribut": config.id,
-                "attributname": config.name,
+                "attributname": f"{config.name} ({config.id})",
                 "attributwert": str(attr_value),
             })
     return {"rows": rows, "total_products": len(active_with_attrs), "total_rows": len(rows)}
@@ -87,7 +88,7 @@ def export_preview():
 @router.post("/stammdaten")
 def export_stammdaten():
     """Download a flat CSV with Stammdaten (one row per product). Does NOT archive."""
-    products = state.get_active_products()
+    products = _resolve_products(state.get_active_products())
     es = get_export_settings()
     csv_content = build_stammdaten_csv(products, delimiter=es.csv_trennzeichen, decimal_sep=es.dezimalformat)
     log_activity("export_stammdaten", f"{len(products)} Produkte exportiert", len(products))
@@ -150,7 +151,7 @@ def stammdaten_preview():
 @router.post("/seo")
 def export_seo():
     """Download a CSV with SEO & Content fields (one row per product). Does NOT archive."""
-    products = state.get_active_products()
+    products = _resolve_products(state.get_active_products())
     es = get_export_settings()
     csv_content = build_seo_csv(products, delimiter=es.csv_trennzeichen)
     log_activity("export_seo", f"{len(products)} Produkte exportiert", len(products))
@@ -178,3 +179,15 @@ def seo_preview():
             "meta_description": p.meta_description or "",
         })
     return {"rows": rows, "total_products": len(products)}
+
+
+@router.post("/archive-exported")
+def archive_exported():
+    """Archive all active products (called manually after all exports are done)."""
+    products = state.get_active_products()
+    archived = 0
+    for p in products:
+        state.archive_product(p.artikelnummer)
+        archived += 1
+    log_activity("archive_after_export", f"{archived} Produkte archiviert", archived)
+    return {"archived": archived}

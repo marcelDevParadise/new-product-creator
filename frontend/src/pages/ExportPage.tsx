@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Download, Eye, Package, FileText, Archive, Globe } from 'lucide-react';
+import { Download, Eye, Package, FileText, Archive, Globe, CheckCircle2 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useToast } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { api } from '../api/client';
 import type { ExportPreview, StammdatenPreview, SeoPreview, ExportValidation } from '../types';
+
+const TOTAL_EXPORTS = 3; // Stammdaten, Attribut, SEO
 
 export function ExportPage() {
   const [ameisePreview, setAmeisePreview] = useState<ExportPreview | null>(null);
@@ -18,6 +20,12 @@ export function ExportPage() {
   const [seoPreview, setSeoPreview] = useState<SeoPreview | null>(null);
   const [seoLoading, setSeoLoading] = useState(false);
   const [seoExporting, setSeoExporting] = useState(false);
+  const [exportCount, setExportCount] = useState(0);
+  const [archiveAfterExport, setArchiveAfterExport] = useState(() => {
+    const stored = localStorage.getItem('export_archiveAfterExport');
+    return stored !== null ? stored === 'true' : true;
+  });
+  const [archiving, setArchiving] = useState(false);
   const { toast } = useToast();
 
   const loadAmeisePreview = async () => {
@@ -49,9 +57,14 @@ export function ExportPage() {
     setAmeiseExporting(true);
     try {
       await api.downloadExport();
-      toast('Export erfolgreich — Produkte wurden archiviert', 'success');
+      const newCount = exportCount + 1;
+      setExportCount(newCount);
+      toast('Attribut-Export erfolgreich', 'success');
       setAmeisePreview(null);
       setValidation(null);
+      if (newCount >= TOTAL_EXPORTS && archiveAfterExport) {
+        await archiveProducts();
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');
     } finally {
@@ -75,7 +88,12 @@ export function ExportPage() {
     setStammdatenExporting(true);
     try {
       await api.downloadStammdatenExport();
+      const newCount = exportCount + 1;
+      setExportCount(newCount);
       toast('Stammdaten-Export erfolgreich', 'success');
+      if (newCount >= TOTAL_EXPORTS && archiveAfterExport) {
+        await archiveProducts();
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');
     } finally {
@@ -99,13 +117,36 @@ export function ExportPage() {
     setSeoExporting(true);
     try {
       await api.downloadSeoExport();
+      const newCount = exportCount + 1;
+      setExportCount(newCount);
       toast('SEO-Export erfolgreich', 'success');
+      if (newCount >= TOTAL_EXPORTS && archiveAfterExport) {
+        await archiveProducts();
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');
     } finally {
       setSeoExporting(false);
     }
   };
+
+  const archiveProducts = async () => {
+    setArchiving(true);
+    try {
+      const result = await api.archiveExported();
+      toast(`${result.archived} Produkte archiviert`, 'success');
+      setExportCount(0);
+      setAmeisePreview(null);
+      setStammdatenPreview(null);
+      setSeoPreview(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Archivierung fehlgeschlagen', 'error');
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  const allExported = exportCount >= TOTAL_EXPORTS;
 
   return (
     <div className="p-8 space-y-6">
@@ -225,10 +266,6 @@ export function ExportPage() {
               <h3 className="text-sm font-semibold text-gray-900">Attribut-Export (JTL Ameise)</h3>
               <p className="text-xs text-gray-500">Eine Zeile pro Attribut — Shopify-Metafelder für JTL Ameise.</p>
             </div>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-              <Archive className="w-3 h-3" />
-              Archiviert Produkte nach Export
-            </span>
           </div>
           <div className="flex gap-2">
             <button
@@ -385,6 +422,49 @@ export function ExportPage() {
             )}
           </div>
         )}
+      </section>
+
+      {/* --- Archivierung --- */}
+      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+              <Archive className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Produkte archivieren</h3>
+              <p className="text-xs text-gray-500">
+                Archiviert alle aktiven Produkte nach Abschluss aller Exporte.
+              </p>
+            </div>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${allExported ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-50 text-gray-500 border border-gray-200'}`}>
+              {allExported && <CheckCircle2 className="w-3.5 h-3.5" />}
+              {exportCount} / {TOTAL_EXPORTS} Exporte
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={archiveAfterExport}
+                onChange={(e) => {
+                  setArchiveAfterExport(e.target.checked);
+                  localStorage.setItem('export_archiveAfterExport', String(e.target.checked));
+                }}
+                className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="text-xs text-gray-600">Automatisch archivieren</span>
+            </label>
+            <button
+              onClick={archiveProducts}
+              disabled={archiving || exportCount === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+            >
+              <Archive className="w-3.5 h-3.5" />
+              {archiving ? 'Archiviere...' : 'Jetzt archivieren'}
+            </button>
+          </div>
+        </div>
       </section>
     </div>
   );

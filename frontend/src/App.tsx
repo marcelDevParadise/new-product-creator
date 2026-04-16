@@ -1,7 +1,8 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { Sidebar } from './components/layout/Sidebar';
 import { ToastProvider } from './components/ui/Toast';
+import { SearchDialog } from './components/ui/SearchDialog';
 import { DashboardPage } from './pages/DashboardPage';
 import { ImportPage } from './pages/ImportPage';
 import { ProductsPage } from './pages/ProductsPage';
@@ -18,14 +19,27 @@ import { CategoriesPage } from './pages/CategoriesPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <ToastProvider>
-      <div className="flex h-screen bg-gray-50/80">
-        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} />
+      <div className="flex h-screen bg-background">
+        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} onSearch={() => setSearchOpen(true)} />
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
+        <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       </div>
     </ToastProvider>
   );

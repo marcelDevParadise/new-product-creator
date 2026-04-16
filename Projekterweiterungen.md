@@ -33,37 +33,7 @@ Damit ist eine solide operative Basis vorhanden. Die nächsten Erweiterungen sol
 ## 1. Höchste Priorität: Funktionen mit direktem Alltagsnutzen
 
 ## 1.1 ✅ Erweiterte Validierung / Datenqualitätsprüfung
-
-### Ziel
-Nicht nur fehlende Pflichtattribute erkennen, sondern echte Datenfehler und Inkonsistenzen frühzeitig sichtbar machen.
-
-### Mögliche Prüfungen
-- doppelte EANs
-- ungültige oder leere Bild-URLs
-- unrealistische Maße oder Gewichte
-- fehlende Herstellerangaben
-- fehlende oder unvollständige Kategoriepfade
-- inkonsistente Attributwerte
-- falsche Formatierungen bei numerischen Feldern
-- unlogische Kombinationen von Produkttyp und Attributen
-- fehlende Angaben für grundpreispflichtige Produkte
-- Produkte mit zu wenig Bildmaterial
-- Produkte ohne Lieferantendaten
-- Produkte mit leerem oder zu kurzem Artikelnamen
-
-### Erweiterungsideen
-- Validierungsstatus pro Produkt
-- Ampelsystem: OK / Warnung / Fehler
-- eigene Seite „Datenqualität“
-- Filter „nur fehlerhafte Produkte“
-- Exportblocker bei kritischen Fehlern
-- Warnungen statt Blocker bei weichen Regeln
-
-### Technische Ansätze
-- dedizierter Validation-Service im Backend
-- standardisierte Rule-Objekte
-- Validierung sowohl beim Speichern als auch beim Export
-- Ergebnisstruktur mit `severity`, `field`, `message`, `suggested_fix`
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -107,95 +77,17 @@ Ein kleines DSL / JSON-Format für Regeln:
 ---
 
 ## 1.3 ✅ Bulk-Stammdatenbearbeitung
-
-### Ziel
-Nicht nur Attribute, sondern auch Stammdaten gesammelt ändern können.
-
-### Sinnvolle Bulk-Felder
-- Hersteller
-- Lieferant
-- Kategorien
-- Maße
-- Grundpreis-Felder
-- Bilder zurücksetzen / ergänzen
-- Export-Status / Archiv-Status
-- EAN-Felder
-- Preisfelder
-- Versandgewicht
-
-### Sinnvolle Bulk-Aktionen
-- Wert setzen
-- Wert löschen
-- Wert ersetzen
-- Prefix / Suffix anhängen
-- numerische Felder prozentual anpassen
-- Kategoriepfad aus Vorlage übernehmen
-- Bilder aus CSV-Mapping ergänzen
-
-### UX-Ideen
-- Bulk-Modal mit Feldwahl
-- Sicherheitsvorschau: „X Produkte werden geändert“
-- Änderungsprotokoll
-- Undo für letzte Bulk-Aktion
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
-## 1.4 Variantenlogik
-
-### Ziel
-Parent-/Child-Produkte oder Varianten sauber abbilden.
-
-### Mögliche Variantenachsen
-- Größe
-- Farbe
-- Material
-- Länge
-- Härtegrad
-- Ausführung
-
-### Nutzen
-- gemeinsame Stammdaten auf Parent-Ebene
-- variantenspezifische Werte auf Child-Ebene
-- sauberere Exporte
-- deutlich bessere Skalierung im Produktmanagement
-
-### Denkbare Datenstruktur
-- `parent_sku`
-- `is_variant_parent`
-- `variant_group`
-- `variant_attributes`
-- gemeinsame Bilder / gemeinsame Beschreibungslogik
-- variantenspezifische EANs und Preise
-
-### Zusätzliche Features
-- Variantenmatrix
-- Massenbearbeitung innerhalb einer Variantengruppe
-- gemeinsame Attributvererbung
-- Sichtprüfung „welche Werte weichen vom Parent ab?“
+## 1.4 ✅ Variantenlogik
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
 ## 1.5 ✅ Gespeicherte Filter und Arbeitsansichten
-
-### Ziel
-Wiederkehrende Arbeitszustände schneller erreichbar machen.
-
-### Beispiele
-- Unvollständige Produkte
-- Produkte ohne Bilder
-- Produkte ohne EAN
-- Exportbereit
-- Archiviert
-- GPSR prüfen
-- Neue Produkte
-- Produkte mit Warnungen
-- Produkte ohne Kategorie
-- Produkte mit fehlenden Pflichtattributen
-
-### Zusatzideen
-- persönliche Standardansicht
-- gemeinsame Team-Ansichten
-- sortierte Warteschlangen für Redaktionsarbeit
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -225,23 +117,7 @@ Produkte durch definierte Bearbeitungsstufen bewegen.
 ---
 
 ## 2.2 ✅ Produktbezogene Änderungshistorie
-
-### Ziel
-Nachvollziehen können, wer wann was geändert hat.
-
-### Sinnvolle Historien-Einträge
-- Feld vorher / nachher
-- Attribut hinzugefügt / entfernt
-- Bulk-Aktion durchgeführt
-- Export ausgelöst
-- Archivierung / Wiederherstellung
-- Vorlage angewendet
-- Regel-Engine angewendet
-
-### Erweiterungen
-- Vergleichsansicht
-- Wiederherstellung älterer Werte
-- Audit-Log für sensible Änderungen
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -279,19 +155,7 @@ Fehler bei Bulk-Aktionen oder Löschungen schnell rückgängig machen.
 ---
 
 ## 2.5 ✅ Import-Center mit Fehlerreport
-
-### Ziel
-CSV-Import robuster und transparenter machen.
-
-### Erweiterungen
-- Import-Mapping speichern
-- Feldzuordnung per UI
-- Preview mit Konflikterkennung
-- Fehlerreport zum Download
-- Teilimporte erlauben
-- „nur neue Produkte importieren“
-- „nur bestehende Produkte aktualisieren“
-- Import-Regeln pro Quelle speichern
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -519,16 +383,7 @@ Produktdaten nicht nur per CSV, sondern auch aus wiederkehrenden Quellen beziehe
 ---
 
 ## 4.6 ✅ SEO & Content Export
-
-### Ziel
-SEO-relevante Produktdaten (Kurzbeschreibung, Beschreibung, URL-Pfad, Title Tag, Meta-Description) als Stammdaten pflegen und als eigenen CSV-Export bereitstellen.
-
-### Umgesetzte Features
-- 5 neue Stammdaten-Felder: `kurzbeschreibung`, `beschreibung`, `url_pfad`, `title_tag`, `meta_description`
-- SEO & Content Sektion im Stammdaten-Editor mit Zeichenzähler (Title ≤60, Meta ≤155)
-- Neuer Export-Typ: SEO & Content CSV (Vorschau + Download)
-- Export-Spalten: Artikelnummer, Artikelname, Kurzbeschreibung, Beschreibung, URL-Pfad, Title Tag, Meta-Description
-- Bulk-Stammdaten-Bearbeitung unterstützt die neuen Felder
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -573,17 +428,7 @@ Bei Produktänderungen externe Systeme automatisch benachrichtigen.
 ## 5. UI- und UX-Verbesserungen
 
 ## 5.1 ✅ Medien-Management mit Vorschaubildern
-
-### Ziel
-Bildpflege deutlich komfortabler machen.
-
-### Erweiterungen
-- Thumbnail-Vorschau
-- Drag & Drop-Sortierung
-- Prüfung der Bild-URLs
-- Markierung des Hauptbilds
-- Bild-Status (OK / Fehler)
-- Alt-Text / Dateiname / Herkunft pflegen
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -612,16 +457,8 @@ Weniger Seitenwechsel, schnellere Bearbeitung.
 
 ---
 
-## 5.4 Verbesserte Dashboard-Ansichten
-
-### Zusätzliche KPI-Ideen
-- Produkte mit Fehlern
-- Produkte ohne Bilder
-- Exporte heute / diese Woche
-- Top-Fehlerarten
-- Attributnutzung je Kategorie
-- Produkte pro Bearbeitungsstatus
-- zuletzt geänderte Produkte
+## 5.4 ✅ Verbesserte Dashboard-Ansichten
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -639,30 +476,13 @@ Jede Tabelle an den Arbeitsstil anpassen.
 
 ---
 
-## 5.6 Globale Suche
-
-### Ziel
-Über alle Bereiche hinweg suchen — Produkte, Attribute, Templates, Aktivitäten.
-
-### Features
-- Suchleiste in der Sidebar oder als Overlay (Ctrl+K)
-- Ergebnisse gruppiert nach Typ (Produkt, Attribut, Template, Log)
-- Schnellnavigation zum Treffer
-- Letzte Suchen merken
-- Fuzzy-Matching für Tippfehler
+## 5.6 ✅ Globale Suche
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
-## 5.7 Dark Mode
-
-### Ziel
-Optionales dunkles Farbschema für komfortableres Arbeiten bei wenig Licht.
-
-### Umsetzung
-- Tailwind CSS `dark:`-Varianten für alle Komponenten
-- Toggle in den Einstellungen oder Sidebar
-- Präferenz speichern (localStorage)
-- System-Präferenz respektieren (prefers-color-scheme)
+## 5.7 ✅ Dark Mode
+→ Details siehe [Erledigte-Erweiterungen.md](Erledigte-Erweiterungen.md)
 
 ---
 
@@ -978,11 +798,11 @@ Nicht alles hart in JSON-Dateien halten.
 - Benutzerrollen
 - Duplikat-Erkennung
 - CSV-Spalten-Mapping
-- Globale Suche
+- ✅ Globale Suche
 - Shopify-Metafield-Mapping
 
 ## Phase 3 — Strategischer Ausbau
-- Variantenlogik
+- ✅ Variantenlogik
 - Shopify-Direktsync
 - Hintergrundjobs
 - PostgreSQL-Migration
@@ -991,7 +811,7 @@ Nicht alles hart in JSON-Dateien halten.
 - API-Webhooks
 - Daten-Vergleich
 - Druckansicht / PDF-Export
-- Dark Mode
+- ✅ Dark Mode
 
 ---
 
@@ -1028,7 +848,7 @@ Falls dieses Dokument direkt als Arbeitsgrundlage für Claude Code genutzt werde
 
 ### Fokus C — Strategischer Ausbau
 - Regel-Engine
-- Variantenlogik
+- ✅ Variantenlogik
 - Export-Profile
 - Shopify-Sync-Vorbereitung
 
@@ -1038,8 +858,8 @@ Falls dieses Dokument direkt als Arbeitsgrundlage für Claude Code genutzt werde
 - Daten-Vergleich
 - Shopify-Metafield-Mapping
 - API-Webhooks
-- Globale Suche
-- Dark Mode
+- ✅ Globale Suche
+- ✅ Dark Mode
 - Druckansicht / PDF-Export
 - Mehrsprachigkeit
 

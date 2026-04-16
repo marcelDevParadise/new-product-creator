@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
-import { Save, ArrowRight, ChevronRight } from 'lucide-react';
+import { useParams, useNavigate, useBlocker, Link } from 'react-router-dom';
+import { Save, ArrowRight, ChevronRight, GitBranch, ArrowDownFromLine, X, Copy } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CategoryCascader } from '../components/ui/CategoryCascader';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
-import type { Product, CategoryTree } from '../types';
+import { VariantMatrix } from '../components/products/VariantMatrix';
+import type { Product, CategoryTree, VariantenSettings } from '../types';
 
 const EINHEITEN_FALLBACK = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
 
@@ -25,10 +26,32 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+function Field({ label, children, hint, inherited, parentValue, onClearOwn }: {
+  label: string; children: React.ReactNode; hint?: string;
+  inherited?: boolean; parentValue?: string; onClearOwn?: () => void;
+}) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <div className="flex items-center gap-2 mb-1">
+        <label className="block text-xs font-medium text-gray-600">{label}</label>
+        {inherited && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-600 rounded-full">
+            <ArrowDownFromLine className="w-3 h-3" />
+            Geerbt{parentValue ? `: ${parentValue}` : ''}
+          </span>
+        )}
+        {onClearOwn && !inherited && (
+          <button
+            type="button"
+            onClick={onClearOwn}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-500 rounded-full hover:bg-red-100 hover:text-red-600 transition-colors"
+            title="Eigenen Wert entfernen → vom Parent erben"
+          >
+            <X className="w-3 h-3" />
+            Eigener Wert
+          </button>
+        )}
+      </div>
       {children}
       {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
     </div>
@@ -75,12 +98,36 @@ export function StammdatenEditPage() {
   const [dirty, setDirty] = useState(false);
   const [categoryTree, setCategoryTree] = useState<CategoryTree>({});
   const [einheiten, setEinheiten] = useState<string[]>(EINHEITEN_FALLBACK);
+  const [inheritFields, setInheritFields] = useState<string[]>([]);
+  const [parentProduct, setParentProduct] = useState<Product | null>(null);
+  const [childProducts, setChildProducts] = useState<Product[]>([]);
+  const [inheritedFieldSet, setInheritedFieldSet] = useState<Set<string>>(new Set());
+  const [resolvedParentValues, setResolvedParentValues] = useState<Record<string, string>>({});
+  const [variantAxes, setVariantAxes] = useState<string[]>([]);
 
   const markDirty = () => setDirty(true);
 
   const set = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setF((prev) => prev ? { ...prev, [key]: e.target.value } : prev);
     markDirty();
+  };
+
+  // Inheritance helpers for child products
+  const isChild = !!product?.parent_sku;
+  const fieldInherit = (fieldName: string) => {
+    if (!isChild) return {};
+    const inherited = inheritedFieldSet.has(fieldName);
+    const parentVal = resolvedParentValues[fieldName];
+    const hasOwnValue = !inherited && inheritFields.includes(fieldName);
+    return {
+      inherited,
+      parentValue: inherited ? parentVal : undefined,
+      onClearOwn: hasOwnValue ? () => {
+        setF(prev => prev ? { ...prev, [fieldName]: '' } : prev);
+        setInheritedFieldSet(prev => new Set([...prev, fieldName]));
+        markDirty();
+      } : undefined,
+    };
   };
 
   // Block navigation when form is dirty
@@ -110,13 +157,37 @@ export function StammdatenEditPage() {
   useEffect(() => {
     if (!sku) return;
     api.getProduct(decodeURIComponent(sku))
-      .then((p) => { setProduct(p); setF(initForm(p)); })
+      .then((p) => {
+        setProduct(p);
+        setF(initForm(p));
+        // Load variant context
+        if (p.parent_sku) {
+          api.getProduct(p.parent_sku).then(setParentProduct).catch(() => {});
+          api.getResolvedProduct(p.artikelnummer).then(res => {
+            setInheritedFieldSet(new Set(res.inherited_fields));
+            // Build map of parent values for inherited fields
+            const parentVals: Record<string, string> = {};
+            for (const field of res.inherited_fields) {
+              const val = (res.product as Record<string, unknown>)[field];
+              if (val != null && val !== '') parentVals[field] = String(val);
+            }
+            setResolvedParentValues(parentVals);
+          }).catch(() => {});
+        }
+        if (p.is_parent) {
+          api.getVariantGroup(p.artikelnummer).then(g => {
+            setChildProducts(g.children);
+            setVariantAxes(g.variant_axes || []);
+          }).catch(() => {});
+        }
+      })
       .catch((e) => setError(e.message));
   }, [sku]);
 
   useEffect(() => {
     api.getCategoryTree().then(setCategoryTree).catch(() => {});
     api.getEinheiten().then(setEinheiten).catch(() => {});
+    api.getVariantenSettings().then((s: VariantenSettings) => setInheritFields(s.inherit_fields)).catch(() => {});
   }, []);
 
   const handleEkChange = async (value: string) => {
@@ -208,46 +279,108 @@ export function StammdatenEditPage() {
         <PageHeader
           title={product.artikelname}
           description={`Stammdaten für ${product.artikelnummer} bearbeiten`}
+          actions={
+            <button
+              onClick={async () => {
+                try {
+                  const cloned = await api.cloneProduct(product.artikelnummer);
+                  toast(`Geklont als ${cloned.artikelnummer}`, 'success');
+                  navigate(`/stammdaten/${encodeURIComponent(cloned.artikelnummer)}`);
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Klonen fehlgeschlagen', 'error');
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+            >
+              <Copy className="w-4 h-4" />
+              Klonen
+            </button>
+          }
         />
       </div>
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-auto px-8 pb-8">
+        {/* Variant info banner */}
+        {product.parent_sku && parentProduct && (
+          <div className="mb-4 flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl">
+            <GitBranch className="w-5 h-5 text-purple-500 shrink-0" />
+            <div className="text-sm">
+              <span className="text-purple-700 dark:text-purple-300">Variante von </span>
+              <Link
+                to={`/stammdaten/${encodeURIComponent(parentProduct.artikelnummer)}`}
+                className="font-medium text-purple-700 dark:text-purple-300 hover:underline"
+              >
+                {parentProduct.artikelnummer} — {parentProduct.artikelname}
+              </Link>
+              {Object.keys(product.variant_attributes).length > 0 && (
+                <span className="ml-2 inline-flex gap-1">
+                  {Object.entries(product.variant_attributes).map(([k, v]) => (
+                    <span key={k} className="px-2 py-0.5 text-[10px] font-medium bg-purple-100 dark:bg-purple-800/40 text-purple-600 dark:text-purple-300 rounded-full">
+                      {k}: {v}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+        {product.is_parent && (
+          <div className="mb-4">
+            <VariantMatrix
+              parentSku={product.artikelnummer}
+              childProducts={childProducts}
+              variantAxes={variantAxes}
+              onChildCreated={() => {
+                api.getVariantGroup(product.artikelnummer).then(g => {
+                  setChildProducts(g.children);
+                  setVariantAxes(g.variant_axes || []);
+                }).catch(() => {});
+              }}
+              onChildRemoved={() => {
+                api.getVariantGroup(product.artikelnummer).then(g => {
+                  setChildProducts(g.children);
+                  setVariantAxes(g.variant_axes || []);
+                }).catch(() => {});
+              }}
+            />
+          </div>
+        )}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* ───── Allgemein ───── */}
           <Section title="Allgemein">
-            <Field label="Artikelname">
+            <Field label="Artikelname" {...fieldInherit('artikelname')}>
               <input className={inputCls} value={f.artikelname} onChange={set('artikelname')} />
             </Field>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="EK (Netto)">
+              <Field label="EK (Netto)" {...fieldInherit('ek')}>
                 <input className={inputCls} value={f.ek} onChange={(e) => handleEkChange(e.target.value)} placeholder="0,00" />
               </Field>
-              <Field label="VK (Brutto)" hint="Wird aus EK berechnet">
+              <Field label="VK (Brutto)" hint="Wird aus EK berechnet" {...fieldInherit('preis')}>
                 <input className={`${inputCls} bg-gray-50`} value={f.preis} onChange={set('preis')} placeholder="wird berechnet" />
               </Field>
             </div>
-            <Field label="Hersteller">
+            <Field label="Hersteller" {...fieldInherit('hersteller')}>
               <input className={inputCls} value={f.hersteller} onChange={set('hersteller')} />
             </Field>
-            <Field label="GTIN / EAN">
+            <Field label="GTIN / EAN" {...fieldInherit('ean')}>
               <input className={`${inputCls} font-mono`} value={f.ean} onChange={set('ean')} placeholder="z.B. 4260605481234" />
             </Field>
           </Section>
 
           {/* ───── Maße / Gewicht ───── */}
           <Section title="Maße / Gewicht">
-            <Field label="Gewicht (g)">
+            <Field label="Gewicht (g)" {...fieldInherit('gewicht')}>
               <input className={inputCls} value={f.gewicht} onChange={set('gewicht')} placeholder="0" />
             </Field>
             <div className="grid grid-cols-3 gap-4">
-              <Field label="Länge (cm)">
+              <Field label="Länge (cm)" {...fieldInherit('laenge')}>
                 <input className={inputCls} value={f.laenge} onChange={set('laenge')} placeholder="0" />
               </Field>
-              <Field label="Breite (cm)">
+              <Field label="Breite (cm)" {...fieldInherit('breite')}>
                 <input className={inputCls} value={f.breite} onChange={set('breite')} placeholder="0" />
               </Field>
-              <Field label="Höhe (cm)">
+              <Field label="Höhe (cm)" {...fieldInherit('hoehe')}>
                 <input className={inputCls} value={f.hoehe} onChange={set('hoehe')} placeholder="0" />
               </Field>
             </div>
@@ -325,7 +458,7 @@ export function StammdatenEditPage() {
                 const url = f[key] as string;
                 const isUrl = url && (url.startsWith('http://') || url.startsWith('https://'));
                 return (
-                  <Field key={i} label={`Bild ${i} Pfad / URL`}>
+                  <Field key={i} label={`Bild ${i} Pfad / URL`} {...fieldInherit(`bild_${i}`)}>
                     <div className="flex gap-2 items-start">
                       <input className={`${inputCls} font-mono text-xs flex-1`} value={url} onChange={set(key)} placeholder="https:// oder C:\..." />
                       {isUrl && (

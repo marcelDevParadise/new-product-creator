@@ -25,6 +25,18 @@ _DEFAULTS: dict = {
         "hersteller": "",
         "lieferant_name": "",
     },
+    "varianten": {
+        "inherit_fields": [
+            "hersteller", "beschreibung", "kurzbeschreibung",
+            "bild_1", "bild_2", "bild_3", "bild_4", "bild_5",
+            "bild_6", "bild_7", "bild_8", "bild_9",
+            "kategorie_1", "kategorie_2", "kategorie_3",
+            "kategorie_4", "kategorie_5", "kategorie_6",
+            "url_pfad", "title_tag", "meta_description",
+            "lieferant_name", "lieferant_artikelnummer", "lieferant_artikelname",
+        ],
+        "variant_axes": ["Größe", "Farbe", "Material", "Ausführung"],
+    },
 }
 
 
@@ -52,7 +64,7 @@ def _load_settings() -> dict:
         # Merge with defaults so new keys are always present
         merged = json.loads(json.dumps(_DEFAULTS))
         merged.update(raw)
-        for section in ("export", "standard_werte"):
+        for section in ("export", "standard_werte", "varianten"):
             if section in _DEFAULTS and isinstance(_DEFAULTS[section], dict):
                 merged[section] = {**_DEFAULTS[section], **raw.get(section, {})}
         return merged
@@ -177,6 +189,30 @@ def update_defaults(body: DefaultValues):
     data["standard_werte"] = body.model_dump()
     _save_settings(data)
     return data["standard_werte"]
+
+
+# --- Varianten ---
+
+def get_varianten_settings() -> dict:
+    return _load_settings().get("varianten", _DEFAULTS["varianten"])
+
+
+@router.get("/varianten")
+def get_varianten():
+    return get_varianten_settings()
+
+
+class VariantenSettings(BaseModel):
+    inherit_fields: list[str]
+    variant_axes: list[str]
+
+
+@router.put("/varianten")
+def update_varianten(body: VariantenSettings):
+    data = _load_settings()
+    data["varianten"] = body.model_dump()
+    _save_settings(data)
+    return data["varianten"]
 
 
 # --- All Settings (combined read) ---

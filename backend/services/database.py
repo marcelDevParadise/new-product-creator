@@ -135,6 +135,10 @@ def _migrate_product_columns(conn: sqlite3.Connection) -> None:
         ("url_pfad", "TEXT"),
         ("title_tag", "TEXT"),
         ("meta_description", "TEXT"),
+        # Varianten
+        ("parent_sku", "TEXT"),
+        ("is_parent", "INTEGER DEFAULT 0"),
+        ("variant_attributes", "TEXT DEFAULT '{}'"),
     ]
     for col_name, col_type in migrations:
         if col_name not in existing:
@@ -152,7 +156,8 @@ def load_all_products() -> dict[str, Product]:
         "lieferant_name, lieferant_artikelnummer, lieferant_artikelname, lieferant_netto_ek, "
         "bild_1, bild_2, bild_3, bild_4, bild_5, bild_6, bild_7, bild_8, bild_9, "
         "kategorie_1, kategorie_2, kategorie_3, kategorie_4, kategorie_5, kategorie_6, "
-        "kurzbeschreibung, beschreibung, url_pfad, title_tag, meta_description "
+        "kurzbeschreibung, beschreibung, url_pfad, title_tag, meta_description, "
+        "parent_sku, is_parent, variant_attributes "
         "FROM products"
     ).fetchall()
     conn.close()
@@ -202,6 +207,9 @@ def load_all_products() -> dict[str, Product]:
             url_pfad=row[40],
             title_tag=row[41],
             meta_description=row[42],
+            parent_sku=row[43],
+            is_parent=bool(row[44]) if row[44] is not None else False,
+            variant_attributes=json.loads(row[45]) if row[45] else {},
         )
     return products
 
@@ -218,6 +226,7 @@ def save_product(product: Product) -> None:
         "bild_1", "bild_2", "bild_3", "bild_4", "bild_5", "bild_6", "bild_7", "bild_8", "bild_9",
         "kategorie_1", "kategorie_2", "kategorie_3", "kategorie_4", "kategorie_5", "kategorie_6",
         "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description",
+        "parent_sku", "is_parent", "variant_attributes",
     ]
     placeholders = ", ".join(["?"] * len(cols))
     col_list = ", ".join(cols)
@@ -232,6 +241,7 @@ def save_product(product: Product) -> None:
         product.bild_1, product.bild_2, product.bild_3, product.bild_4, product.bild_5, product.bild_6, product.bild_7, product.bild_8, product.bild_9,
         product.kategorie_1, product.kategorie_2, product.kategorie_3, product.kategorie_4, product.kategorie_5, product.kategorie_6,
         product.kurzbeschreibung, product.beschreibung, product.url_pfad, product.title_tag, product.meta_description,
+        product.parent_sku, int(product.is_parent), json.dumps(product.variant_attributes),
     )
     conn.execute(
         f"INSERT INTO products ({col_list}) VALUES ({placeholders}) ON CONFLICT(artikelnummer) DO UPDATE SET {updates}",

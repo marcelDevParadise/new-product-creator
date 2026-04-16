@@ -42,5 +42,13 @@ class DashboardStats(BaseModel):
     export_ready: int
     export_not_ready: int
     export_ready_percent: float
+    # Extended KPIs
+    products_without_images: int
+    products_without_ean: int
+    products_with_errors: int
+    seo_complete: int
+    seo_percent: float
+    avg_attributes_per_product: float
+    recently_updated: list[IncompleteProduct]
     incomplete_products: list[IncompleteProduct]
     recent_activities: list[ActivityLog]

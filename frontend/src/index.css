@@ -155,6 +155,13 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Theme transition — disable default cross-fade, JS handles circle reveal */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -165,4 +172,197 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Dark mode overrides for common patterns used across pages */
+
+/* --- Backgrounds --- */
+.dark .bg-white {
+  background-color: oklch(0.205 0 0);
+}
+.dark .bg-gray-50,
+.dark .bg-gray-50\/80 {
+  background-color: oklch(0.17 0 0);
+}
+.dark .bg-gray-100 {
+  background-color: oklch(0.22 0 0);
+}
+.dark .bg-gray-200 {
+  background-color: oklch(0.25 0 0);
+}
+
+/* --- Borders --- */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: oklch(1 0 0 / 10%);
+}
+.dark .border-dashed.border-gray-300 {
+  border-color: oklch(1 0 0 / 15%);
+}
+
+/* --- Text colors --- */
+.dark .text-gray-900 {
+  color: oklch(0.95 0 0);
+}
+.dark .text-gray-800 {
+  color: oklch(0.9 0 0);
+}
+.dark .text-gray-700 {
+  color: oklch(0.82 0 0);
+}
+.dark .text-gray-600 {
+  color: oklch(0.72 0 0);
+}
+.dark .text-gray-500 {
+  color: oklch(0.62 0 0);
+}
+.dark .text-gray-400 {
+  color: oklch(0.55 0 0);
+}
+.dark .text-gray-300 {
+  color: oklch(0.65 0 0);
+}
+
+/* --- Hover states --- */
+.dark .hover\:bg-gray-50:hover {
+  background-color: oklch(0.22 0 0);
+}
+.dark .hover\:bg-gray-100:hover {
+  background-color: oklch(0.25 0 0);
+}
+.dark .hover\:border-gray-400:hover {
+  border-color: oklch(1 0 0 / 20%);
+}
+
+/* --- Dividers --- */
+.dark .divide-gray-100 > :not(:last-child),
+.dark .divide-gray-200 > :not(:last-child) {
+  border-color: oklch(1 0 0 / 8%);
+}
+
+/* --- Native form elements (select, input, textarea) --- */
+.dark select,
+.dark input[type="text"],
+.dark input[type="number"],
+.dark input[type="email"],
+.dark input[type="password"],
+.dark input[type="search"],
+.dark input[type="url"],
+.dark textarea {
+  background-color: oklch(0.17 0 0);
+  color: oklch(0.92 0 0);
+  border-color: oklch(1 0 0 / 15%);
+}
+.dark select:focus,
+.dark input:focus,
+.dark textarea:focus {
+  border-color: oklch(0.457 0.24 277.023);
+}
+.dark select option {
+  background-color: oklch(0.205 0 0);
+  color: oklch(0.92 0 0);
+}
+
+/* --- Checkboxes --- */
+.dark input[type="checkbox"] {
+  background-color: oklch(0.17 0 0);
+  border-color: oklch(1 0 0 / 20%);
+}
+
+/* --- Shadows (soften in dark mode) --- */
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+}
+.dark .shadow-md {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+}
+.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+.dark .shadow-xl,
+.dark .shadow-2xl {
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+}
+
+/* --- Ring overrides --- */
+.dark .ring-black\/5 {
+  --tw-ring-color: rgb(255 255 255 / 0.05);
+}
+
+/* --- Indigo/colored accents --- */
+.dark .bg-indigo-50,
+.dark .bg-indigo-50\/50 {
+  background-color: oklch(0.457 0.24 277.023 / 0.1);
+}
+.dark .text-indigo-700 {
+  color: oklch(0.65 0.2 277);
+}
+.dark .text-indigo-600 {
+  color: oklch(0.6 0.22 277);
+}
+.dark .border-indigo-200 {
+  border-color: oklch(0.457 0.24 277.023 / 0.3);
+}
+
+/* --- Colored status backgrounds --- */
+.dark .bg-emerald-50 {
+  background-color: oklch(0.17 0.04 165 / 0.3);
+}
+.dark .bg-red-50 {
+  background-color: oklch(0.17 0.04 25 / 0.3);
+}
+.dark .bg-amber-50 {
+  background-color: oklch(0.17 0.04 85 / 0.3);
+}
+.dark .bg-green-50 {
+  background-color: oklch(0.17 0.04 150 / 0.3);
+}
+.dark .bg-yellow-50 {
+  background-color: oklch(0.17 0.04 90 / 0.3);
+}
+.dark .bg-orange-50 {
+  background-color: oklch(0.17 0.04 60 / 0.3);
+}
+.dark .hover\:bg-emerald-50:hover { background-color: oklch(0.2 0.04 165 / 0.3); }
+.dark .hover\:bg-red-50:hover { background-color: oklch(0.2 0.04 25 / 0.3); }
+.dark .hover\:bg-amber-50:hover { background-color: oklch(0.2 0.04 85 / 0.3); }
+.dark .hover\:bg-green-50:hover { background-color: oklch(0.2 0.04 150 / 0.3); }
+
+/* --- Active tab pattern (white tab on gray border) --- */
+.dark .border-b-white {
+  border-bottom-color: oklch(0.205 0 0);
+}
+
+/* --- Purple accent (Varianten) --- */
+.dark .bg-purple-100 {
+  background-color: oklch(0.457 0.15 300 / 0.2);
+}
+.dark .text-purple-600 {
+  color: oklch(0.7 0.15 300);
+}
+.dark .text-purple-700 {
+  color: oklch(0.75 0.15 300);
+}
+.dark .hover\:bg-red-100:hover {
+  background-color: oklch(0.25 0.06 25 / 0.4);
+}
+.dark .hover\:text-red-600:hover {
+  color: oklch(0.65 0.2 25);
+}
+
+/* --- TipTap editor dark --- */
+.dark .tiptap pre,
+.dark .tiptap code {
+  background: oklch(0.17 0 0);
+}
+.dark .tiptap blockquote {
+  border-left-color: oklch(1 0 0 / 15%);
+  color: oklch(0.62 0 0);
+}
+.dark .tiptap hr {
+  border-top-color: oklch(1 0 0 / 10%);
+}
+.dark .tiptap a {
+  color: oklch(0.65 0.2 277);
 }

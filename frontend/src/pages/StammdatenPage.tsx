@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -7,10 +7,12 @@ import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import type { Product } from '../types';
 import { BulkStammdatenModal } from '../components/products/BulkStammdatenModal';
-import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Archive, X, ClipboardEdit } from 'lucide-react';
+import { VariantGroupModal } from '../components/products/VariantGroupModal';
+import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Archive, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy, Check } from 'lucide-react';
 
 type SortKey = 'artikelnummer' | 'artikelname' | 'ek' | 'preis' | 'gewicht' | 'hersteller' | 'ean' | 'status';
 type SortDir = 'asc' | 'desc';
+type EditingCell = { sku: string; field: string } | null;
 
 export function StammdatenPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,8 +35,62 @@ export function StammdatenPage() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBulkStammdaten, setShowBulkStammdaten] = useState(false);
+  const [showVariantGroupModal, setShowVariantGroupModal] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [editingCell, setEditingCell] = useState<EditingCell>(null);
+  const [editValue, setEditValue] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const startEdit = useCallback((sku: string, field: string, currentValue: string) => {
+    setEditingCell({ sku, field });
+    setEditValue(currentValue);
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editingCell) return;
+    const { sku, field } = editingCell;
+    const numericFields = ['ek', 'preis', 'gewicht'];
+    const val = editValue.trim();
+    let payload: Record<string, string | number | null>;
+    if (numericFields.includes(field)) {
+      const parsed = val ? parseFloat(val.replace(',', '.')) : null;
+      payload = { [field]: isNaN(parsed as number) ? null : parsed };
+    } else {
+      payload = { [field]: val || null };
+    }
+    try {
+      const updated = await api.updateStammdaten(sku, payload);
+      setProducts(prev => prev.map(p => p.artikelnummer === sku ? updated : p));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Speichern fehlgeschlagen', 'error');
+    }
+    setEditingCell(null);
+  }, [editingCell, editValue, toast]);
+
+  const cancelEdit = useCallback(() => setEditingCell(null), []);
+
+  const handleClone = useCallback(async (sku: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const cloned = await api.cloneProduct(sku);
+      toast(`Geklont als ${cloned.artikelnummer}`, 'success');
+      navigate(`/stammdaten/${encodeURIComponent(cloned.artikelnummer)}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Klonen fehlgeschlagen', 'error');
+    }
+  }, [toast, navigate]);
+
+  const toggleGroupExpand = useCallback((parentSku: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(parentSku)) next.delete(parentSku);
+      else next.add(parentSku);
+      return next;
+    });
+  }, []);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -77,6 +133,39 @@ export function StammdatenPage() {
     }
     return list;
   }, [products, searchQuery, sortKey, sortDir]);
+
+  // Group products: parents with children, standalone products
+  type GroupedRow = { type: 'standalone'; product: Product } | { type: 'parent'; product: Product; childCount: number } | { type: 'child'; product: Product; parentSku: string };
+  const groupedRows = useMemo<GroupedRow[]>(() => {
+    const childMap = new Map<string, Product[]>();
+    const parentSet = new Set<string>();
+    const childSet = new Set<string>();
+    for (const p of filteredProducts) {
+      if (p.is_parent) parentSet.add(p.artikelnummer);
+      if (p.parent_sku) {
+        childSet.add(p.artikelnummer);
+        const list = childMap.get(p.parent_sku) || [];
+        list.push(p);
+        childMap.set(p.parent_sku, list);
+      }
+    }
+    const rows: GroupedRow[] = [];
+    for (const p of filteredProducts) {
+      if (childSet.has(p.artikelnummer)) continue; // children rendered under parent
+      if (parentSet.has(p.artikelnummer)) {
+        const children = childMap.get(p.artikelnummer) || [];
+        rows.push({ type: 'parent', product: p, childCount: children.length });
+        if (expandedGroups.has(p.artikelnummer)) {
+          for (const c of children) {
+            rows.push({ type: 'child', product: c, parentSku: p.artikelnummer });
+          }
+        }
+      } else {
+        rows.push({ type: 'standalone', product: p });
+      }
+    }
+    return rows;
+  }, [filteredProducts, expandedGroups]);
 
   const filteredArchived = useMemo(() => {
     if (!searchQuery.trim()) return archivedProducts;
@@ -218,6 +307,13 @@ export function StammdatenPage() {
             </button>
             {selectedSkus.size > 0 && !showArchive && (
               <>
+                <button
+                  onClick={() => setShowVariantGroupModal(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors"
+                >
+                  <GitBranch className="w-4 h-4" />
+                  Varianten gruppieren
+                </button>
                 <button
                   onClick={() => setShowBulkStammdaten(true)}
                   className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
@@ -363,7 +459,7 @@ export function StammdatenPage() {
 
       {loading ? (
         <LoadingSpinner className="py-16" />
-      ) : products.length === 0 ? (
+      ) : products.length === 0 && !showArchive ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200 shadow-sm">
           <Upload className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-500 mb-4">Keine aktiven Produkte vorhanden.</p>
@@ -413,14 +509,19 @@ export function StammdatenPage() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 w-[140px] cursor-pointer select-none hover:text-gray-700" onClick={() => toggleSort('ean')}>
                     <span className="inline-flex items-center gap-1">GTIN <SortIcon col="ean" /></span>
                   </th>
-                  <th className="px-4 py-3 w-[50px]" />
+                  <th className="px-4 py-3 w-[80px]" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredProducts.map((p) => (
+                {groupedRows.map((row) => {
+                  const p = row.product;
+                  const isChild = row.type === 'child';
+                  const isParent = row.type === 'parent';
+                  const expanded = isParent && expandedGroups.has(p.artikelnummer);
+                  return (
                   <tr
                     key={p.artikelnummer}
-                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${selectedSkus.has(p.artikelnummer) ? 'bg-indigo-50/50' : ''}`}
+                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${selectedSkus.has(p.artikelnummer) ? 'bg-indigo-50/50' : ''} ${isChild ? 'bg-purple-50/30' : ''}`}
                     onClick={() => navigate(`/stammdaten/${encodeURIComponent(p.artikelnummer)}`)}
                   >
                     <td className="px-4 py-2 text-center" onClick={(e) => e.stopPropagation()}>
@@ -438,29 +539,127 @@ export function StammdatenPage() {
                         <AlertCircle className="w-4 h-4 text-amber-400" />
                       )}
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs text-gray-700">{p.artikelnummer}</td>
-                    <td className="px-4 py-2 text-gray-700 truncate max-w-[250px]">{p.artikelname}</td>
-                    <td className="px-4 py-2 text-right text-gray-600 tabular-nums">
-                      {p.ek != null ? `${p.ek.toFixed(2)} €` : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-2 font-mono text-xs text-gray-700">
+                      <span className={`inline-flex items-center gap-1 ${isChild ? 'pl-6' : ''}`}>
+                        {isParent && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleGroupExpand(p.artikelnummer); }}
+                            className="p-0.5 rounded hover:bg-gray-200 transition-colors"
+                          >
+                            {expanded ? <ChevronDown className="w-3.5 h-3.5 text-purple-500" /> : <ChevronRight className="w-3.5 h-3.5 text-purple-500" />}
+                          </button>
+                        )}
+                        {isChild && <span className="w-3 border-l-2 border-b-2 border-purple-200 h-3 mr-1 rounded-bl-sm" />}
+                        {p.artikelnummer}
+                      </span>
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-900 font-medium tabular-nums">
-                      {p.preis != null ? `${p.preis.toFixed(2)} €` : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-2 text-gray-700 truncate max-w-[250px]">
+                      <span className="inline-flex items-center gap-2">
+                        {p.artikelname}
+                        {isParent && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700 rounded-full dark:bg-purple-900/30 dark:text-purple-300">
+                            <GitBranch className="w-3 h-3" />
+                            Parent · {(row as { childCount: number }).childCount}
+                          </span>
+                        )}
+                        {isChild && Object.entries(p.variant_attributes).map(([k, v]) => (
+                          <span key={k} className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-purple-50 text-purple-600 rounded-full border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-700">
+                            {v}
+                          </span>
+                        ))}
+                      </span>
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-900 tabular-nums">
-                      {p.gewicht != null ? `${p.gewicht} g` : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-2 text-right text-gray-600 tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'ek', p.ek != null ? p.ek.toFixed(2) : ''); }}>
+                      {editingCell?.sku === p.artikelnummer && editingCell.field === 'ek' ? (
+                        <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                          onBlur={saveEdit}
+                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                      ) : (
+                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.ek != null ? `${p.ek.toFixed(2)} €` : <span className="text-gray-300">—</span>}</span>
+                      )}
                     </td>
-                    <td className="px-4 py-2 text-gray-600">
-                      {p.hersteller || <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-2 text-right text-gray-900 font-medium tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'preis', p.preis != null ? p.preis.toFixed(2) : ''); }}>
+                      {editingCell?.sku === p.artikelnummer && editingCell.field === 'preis' ? (
+                        <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                          onBlur={saveEdit}
+                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                      ) : (
+                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.preis != null ? `${p.preis.toFixed(2)} €` : <span className="text-gray-300">—</span>}</span>
+                      )}
                     </td>
-                    <td className="px-4 py-2 font-mono text-xs text-gray-500">
-                      {p.ean || <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-2 text-right text-gray-900 tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'gewicht', p.gewicht != null ? String(p.gewicht) : ''); }}>
+                      {editingCell?.sku === p.artikelnummer && editingCell.field === 'gewicht' ? (
+                        <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                          onBlur={saveEdit}
+                          className="w-full px-1.5 py-0.5 text-sm text-right border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                      ) : (
+                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.gewicht != null ? `${p.gewicht} g` : <span className="text-gray-300">—</span>}</span>
+                      )}
                     </td>
-                    <td className="px-4 py-1.5 text-right">
-                      <Pencil className="w-4 h-4 text-gray-400" />
+                    <td className="px-4 py-2 text-gray-600" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'hersteller', p.hersteller || ''); }}>
+                      {editingCell?.sku === p.artikelnummer && editingCell.field === 'hersteller' ? (
+                        <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                          onBlur={saveEdit}
+                          className="w-full px-1.5 py-0.5 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                      ) : (
+                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.hersteller || <span className="text-gray-300">—</span>}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 font-mono text-xs text-gray-500" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'ean', p.ean || ''); }}>
+                      {editingCell?.sku === p.artikelnummer && editingCell.field === 'ean' ? (
+                        <input ref={editInputRef} type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                          onBlur={saveEdit}
+                          className="w-full px-1.5 py-0.5 text-sm font-mono border border-indigo-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white" />
+                      ) : (
+                        <span className="cursor-pointer hover:text-indigo-600 hover:underline decoration-dashed underline-offset-2">{p.ean || <span className="text-gray-300">—</span>}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <span className="inline-flex items-center gap-0.5">
+                        <button
+                          onClick={(e) => handleClone(p.artikelnummer, e)}
+                          className="p-1 rounded hover:bg-indigo-50 transition-colors"
+                          title="Produkt klonen"
+                        >
+                          <Copy className="w-4 h-4 text-gray-400 hover:text-indigo-500" />
+                        </button>
+                        {isParent ? (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await api.deleteVariantGroup(p.artikelnummer);
+                                toast('Varianten-Gruppe aufgelöst', 'success');
+                                reload();
+                              } catch (err) {
+                                toast(err instanceof Error ? err.message : 'Fehler', 'error');
+                              }
+                            }}
+                            className="p-1 rounded hover:bg-red-50 transition-colors"
+                            title="Gruppe auflösen"
+                          >
+                            <Unlink className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => navigate(`/stammdaten/${encodeURIComponent(p.artikelnummer)}`)}
+                            className="p-1 rounded hover:bg-gray-100 transition-colors"
+                            title="Bearbeiten"
+                          >
+                            <Pencil className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                          </button>
+                        )}
+                      </span>
                     </td>
                   </tr>
-                ))}
-                {filteredProducts.length === 0 && (
+                  );
+                })}
+                {groupedRows.length === 0 && (
                   <tr>
                     <td colSpan={10} className="text-center py-8 text-sm text-gray-400">
                       Keine Treffer für „{searchQuery}"
@@ -535,6 +734,14 @@ export function StammdatenPage() {
         <BulkStammdatenModal
           selectedSkus={Array.from(selectedSkus)}
           onClose={() => setShowBulkStammdaten(false)}
+          onSaved={() => { setSelectedSkus(new Set()); reload(); }}
+        />
+      )}
+      {showVariantGroupModal && (
+        <VariantGroupModal
+          selectedSkus={Array.from(selectedSkus)}
+          products={products}
+          onClose={() => setShowVariantGroupModal(false)}
           onSaved={() => { setSelectedSkus(new Set()); reload(); }}
         />
       )}

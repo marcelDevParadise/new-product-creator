@@ -30,6 +30,13 @@ class AppState:
         self._seed_default_templates()
         self._load_category_tree()
 
+    def reload_from_db(self) -> None:
+        """Re-read all data from SQLite into memory."""
+        self._load_attribute_config()
+        self.products = load_all_products()
+        self.templates = load_all_templates()
+        self._load_category_tree()
+
     def _load_attribute_config(self) -> None:
         """Load attributes from DB, seeding from JSON on first run."""
         if count_attribute_definitions() == 0:
@@ -135,6 +142,47 @@ class AppState:
     def save_product_changes(self, product: Product) -> None:
         """Persist current product state to DB (call after attribute changes)."""
         save_product(product)
+
+    # --- Variants ---
+
+    def get_variants(self, parent_sku: str) -> list[Product]:
+        """Return all child products of a given parent."""
+        return [p for p in self.products.values() if p.parent_sku == parent_sku]
+
+    def get_variant_group(self, sku: str) -> dict | None:
+        """Return {parent: Product, children: [Product]} for a variant group."""
+        product = self.products.get(sku)
+        if not product:
+            return None
+        if product.is_parent:
+            parent = product
+        elif product.parent_sku:
+            parent = self.products.get(product.parent_sku)
+            if not parent:
+                return None
+        else:
+            return None
+        children = self.get_variants(parent.artikelnummer)
+        return {"parent": parent, "children": children}
+
+    def resolve_product(self, product: Product, inherit_fields: list[str] | None = None) -> Product:
+        """Return a copy with inherited parent fields where own value is empty/None."""
+        if not product.parent_sku:
+            return product
+        parent = self.products.get(product.parent_sku)
+        if not parent:
+            return product
+        if inherit_fields is None:
+            from routers.settings import get_varianten_settings
+            inherit_fields = get_varianten_settings().get("inherit_fields", [])
+        data = product.model_dump()
+        for field in inherit_fields:
+            val = data.get(field)
+            if val is None or val == "":
+                parent_val = getattr(parent, field, None)
+                if parent_val is not None and parent_val != "":
+                    data[field] = parent_val
+        return Product(**data)
 
     # --- Templates ---
 

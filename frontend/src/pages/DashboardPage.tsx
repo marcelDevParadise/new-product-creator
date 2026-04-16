@@ -13,6 +13,10 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  ImageOff,
+  Barcode,
+  Globe,
+  Archive,
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { DashboardStats } from '../types';
@@ -56,11 +60,13 @@ function formatRelativeTime(isoString: string): string {
 }
 
 const eventConfig: Record<string, { icon: typeof Upload; color: string; label: string }> = {
-  import: { icon: Upload, color: 'text-emerald-600 bg-emerald-50', label: 'Import' },
-  export_ameise: { icon: Download, color: 'text-blue-600 bg-blue-50', label: 'Ameise Export' },
-  export_stammdaten: { icon: Download, color: 'text-indigo-600 bg-indigo-50', label: 'Stammdaten Export' },
-  product_created: { icon: Plus, color: 'text-emerald-600 bg-emerald-50', label: 'Erstellt' },
-  product_deleted: { icon: Trash2, color: 'text-red-600 bg-red-50', label: 'Gelöscht' },
+  import: { icon: Upload, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400', label: 'Import' },
+  export_ameise: { icon: Download, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950 dark:text-blue-400', label: 'Ameise Export' },
+  export_stammdaten: { icon: Download, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950 dark:text-indigo-400', label: 'Stammdaten Export' },
+  export_seo: { icon: Download, color: 'text-violet-600 bg-violet-50 dark:bg-violet-950 dark:text-violet-400', label: 'SEO Export' },
+  archive_after_export: { icon: Archive, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950 dark:text-amber-400', label: 'Archiviert' },
+  product_created: { icon: Plus, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400', label: 'Erstellt' },
+  product_deleted: { icon: Trash2, color: 'text-red-600 bg-red-50 dark:bg-red-950 dark:text-red-400', label: 'Gelöscht' },
 };
 
 export function DashboardPage() {
@@ -145,69 +151,125 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards - Primary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Products */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Produkte</CardTitle>
-            <Package className="w-4 h-4 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Produkte</CardTitle>
+            <Package className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">{stats.products_total}</div>
+            <div className="text-3xl font-bold">{stats.products_total}</div>
             <div className="flex gap-2 mt-2">
-              <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+              <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400">
                 {stats.products_active} aktiv
               </Badge>
-              <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-100">
+              <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400">
                 {stats.products_archived} archiviert
               </Badge>
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 2: Stammdaten */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Stammdaten</CardTitle>
-            <ClipboardCheck className="w-4 h-4 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Stammdaten</CardTitle>
+            <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">{stats.stammdaten_percent}%</div>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-3xl font-bold">{stats.stammdaten_percent}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
               {stats.stammdaten_complete} von {stats.products_active} vollständig
             </p>
             <ProgressBar percent={stats.stammdaten_percent} />
           </CardContent>
         </Card>
 
-        {/* Card 3: Attribute Coverage */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Attribut-Abdeckung</CardTitle>
-            <Tags className="w-4 h-4 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Attribut-Abdeckung</CardTitle>
+            <Tags className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">{stats.attributes_percent}%</div>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-3xl font-bold">{stats.attributes_percent}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
               {stats.attributes_with} von {stats.products_active} mit Attributen
             </p>
             <ProgressBar percent={stats.attributes_percent} />
           </CardContent>
         </Card>
 
-        {/* Card 4: Export Readiness */}
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Export-Bereit</CardTitle>
-            <Rocket className="w-4 h-4 text-gray-400" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Export-Bereit</CardTitle>
+            <Rocket className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-gray-900">{stats.export_ready}</div>
-            <p className="text-xs text-gray-500 mt-1">
+            <div className="text-3xl font-bold">{stats.export_ready}</div>
+            <p className="text-xs text-muted-foreground mt-1">
               {stats.export_ready_percent}% — Stammdaten ✓ + Attribute ✓
             </p>
             <ProgressBar percent={stats.export_ready_percent} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* KPI Cards - Secondary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">SEO-Abdeckung</CardTitle>
+            <Globe className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.seo_percent}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.seo_complete} von {stats.products_active} mit SEO-Daten
+            </p>
+            <ProgressBar percent={stats.seo_percent} />
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ohne Bilder</CardTitle>
+            <ImageOff className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-3xl font-bold ${stats.products_without_images > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+              {stats.products_without_images}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              von {stats.products_active} Produkten
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Ohne EAN</CardTitle>
+            <Barcode className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-3xl font-bold ${stats.products_without_ean > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+              {stats.products_without_ean}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              von {stats.products_active} Produkten
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">⌀ Attribute</CardTitle>
+            <Tags className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.avg_attributes_per_product}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              pro Produkt (Durchschnitt)
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -254,18 +316,18 @@ export function DashboardPage() {
                           variant="secondary"
                           className={
                             p.stammdaten_complete
-                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50'
-                              : 'bg-red-50 text-red-700 hover:bg-red-50'
-                          }
-                        >
-                          {p.stammdaten_complete ? 'Stammdaten ✓' : 'Stammdaten ✗'}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={
-                            p.attribute_count > 0
-                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50'
-                              : 'bg-red-50 text-red-700 hover:bg-red-50'
+                               ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400'
+                               : 'bg-red-50 text-red-700 hover:bg-red-50 dark:bg-red-950 dark:text-red-400'
+                           }
+                         >
+                           {p.stammdaten_complete ? 'Stammdaten ✓' : 'Stammdaten ✗'}
+                         </Badge>
+                         <Badge
+                           variant="secondary"
+                           className={
+                             p.attribute_count > 0
+                               ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400'
+                               : 'bg-red-50 text-red-700 hover:bg-red-50 dark:bg-red-950 dark:text-red-400'
                           }
                         >
                           {p.attribute_count > 0 ? `${p.attribute_count} Attr.` : 'Attribute ✗'}

@@ -3,12 +3,16 @@
 from typing import List
 
 from fastapi import APIRouter, UploadFile, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from state import state
 from models.product import Product
 from services.csv_handler import parse_csv
 from services.database import log_activity, log_product_history, log_product_history_batch, get_product_history
+
+import csv
+import io
 
 
 class DeleteRequest(BaseModel):
@@ -60,6 +64,25 @@ def get_product(artikelnummer: str):
     if product is None:
         raise HTTPException(404, "Produkt nicht gefunden")
     return product
+
+
+@router.get("/import/template")
+def download_import_template():
+    """Download a CSV template file for product import."""
+    columns = ["Artikelnummer", "Artikelname", "EK", "Preis", "Gewicht", "Hersteller", "EAN"]
+    example = ["CYL-00001", "Beispielprodukt", "10,00", "29,95", "250", "Beispielhersteller", "4260000000000"]
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    writer.writerow(columns)
+    writer.writerow(example)
+    content = output.getvalue().encode("utf-8-sig")
+
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": "attachment; filename=import-vorlage.csv"},
+    )
 
 
 @router.post("/import")
@@ -131,6 +154,28 @@ def delete_products(body: DeleteRequest):
     """Delete specific products by their Artikelnummern."""
     deleted = 0
     for sku in body.artikelnummern:
+        product = state.get_product(sku)
+        if not product:
+            continue
+        # If parent, release children first
+        if product.is_parent:
+            for child in state.get_variants(sku):
+                child.parent_sku = None
+                child.variant_attributes = {}
+                state.save_product_changes(child)
+        # If child, clean up parent if no siblings left
+        if product.parent_sku:
+            parent_sku = product.parent_sku
+            state.delete_product(sku)
+            log_product_history(sku, "deleted")
+            deleted += 1
+            remaining = state.get_variants(parent_sku)
+            if not remaining:
+                parent = state.get_product(parent_sku)
+                if parent:
+                    parent.is_parent = False
+                    state.save_product_changes(parent)
+            continue
         if state.delete_product(sku):
             log_product_history(sku, "deleted")
             deleted += 1
@@ -149,6 +194,13 @@ def archive_products(body: DeleteRequest):
             state.archive_product(sku)
             log_product_history(sku, "archived")
             archived += 1
+            # If parent, also archive children
+            if p.is_parent:
+                for child in state.get_variants(sku):
+                    if not child.exported:
+                        state.archive_product(child.artikelnummer)
+                        log_product_history(child.artikelnummer, "archived")
+                        archived += 1
     return {"archived": archived}
 
 
@@ -210,9 +262,10 @@ def update_stammdaten(artikelnummer: str, body: StammdatenUpdate):
     data = body.model_dump(exclude_unset=True)
     history_entries = []
     for field, value in data.items():
-        if field == "stammdaten_complete":
-            continue
         old_value = getattr(product, field)
+        if field == "stammdaten_complete":
+            setattr(product, field, value)
+            continue
         if str(old_value) != str(value):
             history_entries.append((artikelnummer, "stammdaten_update", field,
                                     str(old_value) if old_value is not None else None,
@@ -248,7 +301,7 @@ class BulkStammdatenUpdate(BaseModel):
     fields: dict
 
 
-@router.patch("/bulk/stammdaten")
+@router.post("/bulk/stammdaten")
 def bulk_update_stammdaten(body: BulkStammdatenUpdate):
     """Update Stammdaten fields for multiple products at once."""
     ALLOWED_FIELDS = {
@@ -285,3 +338,37 @@ def bulk_update_stammdaten(body: BulkStammdatenUpdate):
     if updated:
         log_activity("bulk_stammdaten", f"{updated} Produkte aktualisiert: {', '.join(fields.keys())}", updated)
     return {"updated": updated, "fields": list(fields.keys())}
+
+
+@router.post("/{artikelnummer}/clone")
+def clone_product(artikelnummer: str):
+    """Clone a product with a new auto-generated SKU."""
+    source = state.get_product(artikelnummer)
+    if source is None:
+        raise HTTPException(404, "Produkt nicht gefunden")
+
+    # Generate next SKU
+    pattern_re = re.compile(r'^CYL-(\d+)$', re.IGNORECASE)
+    max_num = 0
+    for sku in state.products:
+        m = pattern_re.match(sku)
+        if m:
+            num = int(m.group(1))
+            if num > max_num:
+                max_num = num
+    new_sku = f"CYL-{max_num + 1:05d}"
+
+    # Copy all fields except identity/variant/status
+    data = source.model_dump()
+    data["artikelnummer"] = new_sku
+    data["exported"] = False
+    data["stammdaten_complete"] = False
+    data["parent_sku"] = None
+    data["is_parent"] = False
+    data["variant_attributes"] = {}
+
+    clone = Product(**data)
+    state.add_product(clone)
+    log_activity("product_cloned", f"{new_sku} geklont von {artikelnummer}", 1)
+    log_product_history(new_sku, "created", detail=f"Geklont von {artikelnummer}")
+    return clone
