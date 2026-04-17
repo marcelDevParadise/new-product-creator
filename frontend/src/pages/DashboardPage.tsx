@@ -17,9 +17,12 @@ import {
   Barcode,
   Globe,
   Archive,
+  FileText,
+  DollarSign,
+  TrendingDown,
 } from 'lucide-react';
 import { api } from '../api/client';
-import type { DashboardStats } from '../types';
+import type { DashboardStats, PriceStats } from '../types';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -71,6 +74,7 @@ const eventConfig: Record<string, { icon: typeof Upload; color: string; label: s
 
 export function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [priceStats, setPriceStats] = useState<PriceStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -79,8 +83,9 @@ export function DashboardPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const data = await api.getStats();
+      const [data, prices] = await Promise.all([api.getStats(), api.getPriceStats()]);
       setStats(data);
+      setPriceStats(prices);
       setError(null);
       setLastRefresh(new Date());
     } catch {
@@ -108,7 +113,7 @@ export function DashboardPage() {
 
   if (error) {
     return (
-      <div className="p-8">
+      <div className="p-8 space-y-6">
         <PageHeader title="Dashboard" description="Übersicht über alle Produkte und Aktivitäten" />
         <div className="flex items-center gap-2 text-red-600">
           <AlertCircle className="w-5 h-5" />
@@ -120,7 +125,7 @@ export function DashboardPage() {
 
   if (!stats) {
     return (
-      <div className="p-8">
+      <div className="p-8 space-y-6">
         <PageHeader title="Dashboard" description="Übersicht über alle Produkte und Aktivitäten" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[1, 2, 3, 4].map((i) => (
@@ -215,7 +220,21 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Cards - Secondary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Content-Score</CardTitle>
+            <FileText className="w-4 h-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{stats.content_score_avg}%</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.content_complete} vollständig · {stats.content_partial} teilweise · {stats.content_empty} leer
+            </p>
+            <ProgressBar percent={stats.content_score_avg} />
+          </CardContent>
+        </Card>
+
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">SEO-Abdeckung</CardTitle>
@@ -273,6 +292,68 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Price Stats */}
+      {priceStats && (priceStats.avg_ek > 0 || priceStats.avg_vk > 0) && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">⌀ EK-Preis</CardTitle>
+              <DollarSign className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{priceStats.avg_ek.toFixed(2)} €</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {priceStats.min_ek?.toFixed(2)} € – {priceStats.max_ek?.toFixed(2)} €
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">⌀ VK-Preis</CardTitle>
+              <DollarSign className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{priceStats.avg_vk.toFixed(2)} €</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {priceStats.min_vk?.toFixed(2)} € – {priceStats.max_vk?.toFixed(2)} €
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">⌀ Marge</CardTitle>
+              <DollarSign className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{priceStats.avg_margin.toFixed(2)} €</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {priceStats.avg_margin_percent}% Durchschnittsmarge
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Fehlende Preise</CardTitle>
+              <TrendingDown className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-3xl font-bold ${(priceStats.products_without_ek + priceStats.products_without_vk) > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+                {priceStats.products_without_ek + priceStats.products_without_vk}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {priceStats.products_without_ek} ohne EK · {priceStats.products_without_vk} ohne VK
+                {priceStats.products_negative_margin > 0 && (
+                  <span className="text-red-600 dark:text-red-400"> · {priceStats.products_negative_margin} negative Marge</span>
+                )}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Bottom row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

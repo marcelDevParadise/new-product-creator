@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Download, Eye, Package, FileText, Archive, Globe, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, Eye, Package, FileText, Archive, Globe, CheckCircle2, History } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useToast } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { api } from '../api/client';
-import type { ExportPreview, StammdatenPreview, SeoPreview, ExportValidation } from '../types';
+import type { ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, ExportHistoryEntry } from '../types';
 
 const TOTAL_EXPORTS = 3; // Stammdaten, Attribut, SEO
 
@@ -26,7 +26,14 @@ export function ExportPage() {
     return stored !== null ? stored === 'true' : true;
   });
   const [archiving, setArchiving] = useState(false);
+  const [exportHistory, setExportHistory] = useState<ExportHistoryEntry[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    api.getExportHistory(20).then(setExportHistory).catch(() => {});
+  }, []);
+
+  const refreshHistory = () => api.getExportHistory(20).then(setExportHistory).catch(() => {});
 
   const loadAmeisePreview = async () => {
     setAmeiseLoading(true);
@@ -62,6 +69,7 @@ export function ExportPage() {
       toast('Attribut-Export erfolgreich', 'success');
       setAmeisePreview(null);
       setValidation(null);
+      refreshHistory();
       if (newCount >= TOTAL_EXPORTS && archiveAfterExport) {
         await archiveProducts();
       }
@@ -91,6 +99,7 @@ export function ExportPage() {
       const newCount = exportCount + 1;
       setExportCount(newCount);
       toast('Stammdaten-Export erfolgreich', 'success');
+      refreshHistory();
       if (newCount >= TOTAL_EXPORTS && archiveAfterExport) {
         await archiveProducts();
       }
@@ -120,6 +129,7 @@ export function ExportPage() {
       const newCount = exportCount + 1;
       setExportCount(newCount);
       toast('SEO-Export erfolgreich', 'success');
+      refreshHistory();
       if (newCount >= TOTAL_EXPORTS && archiveAfterExport) {
         await archiveProducts();
       }
@@ -466,6 +476,53 @@ export function ExportPage() {
           </div>
         </div>
       </section>
+
+      {/* Export History */}
+      {exportHistory.length > 0 && (
+        <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+            <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
+              <History className="w-5 h-5 text-gray-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Export-Historie</h3>
+              <p className="text-xs text-gray-500">Letzte {exportHistory.length} Exporte</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto max-h-[16rem]">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Typ</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Dateiname</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Produkte</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Zeilen</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">Datum</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {exportHistory.map((e) => (
+                  <tr key={e.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                        e.export_type === 'ameise' ? 'bg-indigo-50 text-indigo-700' :
+                        e.export_type === 'stammdaten' ? 'bg-blue-50 text-blue-700' :
+                        'bg-violet-50 text-violet-700'
+                      }`}>
+                        {e.export_type === 'ameise' ? 'Attribute' : e.export_type === 'stammdaten' ? 'Stammdaten' : 'SEO'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 font-mono text-gray-700">{e.filename}</td>
+                    <td className="px-4 py-2 text-gray-600">{e.product_count}</td>
+                    <td className="px-4 py-2 text-gray-600">{e.row_count}</td>
+                    <td className="px-4 py-2 text-gray-500">{new Date(e.created_at + 'Z').toLocaleString('de-DE')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

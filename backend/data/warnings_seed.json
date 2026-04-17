@@ -1,0 +1,17 @@
+[
+  {"code": "W-FLAME", "title": "Leicht entzündlich", "text": "Von Zündquellen fernhalten. Nicht rauchen.", "category": "Gefahrstoffe"},
+  {"code": "W-TOXIC", "title": "Giftig", "text": "Darf nicht in die Hände von Kindern gelangen.", "category": "Gefahrstoffe"},
+  {"code": "W-IRRITANT", "title": "Reizend", "text": "Berührung mit Haut und Augen vermeiden.", "category": "Gefahrstoffe"},
+  {"code": "W-CORROSIVE", "title": "Ätzend", "text": "Verursacht schwere Verätzungen der Haut und schwere Augenschäden.", "category": "Gefahrstoffe"},
+  {"code": "W-ENVIRON", "title": "Umweltgefährlich", "text": "Nicht in die Kanalisation oder Gewässer gelangen lassen.", "category": "Gefahrstoffe"},
+  {"code": "W-CHILD", "title": "Nicht für Kinder geeignet", "text": "Nicht für Kinder unter 3 Jahren geeignet. Enthält verschluckbare Kleinteile.", "category": "Sicherheit"},
+  {"code": "W-CHILD14", "title": "Ab 14 Jahren", "text": "Nicht für Kinder unter 14 Jahren geeignet.", "category": "Sicherheit"},
+  {"code": "W-ELECTRIC", "title": "Elektrische Gefährdung", "text": "Vor Nässe schützen. Nicht öffnen.", "category": "Sicherheit"},
+  {"code": "W-BATTERY", "title": "Batterie-Hinweis", "text": "Batterien nicht ins Feuer werfen. Nicht aufladen, wenn nicht vorgesehen.", "category": "Sicherheit"},
+  {"code": "W-ALLERGEN", "title": "Allergiehinweis", "text": "Kann allergische Reaktionen hervorrufen. Inhaltsstoffe beachten.", "category": "Gesundheit"},
+  {"code": "W-SKIN", "title": "Hautschutz", "text": "Bei Hautkontakt sofort mit Wasser und Seife waschen.", "category": "Gesundheit"},
+  {"code": "W-EYE", "title": "Augenschutz", "text": "Bei Augenkontakt sofort mit viel Wasser ausspülen und Arzt konsultieren.", "category": "Gesundheit"},
+  {"code": "W-FOOD", "title": "Nicht zum Verzehr", "text": "Nicht zum Verzehr geeignet. Bei Verschlucken sofort ärztlichen Rat einholen.", "category": "Gesundheit"},
+  {"code": "W-PROP65", "title": "Proposition 65", "text": "Dieses Produkt kann Chemikalien enthalten, die im Staat Kalifornien als krebserregend bekannt sind.", "category": "Regulatorisch"},
+  {"code": "W-BIOCIDE", "title": "Biozid-Hinweis", "text": "Biozidprodukte vorsichtig verwenden. Vor Gebrauch stets Etikett und Produktinformationen lesen.", "category": "Regulatorisch"}
+]

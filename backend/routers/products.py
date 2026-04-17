@@ -13,6 +13,8 @@ from services.database import log_activity, log_product_history, log_product_his
 
 import csv
 import io
+import re
+import unicodedata
 
 
 class DeleteRequest(BaseModel):
@@ -20,7 +22,20 @@ class DeleteRequest(BaseModel):
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
-import re
+
+def _slugify(text: str) -> str:
+    """Generate a URL-friendly slug from text. Handles German umlauts."""
+    s = text.lower().strip()
+    # German umlauts and ß
+    s = s.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+    # Normalize unicode (accented chars → base + combining → remove combining)
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    # Replace non-alphanumeric with hyphens
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    # Collapse multiple hyphens and trim
+    s = re.sub(r"-{2,}", "-", s).strip("-")
+    return s
 
 @router.get("/next-sku")
 def next_sku():
@@ -45,6 +60,9 @@ def create_product(body: Product):
     existing = state.get_product(body.artikelnummer)
     if existing:
         raise HTTPException(409, "Artikelnummer existiert bereits.")
+    # Auto-generate URL slug if empty
+    if not body.url_pfad and body.artikelname:
+        body.url_pfad = _slugify(body.artikelname)
     state.add_product(body)
     log_activity("product_created", body.artikelname, 1)
     log_product_history(body.artikelnummer, "created", detail=body.artikelname)
@@ -127,6 +145,9 @@ async def import_csv(file: UploadFile):
                 log_product_history_batch(history_entries)
             merged += 1
         else:
+            # Auto-generate URL slug if empty
+            if not p.url_pfad and p.artikelname:
+                p.url_pfad = _slugify(p.artikelname)
             state.add_product(p)
             log_product_history(p.artikelnummer, "created", detail=f"Import: {p.artikelname}")
             created += 1
@@ -251,6 +272,7 @@ class StammdatenUpdate(BaseModel):
     url_pfad: str | None = None
     title_tag: str | None = None
     meta_description: str | None = None
+    seo_keywords: str | None = None
 
 
 @router.patch("/{artikelnummer}/stammdaten")
@@ -312,7 +334,7 @@ def bulk_update_stammdaten(body: BulkStammdatenUpdate):
         "lieferant_name", "lieferant_artikelnummer", "lieferant_artikelname", "lieferant_netto_ek",
         "bild_1", "bild_2", "bild_3", "bild_4", "bild_5", "bild_6", "bild_7", "bild_8", "bild_9",
         "kategorie_1", "kategorie_2", "kategorie_3", "kategorie_4", "kategorie_5", "kategorie_6",
-        "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description",
+        "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description", "seo_keywords",
     }
     # Filter to only allowed fields
     fields = {k: v for k, v in body.fields.items() if k in ALLOWED_FIELDS}

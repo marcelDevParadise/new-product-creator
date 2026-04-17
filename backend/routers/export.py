@@ -7,10 +7,16 @@ from fastapi.responses import Response
 
 from state import state
 from services.csv_handler import build_ameise_csv, build_stammdaten_csv, build_seo_csv
-from services.database import log_activity
+from services.database import log_activity, log_export, get_export_history
 from routers.settings import get_export_settings
 
 router = APIRouter(prefix="/api/export", tags=["export"])
+
+
+@router.get("/history")
+def export_history(limit: int = 50):
+    """Return export history entries."""
+    return get_export_history(limit)
 
 
 def _make_filename(typ: str) -> str:
@@ -54,6 +60,8 @@ def export_ameise():
     log_activity("export_ameise", f"{len(products)} Produkte exportiert", len(products))
 
     filename = _make_filename("ameise")
+    total_rows = sum(len(p.attributes) for p in products)
+    log_export("ameise", filename, len(products), total_rows)
 
     return Response(
         content=csv_content.encode("utf-8-sig"),
@@ -93,6 +101,7 @@ def export_stammdaten():
     csv_content = build_stammdaten_csv(products, delimiter=es.csv_trennzeichen, decimal_sep=es.dezimalformat)
     log_activity("export_stammdaten", f"{len(products)} Produkte exportiert", len(products))
     filename = _make_filename("stammdaten")
+    log_export("stammdaten", filename, len(products), len(products))
     return Response(
         content=csv_content.encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",
@@ -156,6 +165,7 @@ def export_seo():
     csv_content = build_seo_csv(products, delimiter=es.csv_trennzeichen)
     log_activity("export_seo", f"{len(products)} Produkte exportiert", len(products))
     filename = _make_filename("seo")
+    log_export("seo", filename, len(products), len(products))
     return Response(
         content=csv_content.encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",

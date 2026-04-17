@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon } from 'lucide-react';
+import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon, FileText, GitBranch, AlertTriangle, FlaskConical } from 'lucide-react';
 import { useTheme } from '../../lib/use-theme';
 
 interface NavItem {
@@ -29,12 +29,17 @@ const sections: NavSection[] = [
       { to: '/import', label: 'Import', icon: Upload },
       { to: '/stammdaten', label: 'Stammdaten', icon: ClipboardList },
       { to: '/products', label: 'Attribute', icon: Package },
+      { to: '/variants', label: 'Varianten', icon: GitBranch },
+      { to: '/bundles', label: 'Bundles', icon: Package },
+      { to: '/warnings', label: 'Warnhinweise', icon: AlertTriangle },
+      { to: '/ingredients', label: 'Inhaltsstoffe', icon: FlaskConical },
     ],
   },
   {
     header: 'Konfiguration',
     items: [
       { to: '/attributes', label: 'Attribut Verwaltung', icon: Settings2 },
+      { to: '/templates', label: 'Vorlagen', icon: FileText },
       { to: '/categories', label: 'Kategorien', icon: FolderTree },
       { to: '/export', label: 'Export', icon: Download },
       { to: '/settings', label: 'Einstellungen', icon: SlidersHorizontal },

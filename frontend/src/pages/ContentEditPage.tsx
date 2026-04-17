@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker } from 'react-router-dom';
-import { Save, ChevronRight, Code, Eye } from 'lucide-react';
+import { Save, ChevronRight, Code, Eye, FileText, Plus, X } from 'lucide-react';
 import { api } from '@/api/client';
 import { useToast } from '@/components/ui/Toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -20,6 +20,8 @@ export function ContentEditPage() {
 
   const [kurzbeschreibung, setKurzbeschreibung] = useState('');
   const [beschreibung, setBeschreibung] = useState('');
+  const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
+  const [newKeyword, setNewKeyword] = useState('');
 
   const [showSourceKurz, setShowSourceKurz] = useState(false);
   const [showSourceBeschr, setShowSourceBeschr] = useState(false);
@@ -56,6 +58,7 @@ export function ContentEditPage() {
         setProduct(p);
         setKurzbeschreibung(p.kurzbeschreibung ?? '');
         setBeschreibung(p.beschreibung ?? '');
+        setSeoKeywords(p.seo_keywords ? p.seo_keywords.split(',').map(k => k.trim()).filter(Boolean) : []);
       })
       .catch((e) => setError(e.message));
   }, [sku]);
@@ -67,6 +70,7 @@ export function ContentEditPage() {
       const payload: Record<string, string | null> = {
         kurzbeschreibung: kurzbeschreibung.trim() || null,
         beschreibung: beschreibung.trim() || null,
+        seo_keywords: seoKeywords.length > 0 ? seoKeywords.join(', ') : null,
       };
       await api.updateStammdaten(product.artikelnummer, payload);
       setDirty(false);
@@ -76,7 +80,7 @@ export function ContentEditPage() {
     } finally {
       setSaving(false);
     }
-  }, [product, kurzbeschreibung, beschreibung, toast]);
+  }, [product, kurzbeschreibung, beschreibung, seoKeywords, toast]);
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
@@ -124,6 +128,36 @@ export function ContentEditPage() {
           title={product.artikelname}
           description="Kurzbeschreibung & Beschreibung als HTML bearbeiten"
         />
+        {(() => {
+          const fields = [
+            { label: 'Artikelname', ok: !!product.artikelname?.trim() },
+            { label: 'Kurzbeschreibung', ok: !!kurzbeschreibung.trim() },
+            { label: 'Beschreibung', ok: !!beschreibung.trim() },
+            { label: 'Title Tag', ok: !!product.title_tag?.trim() },
+            { label: 'Meta-Description', ok: !!product.meta_description?.trim() },
+          ];
+          const score = fields.filter(f => f.ok).length;
+          const missing = fields.filter(f => !f.ok);
+          return (
+            <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <span className={`text-sm font-semibold ${score === 5 ? 'text-emerald-600' : score >= 3 ? 'text-amber-600' : 'text-red-600'}`}>
+                  Content-Score: {score}/5
+                </span>
+              </div>
+              {missing.length > 0 && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {missing.map(f => (
+                    <span key={f.label} className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400 px-2 py-0.5 rounded-full">
+                      {f.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Content */}
@@ -189,6 +223,60 @@ export function ContentEditPage() {
                 minHeight="300px"
               />
             )}
+          </div>
+
+          {/* SEO Keywords */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">SEO Keywords</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {seoKeywords.map((kw, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 rounded-full text-sm"
+                >
+                  {kw}
+                  <button
+                    onClick={() => { setSeoKeywords(seoKeywords.filter((_, j) => j !== i)); setDirty(true); }}
+                    className="hover:text-red-600 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newKeyword}
+                onChange={(e) => setNewKeyword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newKeyword.trim()) {
+                    e.preventDefault();
+                    if (!seoKeywords.includes(newKeyword.trim())) {
+                      setSeoKeywords([...seoKeywords, newKeyword.trim()]);
+                      setDirty(true);
+                    }
+                    setNewKeyword('');
+                  }
+                }}
+                placeholder="Keyword eingeben + Enter…"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              <button
+                onClick={() => {
+                  if (newKeyword.trim() && !seoKeywords.includes(newKeyword.trim())) {
+                    setSeoKeywords([...seoKeywords, newKeyword.trim()]);
+                    setDirty(true);
+                    setNewKeyword('');
+                  }
+                }}
+                disabled={!newKeyword.trim()}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+              >
+                <Plus className="w-4 h-4" />
+                Hinzufügen
+              </button>
+            </div>
           </div>
         </div>
       </div>

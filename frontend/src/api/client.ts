@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient } from '../types';
 
 const BASE = '/api';
 
@@ -29,6 +29,10 @@ export const api = {
   getStats: () => request<DashboardStats>('/stats'),
   getActivities: (limit = 50) => request<ActivityLog[]>(`/stats/activities?limit=${limit}`),
   globalSearch: (q: string) => request<GlobalSearchResult>(`/stats/search?q=${encodeURIComponent(q)}`),
+  getContentScores: () => request<ContentScoreResult>('/stats/content-scores'),
+  getPriceStats: () => request<PriceStats>('/stats/prices'),
+  getSystemHealth: () => request<SystemHealth>('/stats/health'),
+  vacuumDb: () => request<{ success: boolean; old_size: number; new_size: number; saved_bytes: number }>('/stats/vacuum', { method: 'POST' }),
 
   // Products
   getProducts: (archived = false) =>
@@ -124,6 +128,7 @@ export const api = {
   // Export
   getExportPreview: () => request<ExportPreview>('/export/preview'),
   validateExport: () => request<ExportValidation>('/export/validate'),
+  getExportHistory: (limit = 50) => request<ExportHistoryEntry[]>(`/export/history?limit=${limit}`),
   downloadExport: async () => {
     const res = await fetch(`${BASE}/export/ameise`, { method: 'POST' });
     if (!res.ok) throw new Error('Export fehlgeschlagen');
@@ -177,17 +182,49 @@ export const api = {
 
   // Templates
   getTemplates: () => request<Record<string, Template>>('/templates'),
-  createTemplate: (name: string, attributes: Record<string, string | number | boolean>) =>
+  getTemplateCategories: () => request<string[]>('/templates/categories'),
+  createTemplate: (
+    name: string,
+    attributes: Record<string, string | number | boolean>,
+    category = '',
+    description = '',
+  ) =>
     request<Template>('/templates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, attributes }),
+      body: JSON.stringify({ name, attributes, category, description }),
     }),
-  updateTemplate: (name: string, attributes: Record<string, string | number | boolean>) =>
+  updateTemplate: (
+    name: string,
+    attributes: Record<string, string | number | boolean>,
+    category = '',
+    description = '',
+  ) =>
     request<Template>(`/templates/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, attributes }),
+      body: JSON.stringify({ attributes, category, description }),
+    }),
+  updateTemplateMeta: (
+    name: string,
+    data: { category?: string; description?: string },
+  ) =>
+    request<Template>(`/templates/${encodeURIComponent(name)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  renameTemplate: (name: string, newName: string) =>
+    request<Template>(`/templates/${encodeURIComponent(name)}/rename`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_name: newName }),
+    }),
+  cloneTemplate: (name: string, newName: string) =>
+    request<Template>(`/templates/${encodeURIComponent(name)}/clone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_name: newName }),
     }),
   deleteTemplate: (name: string) =>
     request<{ deleted: boolean }>(`/templates/${encodeURIComponent(name)}`, { method: 'DELETE' }),
@@ -251,6 +288,7 @@ export const api = {
     request<ValidationResult>(`/validation${severity ? `?severity=${severity}` : ''}`),
   getProductValidation: (sku: string) =>
     request<ProductValidation>(`/validation/${encodeURIComponent(sku)}`),
+  getHeatmap: () => request<HeatmapData>('/validation/heatmap'),
 
   // Bulk Stammdaten
   bulkUpdateStammdaten: (skus: string[], fields: Record<string, string | number | boolean | null>) =>
@@ -338,5 +376,83 @@ export const api = {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+
+  // Bundles
+  getBundles: () => request<Bundle[]>('/bundles'),
+  getBundle: (id: number) => request<Bundle>(`/bundles/${id}`),
+  createBundle: (data: { name: string; description?: string; items: { artikelnummer: string; quantity: number }[] }) =>
+    request<{ id: number; name: string }>('/bundles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  updateBundle: (id: number, data: { name?: string; description?: string; items?: { artikelnummer: string; quantity: number }[] }) =>
+    request<{ updated: boolean }>(`/bundles/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteBundle: (id: number) =>
+    request<{ deleted: boolean }>(`/bundles/${id}`, { method: 'DELETE' }),
+
+  // Warnings
+  getWarnings: () => request<Warning[]>('/warnings'),
+  createWarning: (data: { code: string; title: string; text?: string; category?: string }) =>
+    request<{ id: number; code: string }>('/warnings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  updateWarning: (id: number, data: { code?: string; title?: string; text?: string; category?: string }) =>
+    request<{ updated: boolean }>(`/warnings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteWarning: (id: number) =>
+    request<{ deleted: boolean }>(`/warnings/${id}`, { method: 'DELETE' }),
+  getProductWarnings: (sku: string) =>
+    request<Warning[]>(`/warnings/product/${encodeURIComponent(sku)}`),
+  assignWarning: (sku: string, warningId: number) =>
+    request<{ assigned: boolean }>(`/warnings/product/${encodeURIComponent(sku)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ warning_id: warningId }),
+    }),
+  unassignWarning: (sku: string, warningId: number) =>
+    request<{ removed: boolean }>(`/warnings/product/${encodeURIComponent(sku)}/${warningId}`, { method: 'DELETE' }),
+
+  // Ingredients
+  getIngredients: () => request<Ingredient[]>('/ingredients'),
+  createIngredient: (data: { name: string; inci_name?: string; cas_number?: string; category?: string }) =>
+    request<{ id: number; name: string }>('/ingredients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  updateIngredient: (id: number, data: { name?: string; inci_name?: string; cas_number?: string; category?: string }) =>
+    request<{ updated: boolean }>(`/ingredients/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteIngredient: (id: number) =>
+    request<{ deleted: boolean }>(`/ingredients/${id}`, { method: 'DELETE' }),
+  getProductIngredients: (sku: string) =>
+    request<Ingredient[]>(`/ingredients/product/${encodeURIComponent(sku)}`),
+  assignIngredient: (sku: string, ingredientId: number, percentage?: string) =>
+    request<{ assigned: boolean }>(`/ingredients/product/${encodeURIComponent(sku)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingredient_id: ingredientId, percentage: percentage || '' }),
+    }),
+  unassignIngredient: (sku: string, ingredientId: number) =>
+    request<{ removed: boolean }>(`/ingredients/product/${encodeURIComponent(sku)}/${ingredientId}`, { method: 'DELETE' }),
+  reorderIngredients: (sku: string, ingredientIds: number[]) =>
+    request<{ reordered: boolean }>(`/ingredients/product/${encodeURIComponent(sku)}/order`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ingredient_ids: ingredientIds }),
     }),
 };

@@ -1,0 +1,45 @@
+{
+  "mwst_prozent": 19.0,
+  "faktor": 2.37,
+  "rundung": 0.95,
+  "export": {
+    "attributgruppe": "Shopify-Attribute",
+    "csv_trennzeichen": ";",
+    "dezimalformat": ",",
+    "dateiname_muster": "{typ}_export_{datum}"
+  },
+  "einheiten": [
+    "ml",
+    "l",
+    "g",
+    "kg",
+    "cm",
+    "m",
+    "mm",
+    "Stück",
+    "m²",
+    "m³"
+  ],
+  "standard_werte": {
+    "hersteller": "",
+    "lieferant_name": ""
+  },
+  "varianten": {
+    "inherit_fields": [
+      "hersteller",
+      "kategorie_1",
+      "kategorie_2",
+      "kategorie_3",
+      "kategorie_4",
+      "kategorie_5",
+      "kategorie_6",
+      "lieferant_name"
+    ],
+    "variant_axes": [
+      "Größe",
+      "Farbe",
+      "Material",
+      "Ausführung"
+    ]
+  }
+}

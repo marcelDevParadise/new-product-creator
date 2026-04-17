@@ -238,7 +238,7 @@ export function CategoriesPage() {
         />
       )}
 
-      <div className="shrink-0 px-8 pt-6 pb-4">
+      <div className="p-8 space-y-6">
         <PageHeader
           title="Kategorien"
           description={`${rootKeys.length} Hauptkategorien · ${totalCount} Kategorien gesamt`}

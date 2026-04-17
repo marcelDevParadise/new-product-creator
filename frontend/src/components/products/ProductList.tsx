@@ -146,7 +146,21 @@ export function ProductList({ products, selectedSkus, onSelectionChange, archive
                   <td className="px-5 py-3 font-mono text-gray-900 font-medium">
                     {p.artikelnummer}
                   </td>
-                  <td className="px-5 py-3 text-gray-700">{p.artikelname}</td>
+                  <td className="px-5 py-3 text-gray-700">
+                    <div className="flex items-center gap-2">
+                      <span>{p.artikelname}</span>
+                      {p.is_parent && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                          Parent
+                        </span>
+                      )}
+                      {!p.is_parent && p.parent_sku && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-violet-50 text-violet-600 dark:bg-violet-900 dark:text-violet-300">
+                          Variante
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">

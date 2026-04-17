@@ -8,6 +8,7 @@ import { CategoryCascader } from '../components/ui/CategoryCascader';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import { VariantMatrix } from '../components/products/VariantMatrix';
+import { slugify } from '../lib/utils';
 import type { Product, CategoryTree, VariantenSettings } from '../types';
 
 const EINHEITEN_FALLBACK = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
@@ -531,7 +532,17 @@ export function StammdatenEditPage() {
           <Section title="SEO">
             <div className="space-y-3">
               <Field label="URL-Pfad">
-                <input className={`${inputCls} font-mono text-xs`} value={f.url_pfad} onChange={set('url_pfad')} placeholder="z. B. lovense-lush-3" />
+                <div className="flex gap-2">
+                  <input className={`${inputCls} font-mono text-xs flex-1`} value={f.url_pfad} onChange={set('url_pfad')} placeholder="z. B. lovense-lush-3" />
+                  <button
+                    type="button"
+                    className="px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-700 dark:hover:bg-indigo-900/50 whitespace-nowrap"
+                    onClick={() => { if (f.artikelname) { setForm(prev => ({ ...prev, url_pfad: slugify(f.artikelname) })); markDirty(); } }}
+                    title="URL-Pfad aus Artikelname generieren"
+                  >
+                    Auto
+                  </button>
+                </div>
               </Field>
               <Field label="Title Tag (SEO)">
                 <div className="space-y-1">

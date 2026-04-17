@@ -189,3 +189,181 @@ Optionales dunkles Farbschema.
 - `reload_from_db()` in AppState
 - Lifespan-Event in FastAPI für automatischen Reload
 - Manueller Reload-Endpoint (`POST /api/reload`)
+
+---
+
+## X ? Vorlagen-Verwaltung & Kategorisierung
+
+### Ziel
+Vorlagen �bersichtlich organisieren, suchbar machen und mit Metadaten anreichern � inkl. dedizierter Verwaltungsseite.
+
+### Umgesetzte Features
+- **Neue Felder pro Vorlage**: `category` und `description` (SQLite-Migration via ALTER TABLE)
+- **Alphabetische Sortierung** der Vorlagen in Modal und Verwaltungsseite
+- **Gruppierung nach Kategorie** (einklappbare Sektionen, `Ohne Kategorie` am Ende)
+- **Vorlagen-Suche** (Name, Kategorie, Notiz)
+- **Umbenennen** (`POST /api/templates/{name}/rename`)
+- **Duplizieren** (`POST /api/templates/{name}/clone`)
+- **Meta-Editor** pro Vorlage (Kategorie + Notiz/Beschreibung)
+- **Datalist-Autovorschl�ge** f�r bestehende Kategorien
+- **Dedizierte Verwaltungsseite** `/templates` mit Karten-Layout, Sidebar-Link Vorlagen`n- **�berarbeitetes TemplateModal** mit Meta-Leiste, Rename/Clone-Inline-Editoren und Kategorie-Gruppierung
+- **Globale Suche** findet Vorlagen jetzt auch über Kategorie & Beschreibung
+- **Seed-Vorlage `GPSR`** erhält Kategorie `Compliance`
+
+---
+
+## ✅ Auto-URL-Slug (5.5)
+
+### Ziel
+URL-Slug automatisch aus Produktname generieren.
+
+### Umgesetzte Features
+- Backend: `_slugify()` Funktion in `routers/products.py` (Umlaute ä→ae etc., Sonderzeichen → `-`)
+- Auto-Fill bei Neuanlage und CSV-Import wenn `url_pfad` leer
+- Frontend: `slugify()` in `lib/utils.ts`
+- „Auto"-Button neben dem `url_pfad`-Feld in StammdatenEditPage
+
+---
+
+## ✅ Content-Fortschritts-Score (5.7)
+
+### Ziel
+Pro Produkt sichtbar machen wie vollständig der SEO-Content ist.
+
+### Umgesetzte Features
+- Backend: `_compute_content_score()` prüft 5 Felder (kurzbeschreibung, beschreibung, url_pfad, title_tag, meta_description)
+- Dashboard-KPIs: `content_score_avg`, `content_complete`, `content_partial`, `content_empty`
+- Neuer Endpoint `GET /api/stats/content-scores`
+- Content-Score-Card im Dashboard mit Fortschrittsbalken
+- Inline-Score-Anzeige in ContentEditPage mit farbigen Badges für fehlende Felder
+
+---
+
+## ✅ Varianten-Badge in Produktlisten (7.12)
+
+### Ziel
+In Produktlisten sofort erkennen ob ein Produkt Parent oder Variante ist.
+
+### Umgesetzte Features
+- Purple „Parent"-Badge für `is_parent`-Produkte in ProductList
+- Violet „Variante"-Badge für Produkte mit `parent_sku`
+
+---
+
+## ✅ System-Health-Dashboard (16.4 + 16.5)
+
+### Ziel
+Systemzustand auf einen Blick: DB-Größe, Integrität, Laufzeit.
+
+### Umgesetzte Features
+- Backend: `GET /api/stats/health` (DB-Größe, Produktanzahl, Logs, Templates, Uptime, Python-Version, Integrity-Check)
+- Backend: `POST /api/stats/vacuum` für SQLite VACUUM
+- Frontend: System-Sektion in SettingsPage mit 8 Stat-Kacheln
+- Integritäts-Indikator (grün/rot)
+- VACUUM-Button mit Lade-Animation
+
+---
+
+## ✅ Export-Historie (9.2)
+
+### Ziel
+Log aller Exporte mit Timestamp und Details.
+
+### Umgesetzte Features
+- Neue DB-Tabelle `export_history`
+- `log_export()` nach jedem Export (Ameise, Stammdaten, SEO)
+- `GET /api/export/history` Endpoint
+- Historie-Tabelle in ExportPage mit Typ-Badges, Dateiname, Produkt-/Zeilenanzahl, Datum
+
+---
+
+## ✅ Preis-Dashboard (13.1)
+
+### Ziel
+Preisverteilung und Margen als KPIs im Dashboard.
+
+### Umgesetzte Features
+- Backend: `GET /api/stats/prices` mit Ø EK, Ø VK, Ø Marge, fehlende Preise, kritische Margen
+- Frontend: 4 Preis-KPI-Cards im Dashboard (Ø EK, Ø VK, Ø Marge, fehlende Preise)
+
+---
+
+## ✅ Vollständigkeits-Heatmap (13.2)
+
+### Ziel
+Matrix-Ansicht: Produkte × Felder, farbcodiert nach Befüllung.
+
+### Umgesetzte Features
+- Backend: `GET /api/validation/heatmap` mit 14 Feldern, Feld-Statistiken + Per-Product-Grid (max 100)
+- Frontend: Toggle-Button in DataQualityPage
+- Feld-Completeness-Balken
+- Per-Product-Grid mit grünen (befüllt) und roten (leer) Zellen
+
+---
+
+## ✅ Variantengruppen-Seite (7.9)
+
+### Ziel
+Dedizierte Übersicht aller Parent/Child-Beziehungen.
+
+### Umgesetzte Features
+- Neue Seite `VariantGroupsPage` unter `/variants`
+- Stats-Cards (Gruppen, Parents, Varianten)
+- Aufklappbare Gruppen-Liste mit Varianten-Tabelle
+- Auflösen-Funktion mit Bestätigungsdialog
+- Sidebar-Link mit GitBranch-Icon
+
+---
+
+## ✅ Keyword-Planer (5.3)
+
+### Ziel
+SEO-Keywords pro Produkt manuell pflegen.
+
+### Umgesetzte Features
+- Backend: `seo_keywords` Feld im Product-Model (komma-separierter String)
+- DB-Migration, Load/Save, StammdatenUpdate
+- Frontend: Tag-Input-Widget in ContentEditPage
+- Keywords als entfernbare Chips, Eingabefeld + Enter/Button zum Hinzufügen
+
+---
+
+## ✅ Bundles / Sets (14.1)
+
+### Ziel
+Produkte zu Sets zusammenfassen mit kombiniertem Preis.
+
+### Umgesetzte Features
+- Backend: Router `routers/bundles.py` mit CRUD (5 Endpoints)
+- DB-Tabelle `bundles` (Name, Beschreibung, Items als JSON)
+- Produktvalidierung beim Erstellen/Aktualisieren
+- Preis-Aggregation (Gesamt-EK, Gesamt-VK)
+- Frontend: `BundlesPage` unter `/bundles` mit Produkt-Suche, Mengenangabe, Erstellen/Bearbeiten/Löschen
+- Sidebar-Link mit Package-Icon
+
+---
+
+## ✅ Warnhinweis-Manager (15.1)
+
+### Ziel
+Pflicht-Warnhinweise nach Produkttyp verwalten und Produkten zuweisen.
+
+### Umgesetzte Features
+- Backend: Router `routers/warnings.py` mit CRUD + Produkt-Zuweisung (7 Endpoints)
+- DB-Tabellen: `warnings` + `product_warnings` (Zuordnung)
+- JSON-Seed `data/warnings_seed.json` mit 15 Standard-Warnhinweisen (Gefahrstoffe, Sicherheit, Gesundheit, Regulatorisch)
+- Frontend: `WarningsPage` unter `/warnings` mit Kategorie-Filter, CRUD-Formular, Nutzungszähler
+- Sidebar-Link mit AlertTriangle-Icon
+
+---
+
+## ✅ Inhaltsstoff-Deklaration (15.3)
+
+### Ziel
+Strukturierte INCI-Listen und Materialzusammensetzung pro Produkt.
+
+### Umgesetzte Features
+- Backend: Router `routers/ingredients.py` mit CRUD + Produkt-Zuweisung + Reihenfolge (8 Endpoints)
+- DB-Tabellen: `ingredients` (Name, INCI-Name, CAS-Nr., Kategorie) + `product_ingredients` (Zuordnung mit Prozentangabe + Position)
+- Frontend: `IngredientsPage` unter `/ingredients` mit Kategorie-Filter, CRUD-Formular, Nutzungszähler
+- Sidebar-Link mit FlaskConical-Icon

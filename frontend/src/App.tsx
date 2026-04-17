@@ -16,6 +16,11 @@ import { ActivityLogPage } from './pages/ActivityLogPage';
 import { DataQualityPage } from './pages/DataQualityPage';
 import { ContentEditPage } from './pages/ContentEditPage';
 import { CategoriesPage } from './pages/CategoriesPage';
+import { TemplatesPage } from './pages/TemplatesPage';
+import { VariantGroupsPage } from './pages/VariantGroupsPage';
+import { BundlesPage } from './pages/BundlesPage';
+import { WarningsPage } from './pages/WarningsPage';
+import { IngredientsPage } from './pages/IngredientsPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -57,11 +62,16 @@ const router = createBrowserRouter([
       { path: '/stammdaten/:sku', element: <StammdatenEditPage /> },
       { path: '/content/:sku', element: <ContentEditPage /> },
       { path: '/attributes', element: <AttributesPage /> },
+      { path: '/templates', element: <TemplatesPage /> },
       { path: '/categories', element: <CategoriesPage /> },
       { path: '/export', element: <ExportPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/activity', element: <ActivityLogPage /> },
       { path: '/quality', element: <DataQualityPage /> },
+      { path: '/variants', element: <VariantGroupsPage /> },
+      { path: '/bundles', element: <BundlesPage /> },
+      { path: '/warnings', element: <WarningsPage /> },
+      { path: '/ingredients', element: <IngredientsPage /> },
     ],
   },
 ]);

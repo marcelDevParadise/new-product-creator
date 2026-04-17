@@ -45,6 +45,7 @@ export interface Product {
   url_pfad: string | null;
   title_tag: string | null;
   meta_description: string | null;
+  seo_keywords: string | null;
   // Varianten
   parent_sku: string | null;
   is_parent: boolean;
@@ -117,6 +118,8 @@ export interface ExportPreview {
 export interface Template {
   name: string;
   attributes: Record<string, string | number | boolean>;
+  category: string;
+  description: string;
 }
 
 export interface StammdatenRow {
@@ -245,9 +248,67 @@ export interface DashboardStats {
   seo_complete: number;
   seo_percent: number;
   avg_attributes_per_product: number;
+  // Content Score
+  content_score_avg: number;
+  content_complete: number;
+  content_partial: number;
+  content_empty: number;
   recently_updated: IncompleteProduct[];
   incomplete_products: IncompleteProduct[];
   recent_activities: ActivityLog[];
+}
+
+export interface ContentScoreProduct {
+  artikelnummer: string;
+  artikelname: string;
+  score: number;
+  score_percent: number;
+  missing: string[];
+}
+
+export interface ContentScoreResult {
+  products: ContentScoreProduct[];
+  total: number;
+  complete: number;
+  avg_percent: number;
+}
+
+export interface PriceStats {
+  avg_ek: number;
+  avg_vk: number;
+  avg_margin: number;
+  avg_margin_percent: number;
+  products_without_ek: number;
+  products_without_vk: number;
+  products_negative_margin: number;
+  min_ek: number | null;
+  max_ek: number | null;
+  min_vk: number | null;
+  max_vk: number | null;
+  critical_margin_products: { artikelnummer: string; artikelname: string; ek: number; vk: number; margin: number; margin_percent: number }[];
+}
+
+export interface SystemHealth {
+  db_size_bytes: number;
+  db_size_display: string;
+  products_count: number;
+  activity_log_count: number;
+  product_history_count: number;
+  attribute_definitions_count: number;
+  templates_count: number;
+  uptime_seconds: number;
+  uptime_display: string;
+  python_version: string;
+  integrity_ok: boolean;
+}
+
+export interface ExportHistoryEntry {
+  id: number;
+  export_type: string;
+  filename: string;
+  product_count: number;
+  row_count: number;
+  created_at: string;
 }
 
 // Validation / Data Quality
@@ -352,3 +413,50 @@ export interface ResolvedProduct {
 }
 
 export type VariantDiff = Record<string, Record<string, { parent_value: string | null; child_value: string | null }>>;
+
+// Bundles
+
+export interface BundleItem {
+  artikelnummer: string;
+  quantity: number;
+  artikelname: string;
+  ek: number | null;
+  preis: number | null;
+}
+
+export interface Bundle {
+  id: number;
+  name: string;
+  description: string;
+  items: BundleItem[];
+  total_ek: number;
+  total_vk: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Warnings
+
+export interface Warning {
+  id: number;
+  code: string;
+  title: string;
+  text: string;
+  category: string;
+  created_at?: string;
+  usage_count?: number;
+}
+
+// Ingredients
+
+export interface Ingredient {
+  id: number;
+  name: string;
+  inci_name: string;
+  cas_number: string;
+  category: string;
+  created_at?: string;
+  usage_count?: number;
+  percentage?: string;
+  position?: number;
+}

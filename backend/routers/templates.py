@@ -1,4 +1,4 @@
-"""Templates router — reusable attribute presets."""
+"""Templates router — reusable attribute presets with category & description."""
 
 from typing import List
 
@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from state import state
-from services.database import log_product_history_batch
+from services.database import log_activity, log_product_history_batch
 
 router = APIRouter(prefix="/api/templates", tags=["templates"])
 
@@ -14,42 +14,129 @@ router = APIRouter(prefix="/api/templates", tags=["templates"])
 class TemplateBody(BaseModel):
     name: str
     attributes: dict[str, str | int | bool]
+    category: str = ""
+    description: str = ""
+
+
+class TemplateUpdateBody(BaseModel):
+    attributes: dict[str, str | int | bool]
+    category: str = ""
+    description: str = ""
+
+
+class TemplateMetaBody(BaseModel):
+    """Update only metadata (category/description) without touching attributes."""
+    category: str | None = None
+    description: str | None = None
+
+
+class RenameBody(BaseModel):
+    new_name: str
+
+
+class CloneBody(BaseModel):
+    new_name: str
 
 
 class ApplyBody(BaseModel):
     artikelnummern: List[str]
 
 
+def _serialize(name: str, tpl: dict) -> dict:
+    return {
+        "name": name,
+        "attributes": tpl.get("attributes", {}),
+        "category": tpl.get("category", ""),
+        "description": tpl.get("description", ""),
+    }
+
+
 @router.get("")
 def list_templates():
-    """Return all saved templates."""
-    return {name: {"name": name, "attributes": attrs} for name, attrs in state.get_templates().items()}
+    """Return all saved templates (with category & description)."""
+    return {name: _serialize(name, tpl) for name, tpl in state.get_templates().items()}
+
+
+@router.get("/categories")
+def list_categories():
+    """Return sorted list of distinct non-empty template categories."""
+    return state.get_template_categories()
 
 
 @router.post("")
 def create_template(body: TemplateBody):
     """Create or update a template."""
-    if not body.name.strip():
+    name = body.name.strip()
+    if not name:
         raise HTTPException(400, "Template-Name darf nicht leer sein.")
-    state.set_template(body.name.strip(), body.attributes)
-    return {"name": body.name.strip(), "attributes": body.attributes}
+    is_new = name not in state.templates
+    state.set_template(name, body.attributes, body.category.strip(), body.description.strip())
+    if is_new:
+        log_activity("template_created", name, 1)
+    return _serialize(name, state.templates[name])
 
 
 @router.put("/{name}")
-def update_template(name: str, body: TemplateBody):
-    """Update an existing template's attributes."""
+def update_template(name: str, body: TemplateUpdateBody):
+    """Update an existing template's attributes and metadata."""
+    if name not in state.templates:
+        raise HTTPException(404, "Template nicht gefunden")
+    state.set_template(name, body.attributes, body.category.strip(), body.description.strip())
+    return _serialize(name, state.templates[name])
+
+
+@router.patch("/{name}")
+def update_template_meta(name: str, body: TemplateMetaBody):
+    """Update only category/description of a template without touching attributes."""
     existing = state.get_template(name)
     if existing is None:
         raise HTTPException(404, "Template nicht gefunden")
-    state.set_template(name, body.attributes)
-    return {"name": name, "attributes": body.attributes}
+    category = body.category.strip() if body.category is not None else existing.get("category", "")
+    description = body.description.strip() if body.description is not None else existing.get("description", "")
+    state.set_template(name, existing.get("attributes", {}), category, description)
+    return _serialize(name, state.templates[name])
 
 
 @router.delete("/{name}")
 def delete_template(name: str):
     if not state.remove_template(name):
         raise HTTPException(404, "Template nicht gefunden")
+    log_activity("template_deleted", name, 1)
     return {"deleted": True}
+
+
+@router.post("/{name}/rename")
+def rename_template(name: str, body: RenameBody):
+    """Rename a template."""
+    if name not in state.templates:
+        raise HTTPException(404, "Template nicht gefunden")
+    new_name = body.new_name.strip()
+    if not new_name:
+        raise HTTPException(400, "Neuer Name darf nicht leer sein.")
+    if new_name == name:
+        return _serialize(name, state.templates[name])
+    if new_name in state.templates:
+        raise HTTPException(409, f'Template "{new_name}" existiert bereits.')
+    if not state.rename_template(name, new_name):
+        raise HTTPException(400, "Umbenennen fehlgeschlagen.")
+    log_activity("template_renamed", f"{name} → {new_name}", 1)
+    return _serialize(new_name, state.templates[new_name])
+
+
+@router.post("/{name}/clone")
+def clone_template(name: str, body: CloneBody):
+    """Clone an existing template under a new name."""
+    if name not in state.templates:
+        raise HTTPException(404, "Template nicht gefunden")
+    new_name = body.new_name.strip()
+    if not new_name:
+        raise HTTPException(400, "Neuer Name darf nicht leer sein.")
+    if new_name in state.templates:
+        raise HTTPException(409, f'Template "{new_name}" existiert bereits.')
+    if not state.clone_template(name, new_name):
+        raise HTTPException(400, "Klonen fehlgeschlagen.")
+    log_activity("template_cloned", f"{name} → {new_name}", 1)
+    return _serialize(new_name, state.templates[new_name])
 
 
 @router.post("/{name}/apply")
@@ -59,8 +146,9 @@ def apply_template(name: str, body: ApplyBody):
     if template is None:
         raise HTTPException(404, "Template nicht gefunden")
 
+    attributes = template.get("attributes", {})
     # Filter out empty string values — only apply filled attributes
-    filled = {k: v for k, v in template.items() if v != ""}
+    filled = {k: v for k, v in attributes.items() if v != ""}
     if not filled:
         raise HTTPException(400, "Template enthält keine ausgefüllten Attribute.")
 

@@ -79,8 +79,19 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_product_history_sku
         ON product_history (artikelnummer, created_at DESC)
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS export_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            export_type TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            product_count INTEGER NOT NULL DEFAULT 0,
+            row_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    """)
     # Migrate existing DB: add Stammdaten columns if missing
     _migrate_product_columns(conn)
+    _migrate_template_columns(conn)
     conn.commit()
     conn.close()
 
@@ -135,6 +146,7 @@ def _migrate_product_columns(conn: sqlite3.Connection) -> None:
         ("url_pfad", "TEXT"),
         ("title_tag", "TEXT"),
         ("meta_description", "TEXT"),
+        ("seo_keywords", "TEXT"),
         # Varianten
         ("parent_sku", "TEXT"),
         ("is_parent", "INTEGER DEFAULT 0"),
@@ -143,6 +155,16 @@ def _migrate_product_columns(conn: sqlite3.Connection) -> None:
     for col_name, col_type in migrations:
         if col_name not in existing:
             conn.execute(f"ALTER TABLE products ADD COLUMN {col_name} {col_type}")
+
+
+def _migrate_template_columns(conn: sqlite3.Connection) -> None:
+    """Add metadata columns (category, description) to templates table."""
+    cursor = conn.execute("PRAGMA table_info(templates)")
+    existing = {row[1] for row in cursor.fetchall()}
+    if "category" not in existing:
+        conn.execute("ALTER TABLE templates ADD COLUMN category TEXT NOT NULL DEFAULT ''")
+    if "description" not in existing:
+        conn.execute("ALTER TABLE templates ADD COLUMN description TEXT NOT NULL DEFAULT ''")
 
 
 def load_all_products() -> dict[str, Product]:
@@ -156,7 +178,7 @@ def load_all_products() -> dict[str, Product]:
         "lieferant_name, lieferant_artikelnummer, lieferant_artikelname, lieferant_netto_ek, "
         "bild_1, bild_2, bild_3, bild_4, bild_5, bild_6, bild_7, bild_8, bild_9, "
         "kategorie_1, kategorie_2, kategorie_3, kategorie_4, kategorie_5, kategorie_6, "
-        "kurzbeschreibung, beschreibung, url_pfad, title_tag, meta_description, "
+        "kurzbeschreibung, beschreibung, url_pfad, title_tag, meta_description, seo_keywords, "
         "parent_sku, is_parent, variant_attributes "
         "FROM products"
     ).fetchall()
@@ -207,9 +229,10 @@ def load_all_products() -> dict[str, Product]:
             url_pfad=row[40],
             title_tag=row[41],
             meta_description=row[42],
-            parent_sku=row[43],
-            is_parent=bool(row[44]) if row[44] is not None else False,
-            variant_attributes=json.loads(row[45]) if row[45] else {},
+            seo_keywords=row[43],
+            parent_sku=row[44],
+            is_parent=bool(row[45]) if row[45] is not None else False,
+            variant_attributes=json.loads(row[46]) if row[46] else {},
         )
     return products
 
@@ -225,7 +248,7 @@ def save_product(product: Product) -> None:
         "lieferant_name", "lieferant_artikelnummer", "lieferant_artikelname", "lieferant_netto_ek",
         "bild_1", "bild_2", "bild_3", "bild_4", "bild_5", "bild_6", "bild_7", "bild_8", "bild_9",
         "kategorie_1", "kategorie_2", "kategorie_3", "kategorie_4", "kategorie_5", "kategorie_6",
-        "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description",
+        "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description", "seo_keywords",
         "parent_sku", "is_parent", "variant_attributes",
     ]
     placeholders = ", ".join(["?"] * len(cols))
@@ -240,7 +263,7 @@ def save_product(product: Product) -> None:
         product.lieferant_name, product.lieferant_artikelnummer, product.lieferant_artikelname, product.lieferant_netto_ek,
         product.bild_1, product.bild_2, product.bild_3, product.bild_4, product.bild_5, product.bild_6, product.bild_7, product.bild_8, product.bild_9,
         product.kategorie_1, product.kategorie_2, product.kategorie_3, product.kategorie_4, product.kategorie_5, product.kategorie_6,
-        product.kurzbeschreibung, product.beschreibung, product.url_pfad, product.title_tag, product.meta_description,
+        product.kurzbeschreibung, product.beschreibung, product.url_pfad, product.title_tag, product.meta_description, product.seo_keywords,
         product.parent_sku, int(product.is_parent), json.dumps(product.variant_attributes),
     )
     conn.execute(
@@ -269,21 +292,39 @@ def delete_all_products() -> None:
 
 # --- Templates ---
 
-def load_all_templates() -> dict[str, dict[str, str | int | bool]]:
-    """Load all templates from the database."""
+def load_all_templates() -> dict[str, dict]:
+    """Load all templates from the database.
+
+    Returns a dict mapping name -> {"attributes": dict, "category": str, "description": str}.
+    """
     conn = _get_connection()
-    rows = conn.execute("SELECT name, attributes FROM templates").fetchall()
+    rows = conn.execute("SELECT name, attributes, category, description FROM templates").fetchall()
     conn.close()
-    return {name: json.loads(attrs_json) for name, attrs_json in rows}
+    return {
+        name: {
+            "attributes": json.loads(attrs_json),
+            "category": category or "",
+            "description": description or "",
+        }
+        for name, attrs_json, category, description in rows
+    }
 
 
-def save_template(name: str, attributes: dict[str, str | int | bool]) -> None:
-    """Insert or update a template."""
+def save_template(
+    name: str,
+    attributes: dict[str, str | int | bool],
+    category: str = "",
+    description: str = "",
+) -> None:
+    """Insert or update a template with its metadata."""
     conn = _get_connection()
     conn.execute(
-        """INSERT INTO templates (name, attributes) VALUES (?, ?)
-           ON CONFLICT(name) DO UPDATE SET attributes = excluded.attributes""",
-        (name, json.dumps(attributes)),
+        """INSERT INTO templates (name, attributes, category, description) VALUES (?, ?, ?, ?)
+           ON CONFLICT(name) DO UPDATE SET
+             attributes = excluded.attributes,
+             category = excluded.category,
+             description = excluded.description""",
+        (name, json.dumps(attributes), category, description),
     )
     conn.commit()
     conn.close()
@@ -398,6 +439,33 @@ def get_recent_activities(limit: int = 10) -> list[dict]:
     conn.close()
     return [
         {"event_type": r[0], "detail": r[1], "count": r[2], "created_at": r[3]}
+        for r in rows
+    ]
+
+
+# --- Export History ---
+
+def log_export(export_type: str, filename: str, product_count: int, row_count: int) -> None:
+    """Append an entry to the export history."""
+    conn = _get_connection()
+    conn.execute(
+        "INSERT INTO export_history (export_type, filename, product_count, row_count, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
+        (export_type, filename, product_count, row_count),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_export_history(limit: int = 50) -> list[dict]:
+    """Return the most recent export history entries."""
+    conn = _get_connection()
+    rows = conn.execute(
+        "SELECT id, export_type, filename, product_count, row_count, created_at FROM export_history ORDER BY id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [
+        {"id": r[0], "export_type": r[1], "filename": r[2], "product_count": r[3], "row_count": r[4], "created_at": r[5]}
         for r in rows
     ]
 

@@ -21,7 +21,7 @@ class AppState:
     def __init__(self) -> None:
         self.products: dict[str, Product] = {}
         self.attribute_config: dict[str, AttributeDefinition] = {}
-        self.templates: dict[str, dict[str, str | int | bool]] = {}
+        self.templates: dict[str, dict] = {}
         self._category_tree: dict = {}
         init_db()
         self._load_attribute_config()
@@ -196,18 +196,32 @@ class AppState:
                 "meta_gpsr_land": "",
                 "meta_gpsr_mail": "",
             }
-            self.templates["GPSR"] = gpsr_attrs
-            db_save_template("GPSR", gpsr_attrs)
+            self.templates["GPSR"] = {
+                "attributes": gpsr_attrs,
+                "category": "Compliance",
+                "description": "GPSR-Pflichtangaben für Hersteller/Import.",
+            }
+            db_save_template("GPSR", gpsr_attrs, "Compliance", "GPSR-Pflichtangaben für Hersteller/Import.")
 
-    def get_templates(self) -> dict[str, dict[str, str | int | bool]]:
+    def get_templates(self) -> dict[str, dict]:
         return self.templates
 
-    def get_template(self, name: str) -> dict[str, str | int | bool] | None:
+    def get_template(self, name: str) -> dict | None:
         return self.templates.get(name)
 
-    def set_template(self, name: str, attributes: dict[str, str | int | bool]) -> None:
-        self.templates[name] = attributes
-        db_save_template(name, attributes)
+    def set_template(
+        self,
+        name: str,
+        attributes: dict[str, str | int | bool],
+        category: str = "",
+        description: str = "",
+    ) -> None:
+        self.templates[name] = {
+            "attributes": attributes,
+            "category": category,
+            "description": description,
+        }
+        db_save_template(name, attributes, category, description)
 
     def remove_template(self, name: str) -> bool:
         if name in self.templates:
@@ -215,6 +229,43 @@ class AppState:
             db_delete_template(name)
             return True
         return False
+
+    def rename_template(self, old_name: str, new_name: str) -> bool:
+        """Rename a template. Returns False if old missing, new exists or name invalid."""
+        new_name = new_name.strip()
+        if not new_name or old_name == new_name:
+            return False
+        if old_name not in self.templates or new_name in self.templates:
+            return False
+        data = self.templates.pop(old_name)
+        self.templates[new_name] = data
+        db_delete_template(old_name)
+        db_save_template(new_name, data["attributes"], data.get("category", ""), data.get("description", ""))
+        return True
+
+    def clone_template(self, source_name: str, new_name: str) -> bool:
+        """Duplicate an existing template under a new name."""
+        new_name = new_name.strip()
+        if not new_name or new_name in self.templates:
+            return False
+        source = self.templates.get(source_name)
+        if source is None:
+            return False
+        attrs_copy = dict(source.get("attributes", {}))
+        category = source.get("category", "")
+        description = source.get("description", "")
+        self.templates[new_name] = {
+            "attributes": attrs_copy,
+            "category": category,
+            "description": description,
+        }
+        db_save_template(new_name, attrs_copy, category, description)
+        return True
+
+    def get_template_categories(self) -> list[str]:
+        """Return sorted list of distinct non-empty template categories."""
+        cats = {t.get("category", "") for t in self.templates.values() if t.get("category")}
+        return sorted(cats, key=lambda s: s.lower())
 
     # --- Category tree ---
 

@@ -1,12 +1,41 @@
-"""Stats router — Dashboard statistics and global search."""
+"""Stats router — Dashboard statistics, content scores, price stats, system health, and global search."""
+
+import os
+import sys
+import time
+import sqlite3
 
 from fastapi import APIRouter
 
 from state import state
-from models.stats import DashboardStats, IncompleteProduct, ActivityLog
+from models.stats import (
+    DashboardStats, IncompleteProduct, ActivityLog,
+    ContentScoreProduct, PriceStats, SystemHealth,
+)
 from services.database import get_recent_activities
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
+
+_START_TIME = time.time()
+
+_CONTENT_FIELDS = ["artikelname", "kurzbeschreibung", "beschreibung", "title_tag", "meta_description"]
+_CONTENT_LABELS = {
+    "artikelname": "Artikelname",
+    "kurzbeschreibung": "Kurzbeschreibung",
+    "beschreibung": "Beschreibung",
+    "title_tag": "Title Tag",
+    "meta_description": "Meta-Description",
+}
+
+
+def _compute_content_score(product) -> tuple[int, list[str]]:
+    """Return (score 0-5, list of missing field labels)."""
+    missing = []
+    for f in _CONTENT_FIELDS:
+        val = getattr(product, f, None)
+        if not val or not str(val).strip():
+            missing.append(_CONTENT_LABELS[f])
+    return len(_CONTENT_FIELDS) - len(missing), missing
 
 
 @router.get("/search")
@@ -41,13 +70,15 @@ def global_search(q: str = "", limit: int = 20):
             if len(attr_results) >= limit:
                 break
 
-    # Search templates
+    # Search templates (match name, category or description)
     template_results = []
     for name, tmpl in state.templates.items():
-        if query in name.lower():
+        category = tmpl.get("category", "")
+        description = tmpl.get("description", "")
+        if query in name.lower() or query in category.lower() or query in description.lower():
             template_results.append({
                 "name": name,
-                "attribute_count": len(tmpl.attributes),
+                "attribute_count": len(tmpl.get("attributes", {})),
             })
             if len(template_results) >= limit:
                 break
@@ -96,6 +127,22 @@ def get_stats():
     seo_percent = round(seo_complete / products_active * 100, 1) if products_active else 0.0
     total_attrs = sum(len(p.attributes) for p in active)
     avg_attributes_per_product = round(total_attrs / products_active, 1) if products_active else 0.0
+
+    # Content Score
+    content_complete = 0
+    content_partial = 0
+    content_empty = 0
+    content_total_score = 0
+    for p in active:
+        score, _ = _compute_content_score(p)
+        content_total_score += score
+        if score == 5:
+            content_complete += 1
+        elif score == 0:
+            content_empty += 1
+        else:
+            content_partial += 1
+    content_score_avg = round(content_total_score / products_active / 5 * 100, 1) if products_active else 0.0
 
     # Build incomplete products list (missing stammdaten or attributes)
     incomplete: list[IncompleteProduct] = []
@@ -153,7 +200,152 @@ def get_stats():
         seo_complete=seo_complete,
         seo_percent=seo_percent,
         avg_attributes_per_product=avg_attributes_per_product,
+        content_score_avg=content_score_avg,
+        content_complete=content_complete,
+        content_partial=content_partial,
+        content_empty=content_empty,
         recently_updated=recently_updated,
         incomplete_products=incomplete,
         recent_activities=recent_activities,
     )
+
+
+@router.get("/content-scores")
+def get_content_scores():
+    """Return per-product content scores and aggregates."""
+    active = state.get_active_products()
+    products = []
+    for p in active:
+        score, missing = _compute_content_score(p)
+        products.append(ContentScoreProduct(
+            artikelnummer=p.artikelnummer,
+            artikelname=p.artikelname,
+            score=score,
+            score_percent=round(score / 5 * 100, 1),
+            missing=missing,
+        ))
+    products.sort(key=lambda x: x.score)
+    total = len(products)
+    complete = sum(1 for p in products if p.score == 5)
+    avg = round(sum(p.score for p in products) / total / 5 * 100, 1) if total else 0.0
+    return {
+        "products": products,
+        "total": total,
+        "complete": complete,
+        "avg_percent": avg,
+    }
+
+
+@router.get("/prices")
+def get_price_stats():
+    """Return price and margin statistics for active products."""
+    active = state.get_active_products()
+    ek_values = [p.ek for p in active if p.ek is not None and p.ek > 0]
+    vk_values = [p.preis for p in active if p.preis is not None and p.preis > 0]
+    margins = []
+    margin_products = []
+    for p in active:
+        if p.ek is not None and p.ek > 0 and p.preis is not None and p.preis > 0:
+            margin = p.preis - p.ek
+            margin_pct = round(margin / p.preis * 100, 1) if p.preis else 0
+            margins.append(margin)
+            margin_products.append({
+                "artikelnummer": p.artikelnummer,
+                "artikelname": p.artikelname,
+                "ek": p.ek,
+                "vk": p.preis,
+                "margin": round(margin, 2),
+                "margin_percent": margin_pct,
+            })
+
+    avg_ek = round(sum(ek_values) / len(ek_values), 2) if ek_values else 0
+    avg_vk = round(sum(vk_values) / len(vk_values), 2) if vk_values else 0
+    avg_margin = round(sum(margins) / len(margins), 2) if margins else 0
+    avg_margin_percent = round(avg_margin / avg_vk * 100, 1) if avg_vk else 0
+
+    negative = [mp for mp in margin_products if mp["margin"] < 0]
+    # Sort by margin ascending → worst margins first
+    margin_products.sort(key=lambda x: x["margin"])
+
+    return PriceStats(
+        avg_ek=avg_ek,
+        avg_vk=avg_vk,
+        avg_margin=avg_margin,
+        avg_margin_percent=avg_margin_percent,
+        products_without_ek=sum(1 for p in active if p.ek is None or p.ek <= 0),
+        products_without_vk=sum(1 for p in active if p.preis is None or p.preis <= 0),
+        products_negative_margin=len(negative),
+        min_ek=min(ek_values) if ek_values else None,
+        max_ek=max(ek_values) if ek_values else None,
+        min_vk=min(vk_values) if vk_values else None,
+        max_vk=max(vk_values) if vk_values else None,
+        critical_margin_products=margin_products[:10],
+    )
+
+
+@router.get("/health")
+def get_system_health():
+    """Return system health information."""
+    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "products.db")
+    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+
+    # Format size
+    if db_size < 1024:
+        size_display = f"{db_size} B"
+    elif db_size < 1024 * 1024:
+        size_display = f"{db_size / 1024:.1f} KB"
+    else:
+        size_display = f"{db_size / (1024 * 1024):.1f} MB"
+
+    # Row counts
+    try:
+        conn = sqlite3.connect(db_path)
+        products_count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+        activity_count = conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
+        history_count = conn.execute("SELECT COUNT(*) FROM product_history").fetchone()[0]
+        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+        conn.close()
+    except Exception:
+        products_count = len(state.products)
+        activity_count = 0
+        history_count = 0
+        integrity = "error"
+
+    uptime = time.time() - _START_TIME
+    if uptime < 3600:
+        uptime_display = f"{uptime / 60:.0f} Min."
+    elif uptime < 86400:
+        uptime_display = f"{uptime / 3600:.1f} Std."
+    else:
+        uptime_display = f"{uptime / 86400:.1f} Tage"
+
+    return SystemHealth(
+        db_size_bytes=db_size,
+        db_size_display=size_display,
+        products_count=products_count,
+        activity_log_count=activity_count,
+        product_history_count=history_count,
+        attribute_definitions_count=len(state.attribute_config),
+        templates_count=len(state.templates),
+        uptime_seconds=round(uptime, 1),
+        uptime_display=uptime_display,
+        python_version=sys.version.split()[0],
+        integrity_ok=integrity == "ok",
+    )
+
+
+@router.post("/vacuum")
+def vacuum_db():
+    """Run VACUUM and ANALYZE on the database."""
+    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "products.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        old_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+        conn.execute("VACUUM")
+        conn.execute("ANALYZE")
+        conn.close()
+        new_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+        saved = old_size - new_size
+        return {"success": True, "old_size": old_size, "new_size": new_size, "saved_bytes": saved}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

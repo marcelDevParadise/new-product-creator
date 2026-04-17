@@ -48,6 +48,7 @@ class Product(BaseModel):
     url_pfad: str | None = None
     title_tag: str | None = None
     meta_description: str | None = None
+    seo_keywords: str | None = None
     # Varianten
     parent_sku: str | None = None
     is_parent: bool = False

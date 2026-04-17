@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Search, Plus, Pencil, Trash2, X, Check, Filter, ArrowUp, ArrowDown,
+  Hash, Tag, FileText, List, Settings2, AlertCircle,
 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Input } from '@/components/ui/input';
@@ -151,10 +152,11 @@ export function AttributesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-8 pt-8">
+      <div className="p-8 space-y-6">
         <PageHeader
           title="Attribute verwalten"
           description={`${totalCount} Attribute in ${allCategoryNames.length} Kategorien`}
+          className='mb-4'
           actions={
             <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="w-4 h-4 mr-2" />
@@ -413,6 +415,11 @@ function EditAttributeDialog({
   const update = (field: string, value: unknown) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
+  const suggestedCount = useMemo(
+    () => form.suggested_values.split('\n').map(s => s.trim()).filter(Boolean).length,
+    [form.suggested_values]
+  );
+
   const handleSubmit = () => {
     const sv = form.suggested_values.trim()
       ? form.suggested_values.split('\n').map(s => s.trim()).filter(Boolean)
@@ -430,53 +437,135 @@ function EditAttributeDialog({
 
   return (
     <Dialog open onOpenChange={onCancel}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Attribut bearbeiten</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <Badge variant="outline" className="font-mono text-xs">{attrKey}</Badge>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Name</Label>
-              <Input value={form.name} onChange={e => update('name', e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">Metafield ID</Label>
-              <Input value={form.id} onChange={e => update('id', e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">Kategorie</Label>
-              <Select value={form.category} onValueChange={v => update('category', v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Standardwert</Label>
-              <Input value={form.default_value} onChange={e => update('default_value', e.target.value)} />
-            </div>
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
+          <div className="flex items-center gap-2 mb-1">
+            <Pencil className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <DialogTitle className="text-base font-semibold">Attribut bearbeiten</DialogTitle>
           </div>
-          <div>
-            <Label className="text-xs">Beschreibung</Label>
-            <Textarea value={form.description} onChange={e => update('description', e.target.value)} rows={2} />
-          </div>
-          <div>
-            <Label className="text-xs">Vorgeschlagene Werte (einer pro Zeile)</Label>
-            <Textarea value={form.suggested_values} onChange={e => update('suggested_values', e.target.value)} rows={2} />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch checked={form.required} onCheckedChange={v => update('required', v)} />
-            <Label className="text-xs">Pflichtfeld</Label>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-300 font-mono text-xs">
+              <Hash className="w-3 h-3" />
+              {attrKey}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Key ist unveränderlich
+            </span>
           </div>
         </div>
-        <DialogFooter>
+
+        {/* Body */}
+        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-6">
+          {/* Grundangaben */}
+          <section className="space-y-3">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <Tag className="w-3.5 h-3.5" />
+              Grundangaben
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Anzeigename</Label>
+                <Input
+                  value={form.name}
+                  onChange={e => update('name', e.target.value)}
+                  placeholder="z.B. Gewicht"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Metafield ID</Label>
+                <Input
+                  value={form.id}
+                  onChange={e => update('id', e.target.value)}
+                  className="font-mono text-xs"
+                  placeholder="meta_weight:custom:number_integer"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Kategorie</Label>
+                <Select value={form.category} onValueChange={v => update('category', v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Standardwert</Label>
+                <Input
+                  value={form.default_value}
+                  onChange={e => update('default_value', e.target.value)}
+                  placeholder="(optional)"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Beschreibung */}
+          <section className="space-y-2">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <FileText className="w-3.5 h-3.5" />
+              Beschreibung
+            </h3>
+            <Textarea
+              value={form.description}
+              onChange={e => update('description', e.target.value)}
+              rows={3}
+              placeholder="Hilfetext, der bei der Zuweisung angezeigt wird…"
+              className="resize-none"
+            />
+          </section>
+
+          {/* Vorgeschlagene Werte */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <List className="w-3.5 h-3.5" />
+                Vorgeschlagene Werte
+              </h3>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {suggestedCount} {suggestedCount === 1 ? 'Wert' : 'Werte'}
+              </span>
+            </div>
+            <Textarea
+              value={form.suggested_values}
+              onChange={e => update('suggested_values', e.target.value)}
+              rows={8}
+              placeholder={'Ein Wert pro Zeile\nz.B.\nRot\nGrün\nBlau'}
+              className="font-mono text-xs resize-y"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Wird als Dropdown angeboten. Leere Liste = Freitexteingabe.
+            </p>
+          </section>
+
+          {/* Verhalten */}
+          <section className="space-y-2">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <Settings2 className="w-3.5 h-3.5" />
+              Verhalten
+            </h3>
+            <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+              <div className="flex items-start gap-2">
+                <AlertCircle className={`w-4 h-4 mt-0.5 ${form.required ? 'text-amber-500' : 'text-gray-400'}`} />
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Pflichtfeld</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Produkte werden in der Qualitätsprüfung markiert, wenn dieses Attribut fehlt.
+                  </div>
+                </div>
+              </div>
+              <Switch checked={form.required} onCheckedChange={v => update('required', v)} />
+            </label>
+          </section>
+        </div>
+
+        {/* Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
           <Button variant="outline" onClick={onCancel}>
             <X className="w-3.5 h-3.5 mr-1" />
             Abbrechen
@@ -520,6 +609,11 @@ function CreateAttributeDialog({
   const update = (field: string, value: unknown) =>
     setForm(prev => ({ ...prev, [field]: value }));
 
+  const suggestedCount = useMemo(
+    () => form.suggested_values.split('\n').map(s => s.trim()).filter(Boolean).length,
+    [form.suggested_values]
+  );
+
   const handleCreate = async () => {
     if (!form.key.trim() || !form.name.trim() || !form.id.trim()) {
       toast('Key, Name und Metafield ID sind erforderlich', 'error');
@@ -556,96 +650,174 @@ function CreateAttributeDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Neues Attribut erstellen</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">Key (eindeutig)</Label>
-              <Input
-                placeholder="z.B. meta_weight"
-                value={form.key}
-                onChange={e => update('key', e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Metafield ID</Label>
-              <Input
-                placeholder="z.B. meta_weight:custom:number_integer"
-                value={form.id}
-                onChange={e => update('id', e.target.value)}
-              />
-            </div>
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
+          <div className="flex items-center gap-2">
+            <Plus className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <DialogTitle className="text-base font-semibold">Neues Attribut erstellen</DialogTitle>
           </div>
-          <div>
-            <Label className="text-xs">Name</Label>
-            <Input
-              placeholder="z.B. Gewicht"
-              value={form.name}
-              onChange={e => update('name', e.target.value)}
-            />
-          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+            Lege ein neues Attribut an. Key und Metafield ID müssen eindeutig sein.
+          </p>
+        </div>
 
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Label className="text-xs">Kategorie</Label>
-              <button
-                className="text-xs text-primary hover:underline"
-                onClick={() => setUseNewCategory(v => !v)}
-              >
-                {useNewCategory ? 'Bestehende wählen' : 'Neue Kategorie'}
-              </button>
+        {/* Body */}
+        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-6">
+          {/* Identifier */}
+          <section className="space-y-3">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <Hash className="w-3.5 h-3.5" />
+              Kennungen
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Key (eindeutig)</Label>
+                <Input
+                  placeholder="meta_weight"
+                  value={form.key}
+                  onChange={e => update('key', e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Metafield ID</Label>
+                <Input
+                  placeholder="meta_weight:custom:number_integer"
+                  value={form.id}
+                  onChange={e => update('id', e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </div>
             </div>
-            {useNewCategory ? (
-              <Input
-                placeholder="Neue Kategorie..."
-                value={form.newCategory}
-                onChange={e => update('newCategory', e.target.value)}
-              />
-            ) : (
-              <Select value={form.category} onValueChange={v => update('category', v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+          </section>
 
-          <div>
-            <Label className="text-xs">Beschreibung</Label>
+          {/* Grundangaben */}
+          <section className="space-y-3">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <Tag className="w-3.5 h-3.5" />
+              Grundangaben
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Anzeigename</Label>
+                <Input
+                  placeholder="z.B. Gewicht"
+                  value={form.name}
+                  onChange={e => update('name', e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Standardwert</Label>
+                <Input
+                  value={form.default_value}
+                  onChange={e => update('default_value', e.target.value)}
+                  placeholder="(optional)"
+                />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium">Kategorie</Label>
+                  <button
+                    type="button"
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                    onClick={() => setUseNewCategory(v => !v)}
+                  >
+                    {useNewCategory ? '← Bestehende wählen' : '+ Neue Kategorie'}
+                  </button>
+                </div>
+                {useNewCategory ? (
+                  <Input
+                    placeholder="Name der neuen Kategorie…"
+                    value={form.newCategory}
+                    onChange={e => update('newCategory', e.target.value)}
+                    autoFocus
+                  />
+                ) : (
+                  <Select value={form.category} onValueChange={v => update('category', v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Kategorie wählen…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* Beschreibung */}
+          <section className="space-y-2">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <FileText className="w-3.5 h-3.5" />
+              Beschreibung
+            </h3>
             <Textarea
               value={form.description}
               onChange={e => update('description', e.target.value)}
-              rows={2}
+              rows={3}
+              placeholder="Hilfetext, der bei der Zuweisung angezeigt wird…"
+              className="resize-none"
             />
-          </div>
-          <div>
-            <Label className="text-xs">Standardwert</Label>
-            <Input value={form.default_value} onChange={e => update('default_value', e.target.value)} />
-          </div>
-          <div>
-            <Label className="text-xs">Vorgeschlagene Werte (einer pro Zeile)</Label>
+          </section>
+
+          {/* Vorgeschlagene Werte */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <List className="w-3.5 h-3.5" />
+                Vorgeschlagene Werte
+              </h3>
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                {suggestedCount} {suggestedCount === 1 ? 'Wert' : 'Werte'}
+              </span>
+            </div>
             <Textarea
               value={form.suggested_values}
               onChange={e => update('suggested_values', e.target.value)}
-              rows={2}
+              rows={6}
+              placeholder={'Ein Wert pro Zeile\nz.B.\nRot\nGrün\nBlau'}
+              className="font-mono text-xs resize-y"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch checked={form.required} onCheckedChange={v => update('required', v)} />
-            <Label className="text-xs">Pflichtfeld</Label>
-          </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Wird als Dropdown angeboten. Leere Liste = Freitexteingabe.
+            </p>
+          </section>
+
+          {/* Verhalten */}
+          <section className="space-y-2">
+            <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              <Settings2 className="w-3.5 h-3.5" />
+              Verhalten
+            </h3>
+            <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
+              <div className="flex items-start gap-2">
+                <AlertCircle className={`w-4 h-4 mt-0.5 ${form.required ? 'text-amber-500' : 'text-gray-400'}`} />
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100">Pflichtfeld</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Produkte werden in der Qualitätsprüfung markiert, wenn dieses Attribut fehlt.
+                  </div>
+                </div>
+              </div>
+              <Switch checked={form.required} onCheckedChange={v => update('required', v)} />
+            </label>
+          </section>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Abbrechen</Button>
-          <Button onClick={handleCreate}>Erstellen</Button>
+
+        {/* Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
+          <Button variant="outline" onClick={onClose}>
+            <X className="w-3.5 h-3.5 mr-1" />
+            Abbrechen
+          </Button>
+          <Button onClick={handleCreate}>
+            <Check className="w-3.5 h-3.5 mr-1" />
+            Erstellen
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
-import type { PricingSettings, ExportSettings, DefaultValues, VariantenSettings } from '../types';
-import { Save, Plus, X, FileSpreadsheet, Calculator, Ruler, Building2, GitBranch } from 'lucide-react';
+import type { PricingSettings, ExportSettings, DefaultValues, VariantenSettings, SystemHealth } from '../types';
+import { Save, Plus, X, FileSpreadsheet, Calculator, Ruler, Building2, GitBranch, HardDrive } from 'lucide-react';
 
 const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
 const selectCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
@@ -74,6 +74,10 @@ export function SettingsPage() {
   const [newAxis, setNewAxis] = useState('');
   const [savingVarianten, setSavingVarianten] = useState(false);
 
+  // System Health
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [vacuuming, setVacuuming] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -81,7 +85,8 @@ export function SettingsPage() {
     Promise.all([
       api.getAllSettings(),
       api.getVariantenSettings(),
-    ]).then(([s, v]) => {
+      api.getSystemHealth(),
+    ]).then(([s, v, h]) => {
       setMwst(String(s.pricing.mwst_prozent));
       setFaktor(String(s.pricing.faktor));
       setRundung(String(s.pricing.rundung));
@@ -92,6 +97,7 @@ export function SettingsPage() {
       setEinheiten(s.einheiten);
       setDefaults(s.standard_werte);
       setVariantenSettings(v);
+      setHealth(h);
       setLoading(false);
     }).catch((e) => { toast(e.message, 'error'); setLoading(false); });
   }, []);
@@ -474,6 +480,89 @@ export function SettingsPage() {
             </div>
           </div>
         </SectionCard>
+
+        {/* System Health */}
+        {health && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                <HardDrive className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">System</h3>
+                <p className="text-xs text-gray-500 mt-0.5">Datenbank & System-Informationen</p>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Datenbank</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.db_size_display}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Produkte</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.products_count}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Aktivitäts-Log</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.activity_log_count}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Historie-Einträge</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.product_history_count}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Attribut-Definitionen</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.attribute_definitions_count}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Vorlagen</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.templates_count}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Uptime</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.uptime_display}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-xs text-gray-500">Python</div>
+                  <div className="text-lg font-semibold text-gray-900">{health.python_version}</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${health.integrity_ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                  <span className="text-sm text-gray-600">
+                    Integrität: {health.integrity_ok ? 'OK' : 'Fehler'}
+                  </span>
+                </div>
+                <button
+                  onClick={async () => {
+                    setVacuuming(true);
+                    try {
+                      const r = await api.vacuumDb();
+                      if (r.success) {
+                        toast(`Datenbank optimiert — ${(r.saved_bytes / 1024).toFixed(1)} KB eingespart`, 'success');
+                        const h = await api.getSystemHealth();
+                        setHealth(h);
+                      }
+                    } catch (e) {
+                      toast(e instanceof Error ? e.message : 'VACUUM fehlgeschlagen', 'error');
+                    } finally {
+                      setVacuuming(false);
+                    }
+                  }}
+                  disabled={vacuuming}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                >
+                  <HardDrive className="w-4 h-4" />
+                  {vacuuming ? 'Optimiere...' : 'DB optimieren (VACUUM)'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

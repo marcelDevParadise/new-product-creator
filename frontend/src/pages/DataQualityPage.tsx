@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, RefreshCw, Search, Filter } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, RefreshCw, Search, Filter, Grid3X3 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { api } from '../api/client';
-import type { ValidationResult, ProductValidation } from '../types';
+import type { ValidationResult, ProductValidation, HeatmapData } from '../types';
 import { Badge } from '../components/ui/badge';
 import {
   Table,
@@ -27,13 +27,16 @@ export function DataQualityPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeverity, setFilterSeverity] = useState<'all' | 'error' | 'warning' | 'ok'>('all');
   const [expandedSku, setExpandedSku] = useState<string | null>(null);
+  const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
   const navigate = useNavigate();
 
   const load = async () => {
     setLoading(true);
     try {
-      const result = await api.getValidation();
+      const [result, hm] = await Promise.all([api.getValidation(), api.getHeatmap()]);
       setData(result);
+      setHeatmap(hm);
     } catch {
       // handled by empty state
     } finally {
@@ -62,7 +65,7 @@ export function DataQualityPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="p-8 space-y-6">
         <PageHeader title="Datenqualität" description="Prüfe deine Produktdaten auf Fehler und Warnungen" />
         <div className="flex items-center justify-center py-20">
           <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
@@ -73,7 +76,7 @@ export function DataQualityPage() {
 
   if (!data) {
     return (
-      <div className="p-8">
+      <div className="p-8 space-y-6">
         <PageHeader title="Datenqualität" description="Prüfe deine Produktdaten auf Fehler und Warnungen" />
         <p className="text-gray-500 text-sm">Keine Daten verfügbar.</p>
       </div>
@@ -157,6 +160,85 @@ export function DataQualityPage() {
                 </Badge>
               ))}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Heatmap Toggle + Section */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setShowHeatmap(!showHeatmap)}
+          className={`flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg transition-colors ${showHeatmap ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-gray-200 hover:bg-gray-50 text-gray-600'}`}
+        >
+          <Grid3X3 className="w-4 h-4" />
+          Vollständigkeits-Heatmap {showHeatmap ? 'ausblenden' : 'anzeigen'}
+        </button>
+      </div>
+
+      {showHeatmap && heatmap && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-base">Vollständigkeits-Heatmap</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Field stats bars */}
+            <div className="space-y-2 mb-6">
+              {heatmap.field_stats.map((f) => (
+                <div key={f.field} className="flex items-center gap-3">
+                  <span className="text-xs text-gray-600 w-32 shrink-0 text-right">{f.label}</span>
+                  <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        f.percent >= 80 ? 'bg-emerald-500' : f.percent >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${f.percent}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 w-16 shrink-0">{f.filled_count}/{f.total} ({f.percent}%)</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Per-product grid */}
+            {heatmap.products.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr>
+                      <th className="text-left px-2 py-1.5 text-gray-500 font-medium sticky left-0 bg-white">Produkt</th>
+                      {heatmap.field_stats.map((f) => (
+                        <th key={f.field} className="px-1 py-1.5 text-center text-gray-400 font-normal whitespace-nowrap" title={f.label}>
+                          {f.label.slice(0, 4)}
+                        </th>
+                      ))}
+                      <th className="px-2 py-1.5 text-right text-gray-500 font-medium">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {heatmap.products.slice(0, 30).map((p) => (
+                      <tr key={p.artikelnummer} className="hover:bg-gray-50">
+                        <td className="px-2 py-1 font-mono text-gray-700 sticky left-0 bg-white max-w-[150px] truncate" title={p.artikelname}>
+                          {p.artikelnummer}
+                        </td>
+                        {heatmap.field_stats.map((f) => (
+                          <td key={f.field} className="px-1 py-1 text-center">
+                            <div
+                              className={`w-4 h-4 rounded-sm mx-auto ${
+                                p.fields[f.field] ? 'bg-emerald-400' : 'bg-red-300'
+                              }`}
+                              title={`${f.label}: ${p.fields[f.field] ? '✓' : '✗'}`}
+                            />
+                          </td>
+                        ))}
+                        <td className="px-2 py-1 text-right text-gray-500">
+                          {p.filled_count}/{p.total_fields}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
