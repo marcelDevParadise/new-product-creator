@@ -3,6 +3,8 @@ import { X, Save, Plus, Search, ChevronRight, Package } from 'lucide-react';
 import type { Template, AttributeConfig } from '../../types';
 import { api } from '../../api/client';
 import { useToast } from '../ui/Toast';
+import { getFieldType } from '@/lib/attribute-utils';
+import { TagPicker } from '@/components/ui/TagPicker';
 
 interface Props {
   template: Template;
@@ -147,8 +149,14 @@ export function TemplateAttributeEditor({ template, attributeConfig, onClose, on
                               <p className="text-xs text-gray-400 mt-0.5 truncate">{def.description}</p>
                             )}
                           </div>
-                          <div className="w-52 shrink-0">
-                            {hasSuggestions ? (
+                          <div className={`${getFieldType(def.id) === 'tags' && hasSuggestions ? 'flex-1' : 'w-52'} shrink-0`}>
+                            {getFieldType(def.id) === 'tags' && hasSuggestions ? (
+                              <TagPicker
+                                value={value}
+                                suggestions={def.suggested_values!}
+                                onChange={(val) => setValue(key, val)}
+                              />
+                            ) : hasSuggestions ? (
                               <select
                                 value={value !== undefined ? String(value) : ''}
                                 onChange={(e) => setValue(key, e.target.value)}

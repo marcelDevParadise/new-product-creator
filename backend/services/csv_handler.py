@@ -131,7 +131,7 @@ def build_ameise_csv(
                 product.artikelname,
                 attributgruppe,
                 config.id,
-                f"{config.name} ({config.id})",
+                config.id,
                 str(attr_value),
             ])
 

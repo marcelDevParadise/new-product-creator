@@ -4,6 +4,7 @@ import type { AttributeConfig } from '../../types';
 import { api } from '../../api/client';
 import { useToast } from '../ui/Toast';
 import { getFieldType } from '@/lib/attribute-utils';
+import { TagPicker } from '@/components/ui/TagPicker';
 
 interface Props {
   selectedSkus: string[];
@@ -153,6 +154,12 @@ export function BulkAttributeModal({ selectedSkus, attributeConfig, onClose, onS
                             />
                             <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" />
                           </label>
+                        ) : fieldType === 'tags' && def.suggested_values && def.suggested_values.length > 0 ? (
+                          <TagPicker
+                            value={value}
+                            suggestions={def.suggested_values}
+                            onChange={(val) => setValue(key, val)}
+                          />
                         ) : def.suggested_values && def.suggested_values.length > 0 ? (
                           <select
                             value={value !== undefined ? String(value) : ''}

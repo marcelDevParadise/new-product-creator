@@ -537,7 +537,7 @@ export function StammdatenEditPage() {
                   <button
                     type="button"
                     className="px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-700 dark:hover:bg-indigo-900/50 whitespace-nowrap"
-                    onClick={() => { if (f.artikelname) { setForm(prev => ({ ...prev, url_pfad: slugify(f.artikelname) })); markDirty(); } }}
+                    onClick={() => { if (f.artikelname) { setF(prev => prev ? { ...prev, url_pfad: slugify(f.artikelname) } : prev); markDirty(); } }}
                     title="URL-Pfad aus Artikelname generieren"
                   >
                     Auto

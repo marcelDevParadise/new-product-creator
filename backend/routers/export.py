@@ -85,7 +85,7 @@ def export_preview():
                 "artikelname": product.artikelname,
                 "attributgruppe": get_export_settings().attributgruppe,
                 "funktionsattribut": config.id,
-                "attributname": f"{config.name} ({config.id})",
+                "attributname": config.id,
                 "attributwert": str(attr_value),
             })
     return {"rows": rows, "total_products": len(active_with_attrs), "total_rows": len(rows)}
