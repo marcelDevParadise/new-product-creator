@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-REPO_DIR="/home/pi/new-product-creator"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="${REPO_DIR}/.venv"
 
 cd "${REPO_DIR}"
@@ -18,7 +18,7 @@ echo "==> Backend-Dependencies (falls geändert)"
 echo "==> Frontend neu bauen"
 cd frontend
 npm ci
-npm run build
+NODE_OPTIONS="--max-old-space-size=2048" npm run build
 cd ..
 
 echo "==> Backend-Service neu starten"

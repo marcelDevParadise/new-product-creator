@@ -9,8 +9,13 @@
 
 set -euo pipefail
 
-REPO_DIR="/home/pi/new-product-creator"
+# Repo-Pfad = Verzeichnis ueber diesem Skript (deploy/), absolut aufgeloest
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="${REPO_DIR}/.venv"
+RUN_USER="$(id -un)"
+
+echo "==> Repo:  ${REPO_DIR}"
+echo "==> User:  ${RUN_USER}"
 
 echo "==> System-Pakete (Python, Caddy, Tools)"
 sudo apt update
@@ -53,17 +58,20 @@ fi
 echo "==> Frontend bauen (npm ci + build)"
 cd "${REPO_DIR}/frontend"
 npm ci
-npm run build
+NODE_OPTIONS="--max-old-space-size=2048" npm run build
 cd "${REPO_DIR}"
 
-echo "==> systemd-Unit für Backend installieren"
-sudo cp "${REPO_DIR}/deploy/attribut-generator.service" /etc/systemd/system/attribut-generator.service
+echo "==> systemd-Unit fuer Backend installieren (User=${RUN_USER}, Repo=${REPO_DIR})"
+sed -e "s|__USER__|${RUN_USER}|g" -e "s|__REPO__|${REPO_DIR}|g" \
+	"${REPO_DIR}/deploy/attribut-generator.service" \
+	| sudo tee /etc/systemd/system/attribut-generator.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable attribut-generator.service
 sudo systemctl restart attribut-generator.service
 
 echo "==> Caddy konfigurieren"
-sudo cp "${REPO_DIR}/deploy/Caddyfile" /etc/caddy/Caddyfile
+sed -e "s|__REPO__|${REPO_DIR}|g" "${REPO_DIR}/deploy/Caddyfile" \
+	| sudo tee /etc/caddy/Caddyfile > /dev/null
 sudo mkdir -p /var/log/caddy
 sudo chown caddy:caddy /var/log/caddy
 sudo systemctl restart caddy

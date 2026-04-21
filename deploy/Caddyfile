@@ -13,7 +13,7 @@
 
 	# Alles andere → statisches Frontend (SPA-Fallback auf index.html)
 	handle {
-		root * /home/pi/new-product-creator/frontend/dist
+		root * __REPO__/frontend/dist
 		try_files {path} /index.html
 		file_server
 	}
