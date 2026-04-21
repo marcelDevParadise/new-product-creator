@@ -1,9 +1,7 @@
 """Stats router — Dashboard statistics, content scores, price stats, system health, and global search."""
 
-import os
 import sys
 import time
-import sqlite3
 
 from fastapi import APIRouter
 
@@ -12,7 +10,7 @@ from models.stats import (
     DashboardStats, IncompleteProduct, ActivityLog,
     ContentScoreProduct, PriceStats, SystemHealth,
 )
-from services.database import get_recent_activities
+from services.database import get_recent_activities, _conn
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -286,8 +284,27 @@ def get_price_stats():
 @router.get("/health")
 def get_system_health():
     """Return system health information."""
-    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "products.db")
-    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+    db_size = 0
+    products_count = len(state.products)
+    activity_count = 0
+    history_count = 0
+    integrity = "error"
+
+    try:
+        with _conn() as conn, conn.cursor() as cur:
+            # Database size in bytes (current database)
+            cur.execute("SELECT pg_database_size(current_database())")
+            db_size = cur.fetchone()[0] or 0
+            cur.execute("SELECT COUNT(*) FROM products")
+            products_count = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM activity_log")
+            activity_count = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM product_history")
+            history_count = cur.fetchone()[0]
+            # Postgres has no PRAGMA integrity_check; a successful query is our health signal.
+            integrity = "ok"
+    except Exception:
+        pass
 
     # Format size
     if db_size < 1024:
@@ -296,20 +313,6 @@ def get_system_health():
         size_display = f"{db_size / 1024:.1f} KB"
     else:
         size_display = f"{db_size / (1024 * 1024):.1f} MB"
-
-    # Row counts
-    try:
-        conn = sqlite3.connect(db_path)
-        products_count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
-        activity_count = conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
-        history_count = conn.execute("SELECT COUNT(*) FROM product_history").fetchone()[0]
-        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-        conn.close()
-    except Exception:
-        products_count = len(state.products)
-        activity_count = 0
-        history_count = 0
-        integrity = "error"
 
     uptime = time.time() - _START_TIME
     if uptime < 3600:
@@ -337,14 +340,15 @@ def get_system_health():
 @router.post("/vacuum")
 def vacuum_db():
     """Run VACUUM and ANALYZE on the database."""
-    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "products.db")
     try:
-        conn = sqlite3.connect(db_path)
-        old_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
-        conn.execute("VACUUM")
-        conn.execute("ANALYZE")
-        conn.close()
-        new_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+        with _conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT pg_database_size(current_database())")
+            old_size = cur.fetchone()[0] or 0
+            # VACUUM cannot run inside a transaction. autocommit is enabled in the pool.
+            cur.execute("VACUUM")
+            cur.execute("ANALYZE")
+            cur.execute("SELECT pg_database_size(current_database())")
+            new_size = cur.fetchone()[0] or 0
         saved = old_size - new_size
         return {"success": True, "old_size": old_size, "new_size": new_size, "saved_bytes": saved}
     except Exception as e:

@@ -258,3 +258,115 @@ crontab -e
 4. **Connection-String** im Backend auf Tailscale-IP umstellen
 5. **Backend auf Pi deployen** (systemd + uvicorn)
 6. **Frontend-Build** (`npm run build`) per nginx auf Pi ausliefern
+
+---
+
+## Teil 7: App-Deployment auf dem Pi
+
+Architektur:
+
+```
+[Browser]
+   │  HTTPS via Tailscale
+   ▼
+https://<host>.<tailnet>.ts.net   ← tailscale serve
+   │
+   ▼
+Caddy :8080 (lokal)
+   ├─ /api/*  → uvicorn :8000  (systemd: attribut-generator.service)
+   └─ /*      → frontend/dist   (statisches React-Build)
+                  │
+                  ▼
+              PostgreSQL :5432  (lokal über Unix-Socket / 127.0.0.1)
+```
+
+### 7.1 Repo klonen
+
+```bash
+cd ~
+git clone https://github.com/marcelDevParadise/new-product-creator.git
+cd new-product-creator
+```
+
+### 7.2 `.env` für Backend anlegen
+
+Da das Backend jetzt **auf dem Pi selbst** läuft, geht die DB-Verbindung über `127.0.0.1` (nicht über Tailscale):
+
+```bash
+cp backend/.env.example backend/.env
+nano backend/.env
+```
+
+```env
+DATABASE_URL=postgresql://attributgen:SICHERES_PASSWORT_HIER@127.0.0.1:5432/attribut_generator
+CORS_ORIGINS=https://<host>.<tailnet>.ts.net
+```
+
+> Tailscale-Hostname rausfinden mit `tailscale status --self --json | jq -r '.Self.DNSName'` oder einfach `tailscale dns status`.
+
+### 7.3 Setup-Skript ausführen
+
+```bash
+chmod +x deploy/setup-pi.sh deploy/update-pi.sh
+bash deploy/setup-pi.sh
+```
+
+Das Skript:
+- installiert Python-venv, Node.js, Caddy
+- legt `.venv` an und installiert Backend-Dependencies
+- baut das Frontend (`npm ci && npm run build`)
+- installiert die systemd-Unit `attribut-generator.service` und startet sie
+- kopiert den Caddyfile nach `/etc/caddy/` und startet Caddy
+- aktiviert Tailscale Serve (HTTPS auf Port 443 → Caddy auf 8080)
+
+### 7.4 Daten von der lokalen SQLite migrieren (einmalig)
+
+Falls noch nicht geschehen — vom **Windows-PC aus** die Migration ausführen (DATABASE_URL zeigt dann auf die Tailscale-IP):
+
+```powershell
+cd backend
+python migrate_to_postgres.py --clear
+```
+
+### 7.5 Status prüfen
+
+```bash
+sudo systemctl status attribut-generator caddy
+sudo journalctl -u attribut-generator -f
+curl http://127.0.0.1:8000/api/health
+curl http://127.0.0.1:8080/api/health
+```
+
+### 7.6 Im Browser öffnen
+
+```
+https://<host>.<tailnet>.ts.net/
+```
+
+Funktioniert von jedem Gerät, das im selben Tailscale-Netz angemeldet ist.
+
+### 7.7 Updates einspielen
+
+Code geändert und auf GitHub gepusht? Auf dem Pi:
+
+```bash
+cd ~/new-product-creator
+bash deploy/update-pi.sh
+```
+
+Macht `git pull`, installiert geänderte Python-Pakete, baut Frontend neu, restartet Backend, reloadet Caddy.
+
+---
+
+## Teil 8: Häufige Probleme
+
+| Symptom | Lösung |
+|---|---|
+| `502 Bad Gateway` von Caddy | `sudo journalctl -u attribut-generator -n 50` — meist ImportError oder fehlende `.env` |
+| Frontend lädt aber API gibt 404 | Caddyfile-Pfad falsch — `handle /api/*` vor `handle {}` prüfen |
+| `permission denied` auf `/var/log/caddy` | `sudo chown -R caddy:caddy /var/log/caddy` |
+| `tailscale serve` zeigt "permission denied" | Pi neu mit `--operator=$USER` aufsetzen oder `sudo` davor |
+| Browser zeigt "ERR_CERT_AUTHORITY_INVALID" | Gerät noch nicht im Tailscale eingeloggt — Tailscale-Cert wird nur Mitgliedern ausgeliefert |
+| Backend startet aber `init_db` schlägt fehl | DATABASE_URL prüfen, `psql -h 127.0.0.1 -U attributgen -d attribut_generator` testen |
+| `npm run build` läuft out-of-memory auf Pi | `NODE_OPTIONS=--max-old-space-size=2048 npm run build` |
+

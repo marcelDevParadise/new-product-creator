@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from state import state
-from services.database import _get_connection, log_activity
+from services.database import get_conn, log_activity
 
 router = APIRouter(prefix="/api/bundles", tags=["bundles"])
 
@@ -22,35 +22,18 @@ class BundleUpdate(BaseModel):
     items: list[dict] | None = None
 
 
-def _ensure_table():
-    conn = _get_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS bundles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            items TEXT NOT NULL DEFAULT '[]',
-            created_at TEXT NOT NULL DEFAULT (datetime('now')),
-            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-
-_ensure_table()
-
-
 @router.get("")
 def list_bundles():
     """Return all bundles with resolved product info."""
-    conn = _get_connection()
-    rows = conn.execute("SELECT id, name, description, items, created_at, updated_at FROM bundles ORDER BY id DESC").fetchall()
-    conn.close()
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, description, items, created_at, updated_at "
+            "FROM bundles ORDER BY id DESC"
+        )
+        rows = cur.fetchall()
     bundles = []
     for r in rows:
         items = json.loads(r[3])
-        # Enrich items with product names
         enriched = []
         total_ek = 0.0
         total_vk = 0.0
@@ -83,18 +66,15 @@ def list_bundles():
 @router.post("")
 def create_bundle(data: BundleCreate):
     """Create a new bundle."""
-    # Validate all SKUs exist
     for item in data.items:
         if not state.get_product(item["artikelnummer"]):
             raise HTTPException(404, f"Produkt {item['artikelnummer']} nicht gefunden")
-    conn = _get_connection()
-    cur = conn.execute(
-        "INSERT INTO bundles (name, description, items) VALUES (?, ?, ?)",
-        (data.name, data.description, json.dumps(data.items)),
-    )
-    bundle_id = cur.lastrowid
-    conn.commit()
-    conn.close()
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO bundles (name, description, items) VALUES (%s, %s, %s) RETURNING id",
+            (data.name, data.description, json.dumps(data.items)),
+        )
+        bundle_id = cur.fetchone()[0]
     log_activity("bundle_created", f"Bundle '{data.name}' erstellt", len(data.items))
     return {"id": bundle_id, "name": data.name}
 
@@ -102,9 +82,13 @@ def create_bundle(data: BundleCreate):
 @router.get("/{bundle_id}")
 def get_bundle(bundle_id: int):
     """Get a single bundle."""
-    conn = _get_connection()
-    row = conn.execute("SELECT id, name, description, items, created_at, updated_at FROM bundles WHERE id = ?", (bundle_id,)).fetchone()
-    conn.close()
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, description, items, created_at, updated_at "
+            "FROM bundles WHERE id = %s",
+            (bundle_id,),
+        )
+        row = cur.fetchone()
     if not row:
         raise HTTPException(404, "Bundle nicht gefunden")
     items = json.loads(row[3])
@@ -124,46 +108,40 @@ def get_bundle(bundle_id: int):
 @router.put("/{bundle_id}")
 def update_bundle(bundle_id: int, data: BundleUpdate):
     """Update a bundle."""
-    conn = _get_connection()
-    row = conn.execute("SELECT id FROM bundles WHERE id = ?", (bundle_id,)).fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(404, "Bundle nicht gefunden")
-    if data.items is not None:
-        for item in data.items:
-            if not state.get_product(item["artikelnummer"]):
-                conn.close()
-                raise HTTPException(404, f"Produkt {item['artikelnummer']} nicht gefunden")
-    updates = []
-    vals = []
-    if data.name is not None:
-        updates.append("name = ?")
-        vals.append(data.name)
-    if data.description is not None:
-        updates.append("description = ?")
-        vals.append(data.description)
-    if data.items is not None:
-        updates.append("items = ?")
-        vals.append(json.dumps(data.items))
-    if updates:
-        updates.append("updated_at = datetime('now')")
-        vals.append(bundle_id)
-        conn.execute(f"UPDATE bundles SET {', '.join(updates)} WHERE id = ?", vals)
-        conn.commit()
-    conn.close()
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM bundles WHERE id = %s", (bundle_id,))
+        if not cur.fetchone():
+            raise HTTPException(404, "Bundle nicht gefunden")
+        if data.items is not None:
+            for item in data.items:
+                if not state.get_product(item["artikelnummer"]):
+                    raise HTTPException(404, f"Produkt {item['artikelnummer']} nicht gefunden")
+        updates = []
+        vals: list = []
+        if data.name is not None:
+            updates.append("name = %s")
+            vals.append(data.name)
+        if data.description is not None:
+            updates.append("description = %s")
+            vals.append(data.description)
+        if data.items is not None:
+            updates.append("items = %s")
+            vals.append(json.dumps(data.items))
+        if updates:
+            updates.append("updated_at = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')")
+            vals.append(bundle_id)
+            cur.execute(f"UPDATE bundles SET {', '.join(updates)} WHERE id = %s", vals)
     return {"updated": True}
 
 
 @router.delete("/{bundle_id}")
 def delete_bundle(bundle_id: int):
     """Delete a bundle."""
-    conn = _get_connection()
-    row = conn.execute("SELECT name FROM bundles WHERE id = ?", (bundle_id,)).fetchone()
-    if not row:
-        conn.close()
-        raise HTTPException(404, "Bundle nicht gefunden")
-    conn.execute("DELETE FROM bundles WHERE id = ?", (bundle_id,))
-    conn.commit()
-    conn.close()
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT name FROM bundles WHERE id = %s", (bundle_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Bundle nicht gefunden")
+        cur.execute("DELETE FROM bundles WHERE id = %s", (bundle_id,))
     log_activity("bundle_deleted", f"Bundle '{row[0]}' gelöscht")
     return {"deleted": True}

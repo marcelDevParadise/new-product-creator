@@ -1,5 +1,6 @@
 """Attribut Generator — FastAPI Backend."""
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,9 +19,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Attribut Generator", version="1.0.0", lifespan=lifespan)
 
+# CORS_ORIGINS: kommaseparierte Liste von Origins, oder "*" für alle.
+# Default deckt lokale Entwicklung ab; auf dem Pi via .env überschreiben.
+_cors_env = os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").strip()
+if _cors_env == "*":
+    cors_origins = ["*"]
+else:
+    cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

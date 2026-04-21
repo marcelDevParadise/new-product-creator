@@ -1,0 +1,28 @@
+# Caddyfile — Attribut Generator
+# Tailscale Serve verteilt diesen Vhost via HTTPS unter https://<host>.<tailnet>.ts.net
+#
+# Lokal lauscht Caddy auf :8080 und wird von `tailscale serve` als Reverse-Proxy nach außen gegeben.
+
+:8080 {
+	encode zstd gzip
+
+	# /api/* → FastAPI Backend
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# Alles andere → statisches Frontend (SPA-Fallback auf index.html)
+	handle {
+		root * /home/pi/new-product-creator/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output file /var/log/caddy/attribut-generator.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format console
+	}
+}
