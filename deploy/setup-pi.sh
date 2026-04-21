@@ -12,9 +12,20 @@ set -euo pipefail
 REPO_DIR="/home/pi/new-product-creator"
 VENV_DIR="${REPO_DIR}/.venv"
 
-echo "==> System-Pakete (Python, Node.js, Caddy)"
+echo "==> System-Pakete (Python, Caddy, Tools)"
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip nodejs npm debian-keyring debian-archive-keyring apt-transport-https curl
+sudo apt install -y python3 python3-venv python3-pip debian-keyring debian-archive-keyring apt-transport-https curl ca-certificates gnupg
+
+echo "==> Node.js 20 via NodeSource (enthaelt npm)"
+# Falls altes Debian-npm/nodejs installiert ist -> entfernen, weil es mit NodeSource kollidiert
+sudo apt remove -y nodejs npm libnode72 libnode-dev 2>/dev/null || true
+sudo apt autoremove -y
+if [ ! -f /etc/apt/sources.list.d/nodesource.list ]; then
+	curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+fi
+sudo apt install -y nodejs
+node --version
+npm --version
 
 if ! command -v caddy >/dev/null 2>&1; then
 	echo "==> Caddy installieren"
