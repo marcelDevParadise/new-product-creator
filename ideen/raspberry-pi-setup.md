@@ -358,6 +358,73 @@ Macht `git pull`, installiert geänderte Python-Pakete, baut Frontend neu, resta
 
 ---
 
+## Teil 7b: Auto-Deploy per Tag (kein SSH nötig)
+
+Wenn du nur bei "echten" Releases den Pi aktualisieren willst, kannst du einen Tag pushen — der Pi prüft alle 5 Min auf neue Tags und deployed dann automatisch.
+
+### 7b.1 Cronjob auf dem Pi einrichten
+
+```bash
+crontab -e
+```
+
+```cron
+*/5 * * * * /home/marcel/new-product-creator/deploy/auto-update.sh >> /home/marcel/auto-deploy.log 2>&1
+```
+
+> Pfad an deinen User anpassen falls du nicht `marcel` heißt.
+
+Was das Skript tut:
+1. `git fetch --tags` (kein Side-Effect, falls keine neuen Tags)
+2. Sucht den neuesten Tag, der zu `v*` oder `deploy-*` passt
+3. Vergleicht mit dem zuletzt deployten Tag (in `.last-deployed-tag`)
+4. Wenn neu → `git checkout <tag>` + `bash deploy/update-pi.sh`
+5. Sonst: still beenden (kein Restart, keine Disk-IO)
+
+### 7b.2 Release vom Windows-PC pushen
+
+Im Repo-Root in PowerShell:
+
+```powershell
+# Datum-basierter Tag (deploy-2026-04-22-1)
+.\deploy\release.ps1
+
+# Semver-Tag (v1.4.0)
+.\deploy\release.ps1 -Version "1.4.0" -Message "Neue Variantenmatrix"
+```
+
+Das Skript:
+- prüft dass nichts uncommittetes da ist
+- erstellt einen annotated Tag
+- pusht Branch + Tag (`--follow-tags`)
+- Pi deployed beim nächsten Cron-Run
+
+### 7b.3 Status prüfen
+
+Auf dem Pi:
+
+```bash
+tail -f /home/marcel/auto-deploy.log
+cat ~/new-product-creator/.last-deployed-tag
+sudo systemctl status attribut-generator caddy
+```
+
+### 7b.4 Manueller Trigger zwischendurch
+
+Wenn du nicht 5 Min warten willst:
+
+```bash
+ssh marcel@100.87.118.91 'bash ~/new-product-creator/deploy/auto-update.sh'
+```
+
+Oder ohne Tag-Check direkt vom letzten master-Commit deployen:
+
+```bash
+ssh marcel@100.87.118.91 'cd ~/new-product-creator && git checkout master && bash deploy/update-pi.sh'
+```
+
+---
+
 ## Teil 8: Häufige Probleme
 
 | Symptom | Lösung |

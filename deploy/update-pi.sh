@@ -9,8 +9,13 @@ VENV_DIR="${REPO_DIR}/.venv"
 
 cd "${REPO_DIR}"
 
-echo "==> git pull"
-git pull --ff-only
+# git pull nur wenn wir auf einem Branch sind (nicht im detached-HEAD-Tag-Modus von auto-update.sh)
+if git symbolic-ref -q HEAD >/dev/null; then
+	echo "==> git pull"
+	git pull --ff-only
+else
+	echo "==> Detached HEAD ($(git describe --tags --always)) \u2014 ueberspringe git pull"
+fi
 
 echo "==> Backend-Dependencies (falls geändert)"
 "${VENV_DIR}/bin/pip" install -r backend/requirements.txt
