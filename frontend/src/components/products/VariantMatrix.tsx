@@ -69,7 +69,7 @@ export function VariantMatrix({ parentSku, childProducts, variantAxes, onChildCr
   };
 
   const formatValue = (product: Product, field: string): string => {
-    const val = (product as Record<string, unknown>)[field];
+    const val = (product as unknown as Record<string, unknown>)[field];
     if (val == null || val === '') return '–';
     if (typeof val === 'number') return String(val);
     return String(val);
@@ -137,8 +137,9 @@ export function VariantMatrix({ parentSku, childProducts, variantAxes, onChildCr
                     ))}
                     {coreColumns.map(col => {
                       const hasDiff = !!childDiff[col];
+                      const childRec = child as unknown as Record<string, unknown>;
                       const isInherited = inheritFields.includes(col) && !hasDiff &&
-                        (((child as Record<string, unknown>)[col]) == null || ((child as Record<string, unknown>)[col]) === '');
+                        (childRec[col] == null || childRec[col] === '');
                       return (
                         <td key={col} className={`${cellCls} ${hasDiff ? 'bg-amber-50 dark:bg-amber-500/10' : ''}`}>
                           <div className="flex items-center gap-1">
@@ -146,7 +147,9 @@ export function VariantMatrix({ parentSku, childProducts, variantAxes, onChildCr
                               {formatValue(child, col)}
                             </span>
                             {hasDiff && (
-                              <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" title={`Abweichung: Parent = ${childDiff[col].parent_value}`} />
+                              <span title={`Abweichung: Parent = ${childDiff[col].parent_value}`}>
+                                <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                              </span>
                             )}
                           </div>
                         </td>

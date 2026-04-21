@@ -311,6 +311,28 @@ export interface ExportHistoryEntry {
   created_at: string;
 }
 
+export interface HeatmapFieldStat {
+  field: string;
+  label: string;
+  filled_count: number;
+  total: number;
+  percent: number;
+}
+
+export interface HeatmapProduct {
+  artikelnummer: string;
+  artikelname: string;
+  filled_count: number;
+  total_fields: number;
+  fields: Record<string, boolean>;
+}
+
+export interface HeatmapData {
+  field_stats: HeatmapFieldStat[];
+  products: HeatmapProduct[];
+  total_products: number;
+}
+
 // Validation / Data Quality
 
 export interface ValidationIssue {

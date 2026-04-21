@@ -212,12 +212,6 @@ const EVENT_COLORS: Record<string, string> = {
   deleted: 'bg-red-100 text-red-700',
 };
 
-function formatDate(iso: string) {
-  const d = new Date(iso + 'Z');
-  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    + ' ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-}
-
 function HistoryTab({ entries, loading }: { entries: ProductHistoryEntry[]; loading: boolean }) {
   if (loading) return <LoadingSpinner className="h-40" />;
 

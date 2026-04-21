@@ -10,7 +10,7 @@ import {
 } from '@dnd-kit/core';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
-  Save, Trash2, Search, Plus, ChevronDown, ChevronRight, X,
+  Save, Trash2, Search, Plus, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

@@ -169,7 +169,7 @@ export function StammdatenEditPage() {
             // Build map of parent values for inherited fields
             const parentVals: Record<string, string> = {};
             for (const field of res.inherited_fields) {
-              const val = (res.product as Record<string, unknown>)[field];
+              const val = (res.product as unknown as Record<string, unknown>)[field];
               if (val != null && val !== '') parentVals[field] = String(val);
             }
             setResolvedParentValues(parentVals);

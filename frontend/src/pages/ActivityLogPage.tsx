@@ -64,10 +64,6 @@ export function ActivityLogPage() {
       <PageHeader
         title="Aktivitätsprotokoll"
         description="Alle Aktivitäten im Überblick"
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/' },
-          { label: 'Aktivitätsprotokoll' },
-        ]}
       />
 
       <div className="flex items-center justify-between">

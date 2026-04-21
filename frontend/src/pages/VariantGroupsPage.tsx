@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, ChevronRight, ChevronDown, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { GitBranch, ChevronRight, ChevronDown, RefreshCw, Trash2 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { api } from '../api/client';
 import { useToast } from '../components/ui/Toast';
