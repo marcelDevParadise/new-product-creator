@@ -24,3 +24,8 @@ dist-ssr/
 *.suo
 *.sw?
 .DS_Store
+
+# Lokale Notizen / Vorlagen (nicht im Repo)
+ideen/
+vorlagen/
+

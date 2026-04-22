@@ -1,9 +1,3 @@
-#!Z:\NUR-LOKAL\nicht-im-repo
-# release.ps1 — Release-Tag erstellen und pushen.
-# Aufruf:   .\deploy\release.ps1                  -> v-Tag mit Datum (z.B. deploy-2026-04-22-1)
-#           .\deploy\release.ps1 -Version "1.4.0" -> v1.4.0
-#           .\deploy\release.ps1 -Message "Hotfix Variantenbug"
-
 [CmdletBinding()]
 param(
 	[string]$Version,

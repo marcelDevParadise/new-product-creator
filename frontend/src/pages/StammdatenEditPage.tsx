@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker, Link } from 'react-router-dom';
-import { Save, ArrowRight, ChevronRight, GitBranch, ArrowDownFromLine, X, Copy } from 'lucide-react';
+import { Save, ArrowRight, ChevronRight, GitBranch, ArrowDownFromLine, X, Copy, Code, Eye, Plus } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CategoryCascader } from '../components/ui/CategoryCascader';
+import { HtmlEditor } from '../components/ui/HtmlEditor';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import { VariantMatrix } from '../components/products/VariantMatrix';
@@ -70,6 +71,7 @@ type Form = {
   bild_1: string; bild_2: string; bild_3: string; bild_4: string; bild_5: string; bild_6: string; bild_7: string; bild_8: string; bild_9: string;
   kategorie_1: string; kategorie_2: string; kategorie_3: string; kategorie_4: string; kategorie_5: string; kategorie_6: string;
   url_pfad: string; title_tag: string; meta_description: string;
+  kurzbeschreibung: string; beschreibung: string;
 };
 
 function initForm(p: Product): Form {
@@ -85,6 +87,7 @@ function initForm(p: Product): Form {
     bild_1: s(p.bild_1), bild_2: s(p.bild_2), bild_3: s(p.bild_3), bild_4: s(p.bild_4), bild_5: s(p.bild_5), bild_6: s(p.bild_6), bild_7: s(p.bild_7), bild_8: s(p.bild_8), bild_9: s(p.bild_9),
     kategorie_1: s(p.kategorie_1), kategorie_2: s(p.kategorie_2), kategorie_3: s(p.kategorie_3), kategorie_4: s(p.kategorie_4), kategorie_5: s(p.kategorie_5), kategorie_6: s(p.kategorie_6),
     url_pfad: s(p.url_pfad), title_tag: s(p.title_tag), meta_description: s(p.meta_description),
+    kurzbeschreibung: s(p.kurzbeschreibung), beschreibung: s(p.beschreibung),
   };
 }
 
@@ -105,6 +108,10 @@ export function StammdatenEditPage() {
   const [inheritedFieldSet, setInheritedFieldSet] = useState<Set<string>>(new Set());
   const [resolvedParentValues, setResolvedParentValues] = useState<Record<string, string>>({});
   const [variantAxes, setVariantAxes] = useState<string[]>([]);
+  const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
+  const [newKeyword, setNewKeyword] = useState('');
+  const [showSourceKurz, setShowSourceKurz] = useState(false);
+  const [showSourceBeschr, setShowSourceBeschr] = useState(false);
 
   const markDirty = () => setDirty(true);
 
@@ -161,6 +168,7 @@ export function StammdatenEditPage() {
       .then((p) => {
         setProduct(p);
         setF(initForm(p));
+        setSeoKeywords(p.seo_keywords ? p.seo_keywords.split(',').map(k => k.trim()).filter(Boolean) : []);
         // Load variant context
         if (p.parent_sku) {
           api.getProduct(p.parent_sku).then(setParentProduct).catch(() => {});
@@ -224,18 +232,22 @@ export function StammdatenEditPage() {
         kategorie_1: str(f.kategorie_1), kategorie_2: str(f.kategorie_2), kategorie_3: str(f.kategorie_3),
         kategorie_4: str(f.kategorie_4), kategorie_5: str(f.kategorie_5), kategorie_6: str(f.kategorie_6),
         url_pfad: str(f.url_pfad), title_tag: str(f.title_tag), meta_description: str(f.meta_description),
+        kurzbeschreibung: str(f.kurzbeschreibung), beschreibung: str(f.beschreibung),
+        seo_keywords: seoKeywords.length > 0 ? seoKeywords.join(', ') : null,
         stammdaten_complete: true,
       };
       await api.updateStammdaten(product.artikelnummer, payload);
       setDirty(false);
       toast('Stammdaten gespeichert', 'success');
-      navigate(andContinue ? `/products/${encodeURIComponent(product.artikelnummer)}` : '/stammdaten');
+      if (andContinue) {
+        navigate(`/products/${encodeURIComponent(product.artikelnummer)}`);
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Speichern fehlgeschlagen', 'error');
     } finally {
       setSaving(false);
     }
-  }, [product, f, navigate, toast]);
+  }, [product, f, seoKeywords, navigate, toast]);
 
   // Keep ref in sync for Ctrl+S
   useEffect(() => {
@@ -556,17 +568,133 @@ export function StammdatenEditPage() {
                   <p className={`text-xs ${f.meta_description.length > 155 ? 'text-red-500 font-medium' : 'text-gray-400'}`}>{f.meta_description.length}/155 Zeichen</p>
                 </div>
               </Field>
-              <div className="pt-2 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => navigate(`/content/${encodeURIComponent(product.artikelnummer)}`)}
-                  className="text-sm text-indigo-600 hover:text-indigo-800 transition-colors"
-                >
-                  Beschreibungen bearbeiten (HTML-Editor) →
-                </button>
-              </div>
             </div>
           </Section>
+
+          {/* ───── Beschreibungen ───── */}
+          <div className="xl:col-span-2">
+            <Section title="Beschreibungen">
+              <div className="space-y-6">
+                {/* Kurzbeschreibung */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-gray-600">Kurzbeschreibung</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSourceKurz((v) => !v)}
+                      className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showSourceKurz ? <Eye className="w-3.5 h-3.5" /> : <Code className="w-3.5 h-3.5" />}
+                      {showSourceKurz ? 'Editor' : 'HTML-Quelltext'}
+                    </button>
+                  </div>
+                  {showSourceKurz ? (
+                    <textarea
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+                      rows={6}
+                      value={f.kurzbeschreibung}
+                      onChange={(e) => { setF((prev) => prev ? { ...prev, kurzbeschreibung: e.target.value } : prev); markDirty(); }}
+                      placeholder="<p>HTML-Quelltext eingeben…</p>"
+                    />
+                  ) : (
+                    <HtmlEditor
+                      content={f.kurzbeschreibung}
+                      onChange={(html) => { setF((prev) => prev ? { ...prev, kurzbeschreibung: html } : prev); markDirty(); }}
+                      placeholder="Kurze Produktbeschreibung eingeben…"
+                      minHeight="120px"
+                    />
+                  )}
+                </div>
+
+                {/* Beschreibung */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-gray-600">Beschreibung</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowSourceBeschr((v) => !v)}
+                      className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      {showSourceBeschr ? <Eye className="w-3.5 h-3.5" /> : <Code className="w-3.5 h-3.5" />}
+                      {showSourceBeschr ? 'Editor' : 'HTML-Quelltext'}
+                    </button>
+                  </div>
+                  {showSourceBeschr ? (
+                    <textarea
+                      className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+                      rows={14}
+                      value={f.beschreibung}
+                      onChange={(e) => { setF((prev) => prev ? { ...prev, beschreibung: e.target.value } : prev); markDirty(); }}
+                      placeholder="<p>HTML-Quelltext eingeben…</p>"
+                    />
+                  ) : (
+                    <HtmlEditor
+                      content={f.beschreibung}
+                      onChange={(html) => { setF((prev) => prev ? { ...prev, beschreibung: html } : prev); markDirty(); }}
+                      placeholder="Ausführliche Produktbeschreibung eingeben…"
+                      minHeight="300px"
+                    />
+                  )}
+                </div>
+
+                {/* SEO Keywords */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-2 block">SEO Keywords</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {seoKeywords.map((kw, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 rounded-full text-sm"
+                      >
+                        {kw}
+                        <button
+                          type="button"
+                          onClick={() => { setSeoKeywords(seoKeywords.filter((_, j) => j !== i)); markDirty(); }}
+                          className="hover:text-red-600 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newKeyword}
+                      onChange={(e) => setNewKeyword(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newKeyword.trim()) {
+                          e.preventDefault();
+                          if (!seoKeywords.includes(newKeyword.trim())) {
+                            setSeoKeywords([...seoKeywords, newKeyword.trim()]);
+                            markDirty();
+                          }
+                          setNewKeyword('');
+                        }
+                      }}
+                      placeholder="Keyword eingeben + Enter…"
+                      className={`${inputCls} flex-1`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newKeyword.trim() && !seoKeywords.includes(newKeyword.trim())) {
+                          setSeoKeywords([...seoKeywords, newKeyword.trim()]);
+                          markDirty();
+                          setNewKeyword('');
+                        }
+                      }}
+                      disabled={!newKeyword.trim()}
+                      className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Hinzufügen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Section>
+          </div>
         </div>
       </div>
       <div className="shrink-0 flex items-center justify-between px-8 py-4 bg-white border-t border-gray-200">
