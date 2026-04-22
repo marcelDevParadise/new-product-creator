@@ -29,3 +29,6 @@ dist-ssr/
 ideen/
 vorlagen/
 
+# Pi-Laufzeit-Dateien
+.last-deployed-tag
+
