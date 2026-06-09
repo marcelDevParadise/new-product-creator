@@ -14,13 +14,26 @@ type SortKey = 'artikelnummer' | 'artikelname' | 'ek' | 'preis' | 'gewicht' | 'h
 type SortDir = 'asc' | 'desc';
 type EditingCell = { sku: string; field: string } | null;
 
+const SORT_STORAGE_KEY = 'stammdaten.sort.v1';
+
+function loadSort(): { key: SortKey | null; dir: SortDir } {
+  try {
+    const raw = localStorage.getItem(SORT_STORAGE_KEY);
+    if (!raw) return { key: null, dir: 'asc' };
+    const parsed = JSON.parse(raw) as { key: SortKey | null; dir: SortDir };
+    return { key: parsed.key ?? null, dir: parsed.dir === 'desc' ? 'desc' : 'asc' };
+  } catch {
+    return { key: null, dir: 'asc' };
+  }
+}
+
 export function StammdatenPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [archivedProducts, setArchivedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [sortKey, setSortKey] = useState<SortKey | null>(() => loadSort().key);
+  const [sortDir, setSortDir] = useState<SortDir>(() => loadSort().dir);
   const [showArchive, setShowArchive] = useState(false);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
@@ -100,6 +113,12 @@ export function StammdatenPage() {
       setSortDir('asc');
     }
   };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify({ key: sortKey, dir: sortDir }));
+    } catch { /* localStorage unavailable */ }
+  }, [sortKey, sortDir]);
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-gray-300" />;

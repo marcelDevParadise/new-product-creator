@@ -148,6 +148,31 @@ export function AttributesPage() {
     }
   };
 
+  const handleMoveCategory = async (category: string, direction: 'up' | 'down') => {
+    const idx = allCategoryNames.indexOf(category);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= allCategoryNames.length) return;
+
+    const newCatOrder = [...allCategoryNames];
+    [newCatOrder[idx], newCatOrder[swapIdx]] = [newCatOrder[swapIdx], newCatOrder[idx]];
+
+    // Build full key list: all keys grouped by the new category order,
+    // preserving existing order within each category.
+    const reordered: string[] = [];
+    for (const cat of newCatOrder) {
+      for (const { key } of categories.get(cat) ?? []) {
+        reordered.push(key);
+      }
+    }
+    try {
+      await api.reorderAttributeDefinitions(reordered);
+      await reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Sortierung fehlgeschlagen', 'error');
+    }
+  };
+
   const totalCount = Object.keys(config).length;
 
   return (
@@ -193,25 +218,59 @@ export function AttributesPage() {
 
           <ScrollArea className="flex-1">
             <nav className="space-y-0.5">
-              {allCategoryNames.map(cat => {
+              {allCategoryNames.map((cat, catIdx) => {
                 const count = categoryCounts.get(cat) ?? 0;
                 const isActive = !search && activeCategory === cat;
                 if (search && count === 0) return null;
+                const canMoveUp = catIdx > 0;
+                const canMoveDown = catIdx < allCategoryNames.length - 1;
                 return (
-                  <button
+                  <div
                     key={cat}
-                    onClick={() => { setActiveCategory(cat); setSearch(''); }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors ${
+                    className={`group/cat flex items-center gap-0.5 rounded-md transition-colors ${
                       isActive
-                        ? 'bg-accent text-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                        ? 'bg-accent'
+                        : 'hover:bg-accent/50'
                     }`}
                   >
-                    <span className="truncate">{cat}</span>
-                    <span className={`text-xs tabular-nums ${isActive ? 'text-foreground/70' : 'text-muted-foreground/60'}`}>
-                      {count}
-                    </span>
-                  </button>
+                    <button
+                      onClick={() => { setActiveCategory(cat); setSearch(''); }}
+                      className={`flex-1 min-w-0 flex items-center justify-between px-3 py-2 text-sm transition-colors ${
+                        isActive
+                          ? 'text-foreground font-medium'
+                          : 'text-muted-foreground group-hover/cat:text-foreground'
+                      }`}
+                    >
+                      <span className="truncate">{cat}</span>
+                      <span className={`text-xs tabular-nums ${isActive ? 'text-foreground/70' : 'text-muted-foreground/60'}`}>
+                        {count}
+                      </span>
+                    </button>
+                    {!search && (
+                      <div className="flex shrink-0 opacity-0 group-hover/cat:opacity-100 transition-opacity pr-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          disabled={!canMoveUp}
+                          onClick={(e) => { e.stopPropagation(); handleMoveCategory(cat, 'up'); }}
+                          title="Kategorie nach oben"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          disabled={!canMoveDown}
+                          onClick={(e) => { e.stopPropagation(); handleMoveCategory(cat, 'down'); }}
+                          title="Kategorie nach unten"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>
@@ -219,7 +278,7 @@ export function AttributesPage() {
         </div>
 
         {/* Main content — Attribute list */}
-        <div className="flex-1 min-w-0 rounded-lg border bg-card shadow-sm">
+        <div className="flex-1 min-w-0 flex flex-col rounded-lg border bg-card shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -227,7 +286,7 @@ export function AttributesPage() {
           ) : (
             <>
               {/* List header */}
-              <div className="flex items-center px-5 py-3 border-b text-xs font-medium text-muted-foreground">
+              <div className="flex items-center px-5 py-3 border-b text-xs font-medium text-muted-foreground shrink-0">
                 <span className="flex-1">
                   {search ? `Ergebnisse für „${search}"` : activeCategory}
                 </span>
@@ -237,7 +296,7 @@ export function AttributesPage() {
               </div>
 
               {/* Attribute rows */}
-              <ScrollArea className="max-h-[calc(100vh-260px)]">
+              <ScrollArea className="flex-1 min-h-0">
                 {filteredEntries.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                     <Search className="w-8 h-8 mb-2 opacity-20" />
@@ -605,9 +664,21 @@ function CreateAttributeDialog({
     newCategory: '',
   });
   const [useNewCategory, setUseNewCategory] = useState(false);
+  const [idManuallyEdited, setIdManuallyEdited] = useState(false);
+
+  const buildMetafieldId = (key: string) => key ? `${key}:custom:single_line_text_field` : '';
 
   const update = (field: string, value: unknown) =>
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm(prev => {
+      // Auto-build the Metafield ID from the key unless the user already typed one in manually.
+      if (field === 'key' && !idManuallyEdited) {
+        return { ...prev, key: value as string, id: buildMetafieldId((value as string).trim()) };
+      }
+      if (field === 'id') {
+        setIdManuallyEdited(true);
+      }
+      return { ...prev, [field]: value };
+    });
 
   const suggestedCount = useMemo(
     () => form.suggested_values.split('\n').map(s => s.trim()).filter(Boolean).length,
@@ -615,10 +686,11 @@ function CreateAttributeDialog({
   );
 
   const handleCreate = async () => {
-    if (!form.key.trim() || !form.name.trim() || !form.id.trim()) {
-      toast('Key, Name und Metafield ID sind erforderlich', 'error');
+    if (!form.key.trim() || !form.name.trim()) {
+      toast('Key und Name sind erforderlich', 'error');
       return;
     }
+    const finalId = (form.id.trim() || buildMetafieldId(form.key.trim()));
 
     const category = useNewCategory ? form.newCategory.trim() : form.category;
     if (!category) {
@@ -633,7 +705,7 @@ function CreateAttributeDialog({
     try {
       await api.createAttributeDefinition({
         key: form.key.trim(),
-        id: form.id.trim(),
+        id: finalId,
         category,
         name: form.name.trim(),
         description: form.description.trim(),
@@ -650,7 +722,7 @@ function CreateAttributeDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+      <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
           <div className="flex items-center gap-2">
@@ -658,7 +730,7 @@ function CreateAttributeDialog({
             <DialogTitle className="text-base font-semibold">Neues Attribut erstellen</DialogTitle>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-            Lege ein neues Attribut an. Key und Metafield ID müssen eindeutig sein.
+            Lege ein neues Attribut an. Key muss eindeutig sein. Die Metafield ID wird automatisch aus dem Key gebaut.
           </p>
         </div>
 
@@ -681,13 +753,27 @@ function CreateAttributeDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium">Metafield ID</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium">Metafield ID</Label>
+                  {idManuallyEdited && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                      onClick={() => { setIdManuallyEdited(false); setForm(prev => ({ ...prev, id: buildMetafieldId(prev.key.trim()) })); }}
+                    >
+                      ↻ Auto
+                    </button>
+                  )}
+                </div>
                 <Input
-                  placeholder="meta_weight:custom:number_integer"
+                  placeholder="wird aus dem Key gebaut…"
                   value={form.id}
                   onChange={e => update('id', e.target.value)}
                   className="font-mono text-xs"
                 />
+                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Format: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">key:custom:single_line_text_field</code>
+                </p>
               </div>
             </div>
           </section>

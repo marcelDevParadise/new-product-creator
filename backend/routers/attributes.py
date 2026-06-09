@@ -64,6 +64,22 @@ def create_attribute_definition(body: AttributeDefinitionCreate):
     return {"key": body.key, **attr.model_dump()}
 
 
+# NOTE: /definitions/reorder must be declared BEFORE /definitions/{key},
+# otherwise FastAPI matches 'reorder' as a key parameter.
+@router.put("/definitions/reorder")
+def reorder_attribute_definitions(body: ReorderRequest):
+    """Reorder attribute definitions by providing ordered keys."""
+    from services.database import save_attribute_definition as db_save
+    for idx, key in enumerate(body.ordered_keys):
+        attr = state.attribute_config.get(key)
+        if attr:
+            db_save(key, attr, sort_order=idx)
+    # Reload config with new order
+    from services.database import load_all_attribute_definitions
+    state.attribute_config = load_all_attribute_definitions()
+    return {"reordered": len(body.ordered_keys)}
+
+
 @router.put("/definitions/{key}")
 def update_attribute_definition(key: str, body: AttributeDefinitionUpdate):
     """Update an existing attribute definition."""
@@ -86,20 +102,6 @@ def delete_attribute_definition(key: str):
     if not state.remove_attribute_definition(key):
         raise HTTPException(404, f"Attribut '{key}' nicht gefunden")
     return {"deleted": True}
-
-
-@router.put("/definitions/reorder")
-def reorder_attribute_definitions(body: ReorderRequest):
-    """Reorder attribute definitions by providing ordered keys."""
-    from services.database import save_attribute_definition as db_save
-    for idx, key in enumerate(body.ordered_keys):
-        attr = state.attribute_config.get(key)
-        if attr:
-            db_save(key, attr, sort_order=idx)
-    # Reload config with new order
-    from services.database import load_all_attribute_definitions
-    state.attribute_config = load_all_attribute_definitions()
-    return {"reordered": len(body.ordered_keys)}
 
 
 # --- Per-product attribute management ---
