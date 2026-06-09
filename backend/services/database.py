@@ -16,22 +16,27 @@ from psycopg_pool import ConnectionPool
 from config import get_database_url
 from models.product import Product
 from models.attribute import AttributeDefinition
+from services.sqlite_backend import is_sqlite_url, make_pool as _make_sqlite_pool, SqlitePool
 
 # Lazy connection pool — created on first use so importing this module
 # does not require a reachable database.
-_pool: ConnectionPool | None = None
+_pool: ConnectionPool | SqlitePool | None = None
 
 
-def _get_pool() -> ConnectionPool:
+def _get_pool() -> ConnectionPool | SqlitePool:
     global _pool
     if _pool is None:
-        _pool = ConnectionPool(
-            conninfo=get_database_url(),
-            min_size=1,
-            max_size=10,
-            kwargs={"autocommit": True},
-            open=True,
-        )
+        url = get_database_url()
+        if is_sqlite_url(url):
+            _pool = _make_sqlite_pool(url)
+        else:
+            _pool = ConnectionPool(
+                conninfo=url,
+                min_size=1,
+                max_size=10,
+                kwargs={"autocommit": True},
+                open=True,
+            )
     return _pool
 
 

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
-import { AttributeEditor } from '../components/products/AttributeEditor';
+import { AttributeWizard } from '../components/products/wizard/AttributeWizard';
 import { api } from '../api/client';
 import type { Product, AttributeConfig, ProductHistoryEntry } from '../types';
 
@@ -14,6 +14,7 @@ export function ProductDetailPage() {
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [config, setConfig] = useState<AttributeConfig | null>(null);
+  const [parentAttributes, setParentAttributes] = useState<Record<string, string | number | boolean> | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'attributes' | 'history'>('attributes');
   const [history, setHistory] = useState<ProductHistoryEntry[]>([]);
@@ -52,6 +53,17 @@ export function ProductDetailPage() {
       })
       .catch((e) => setError(e.message));
   }, [sku]);
+
+  // Fetch parent attributes if this is a variant child, for inheritance display.
+  useEffect(() => {
+    if (!product?.parent_sku) {
+      setParentAttributes(undefined);
+      return;
+    }
+    api.getProduct(product.parent_sku)
+      .then(parent => setParentAttributes(parent.attributes))
+      .catch(() => setParentAttributes(undefined));
+  }, [product?.parent_sku]);
 
   useEffect(() => {
     if (tab !== 'history' || !product) return;
@@ -146,7 +158,7 @@ export function ProductDetailPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-8">
+        <div className="flex-1 overflow-auto p-8 flex flex-col min-h-0">
           {tab === 'attributes' && (
             <>
               {!product.stammdaten_complete ? (
@@ -164,11 +176,20 @@ export function ProductDetailPage() {
                   </Button>
                 </div>
               ) : (
-                <AttributeEditor
-                  product={product}
-                  attributeConfig={config}
-                  onSaved={(updated) => setProduct(updated)}
-                />
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <AttributeWizard
+                    mode="product"
+                    attributeConfig={config}
+                    initialValues={product.attributes}
+                    productTitle={product.artikelname}
+                    inheritedValues={parentAttributes}
+                    onSave={async (values) => {
+                      const updated = await api.updateAttributes(product.artikelnummer, values);
+                      setProduct(updated);
+                      toast('Attribute gespeichert', 'success');
+                    }}
+                  />
+                </div>
               )}
             </>
           )}

@@ -496,7 +496,7 @@ function EditAttributeDialog({
 
   return (
     <Dialog open onOpenChange={onCancel}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-3xl p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
           <div className="flex items-center gap-2 mb-1">
@@ -722,7 +722,7 @@ function CreateAttributeDialog({
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-4xl p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
           <div className="flex items-center gap-2">

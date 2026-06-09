@@ -15,7 +15,9 @@ FRONTEND_DIR = ROOT / "frontend"
 
 BACKEND_URL = "http://localhost:8000"
 FRONTEND_URL = "http://localhost:5173"
-HEALTH_URL = f"{BACKEND_URL}/api/health"
+# Uvicorn bindet nur IPv4; Windows resolved "localhost" oft zuerst nach ::1.
+# Health-Check daher direkt über die IPv4-Loopback-Adresse.
+HEALTH_URL = "http://127.0.0.1:8000/api/health"
 
 BACKEND_READY_TIMEOUT = 60  # seconds
 POLL_INTERVAL = 0.5  # seconds
