@@ -32,3 +32,20 @@ vorlagen/
 # Pi-Laufzeit-Dateien
 .last-deployed-tag
 
+backend/data/*.db
+backend/services/*.db
+backend/services/data/*.db
+
+Umsetzung/
+Umsetzung/*md
+Umsetzung/Phase 2 - Kategorieseiten
+
+rules/
+rules/*.md
+
+vorlagen/
+vorlagen/*.md
+vorlagen/ausgabe/
+
+*.md
+*.html
