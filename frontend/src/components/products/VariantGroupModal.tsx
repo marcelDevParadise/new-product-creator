@@ -68,10 +68,10 @@ export function VariantGroupModal({ selectedSkus, products, onClose, onSaved }: 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-stretch md:items-center justify-center z-50 md:p-4">
+      <div className="bg-white dark:bg-gray-900 shadow-xl w-full md:max-w-2xl h-full md:h-auto md:max-h-[80vh] md:rounded-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
               <GitBranch className="w-5 h-5 text-purple-600 dark:text-purple-400" />

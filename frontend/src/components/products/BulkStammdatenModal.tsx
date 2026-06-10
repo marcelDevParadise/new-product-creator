@@ -94,11 +94,11 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+      <div className="relative bg-white shadow-xl w-full md:max-w-lg h-full md:h-auto md:max-h-[80vh] md:rounded-xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Stammdaten Bulk-Bearbeitung</h2>
             <p className="text-xs text-gray-500 mt-0.5">{selectedSkus.length} Produkte ausgewählt</p>

@@ -65,7 +65,7 @@ export function DataQualityPage() {
 
   if (loading) {
     return (
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <PageHeader title="Datenqualität" description="Prüfe deine Produktdaten auf Fehler und Warnungen" />
         <div className="flex items-center justify-center py-20">
           <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
@@ -76,7 +76,7 @@ export function DataQualityPage() {
 
   if (!data) {
     return (
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <PageHeader title="Datenqualität" description="Prüfe deine Produktdaten auf Fehler und Warnungen" />
         <p className="text-gray-500 text-sm">Keine Daten verfügbar.</p>
       </div>
@@ -86,13 +86,13 @@ export function DataQualityPage() {
   const { stats } = data;
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <PageHeader title="Datenqualität" description="Prüfe deine Produktdaten auf Fehler und Warnungen" />
         <button
           onClick={load}
           disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors self-start sm:self-auto"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           Aktualisieren
@@ -100,7 +100,7 @@ export function DataQualityPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Gesamt</CardTitle>
@@ -244,8 +244,8 @@ export function DataQualityPage() {
       )}
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="relative w-full sm:flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -274,7 +274,8 @@ export function DataQualityPage() {
       {/* Product Table */}
       <Card className="shadow-sm">
         <CardContent className="p-0">
-          <Table>
+          <div className="overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">Status</TableHead>
@@ -310,6 +311,7 @@ export function DataQualityPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

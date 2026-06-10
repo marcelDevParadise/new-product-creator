@@ -18,7 +18,7 @@ function SectionCard({ icon: Icon, title, description, children, onSave, saving 
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
           <Icon className="w-4 h-4 text-indigo-600" />
         </div>
@@ -27,7 +27,7 @@ function SectionCard({ icon: Icon, title, description, children, onSave, saving 
           <p className="text-xs text-gray-500 mt-0.5">{description}</p>
         </div>
       </div>
-      <div className="p-6 space-y-5">
+      <div className="p-4 sm:p-6 space-y-5">
         {children}
         <div className="flex justify-end pt-2">
           <button
@@ -239,7 +239,7 @@ export function SettingsPage() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="p-8 space-y-6 max-w-2xl">
+      <div className="p-4 md:p-8 space-y-6 max-w-2xl">
         <PageHeader
           title="Einstellungen"
           description="Preisberechnung, Export-Format, Einheiten und Standard-Werte konfigurieren."
@@ -253,7 +253,7 @@ export function SettingsPage() {
           onSave={savePricing}
           saving={savingPricing}
         >
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">MwSt (%)</label>
               <input type="text" className={inputCls} value={mwst} onChange={(e) => setMwst(e.target.value)} />
@@ -305,7 +305,7 @@ export function SettingsPage() {
             <p className="text-xs text-gray-400 mt-1">Wird in der Ameise-CSV als Attributgruppe verwendet.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">CSV-Trennzeichen</label>
               <select className={selectCls} value={csvTrennzeichen} onChange={(e) => setCsvTrennzeichen(e.target.value)}>
@@ -384,7 +384,7 @@ export function SettingsPage() {
           onSave={saveDefaults}
           saving={savingDefaults}
         >
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Standard-Hersteller</label>
               <input
@@ -453,7 +453,7 @@ export function SettingsPage() {
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-2">Vererbbare Felder</label>
             <p className="text-xs text-gray-400 mb-3">Felder die von Parent-Produkten an Varianten vererbt werden, wenn bei der Variante kein eigener Wert gesetzt ist.</p>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-2 gap-1.5">
               {[
                 { key: 'hersteller', label: 'Hersteller' },
                 { key: 'beschreibung', label: 'Beschreibung' },
@@ -530,7 +530,7 @@ export function SettingsPage() {
                   <div className="text-lg font-semibold text-gray-900">{health.python_version}</div>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${health.integrity_ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
                   <span className="text-sm text-gray-600">

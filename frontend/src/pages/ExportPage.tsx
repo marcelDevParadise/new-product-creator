@@ -159,7 +159,7 @@ export function ExportPage() {
   const allExported = exportCount >= TOTAL_EXPORTS;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <PageHeader
         title="Export"
         description="Exportiere Produkt- und Attributdaten als CSV."
@@ -167,7 +167,7 @@ export function ExportPage() {
 
       {/* --- Stammdaten Export --- */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
               <Package className="w-5 h-5 text-emerald-600" />
@@ -267,7 +267,7 @@ export function ExportPage() {
 
       {/* --- Ameise Attribut-Export --- */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center">
               <FileText className="w-5 h-5 text-indigo-600" />
@@ -357,7 +357,7 @@ export function ExportPage() {
 
       {/* --- SEO & Content Export --- */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center">
               <Globe className="w-5 h-5 text-violet-600" />
@@ -436,7 +436,7 @@ export function ExportPage() {
 
       {/* --- Archivierung --- */}
       <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
               <Archive className="w-5 h-5 text-amber-600" />

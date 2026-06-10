@@ -281,7 +281,7 @@ export function StammdatenEditPage() {
       )}
 
       {/* Header with breadcrumb */}
-      <div className="shrink-0 px-8 pt-6 pb-4">
+      <div className="shrink-0 px-4 md:px-8 pt-4 md:pt-6 pb-4">
         <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
           <button onClick={() => navigate('/stammdaten')} className="hover:text-gray-900 transition-colors">
             Stammdaten
@@ -313,7 +313,7 @@ export function StammdatenEditPage() {
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-auto px-8 pb-8">
+      <div className="flex-1 overflow-auto px-4 md:px-8 pb-8">
         {/* Variant info banner */}
         {product.parent_sku && parentProduct && (
           <div className="mb-4 flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl">
@@ -365,7 +365,7 @@ export function StammdatenEditPage() {
             <Field label="Artikelname" {...fieldInherit('artikelname')}>
               <input className={inputCls} value={f.artikelname} onChange={set('artikelname')} />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="EK (Netto)" {...fieldInherit('ek')}>
                 <input className={inputCls} value={f.ek} onChange={(e) => handleEkChange(e.target.value)} placeholder="0,00" />
               </Field>
@@ -386,7 +386,7 @@ export function StammdatenEditPage() {
             <Field label="Gewicht (g)" {...fieldInherit('gewicht')}>
               <input className={inputCls} value={f.gewicht} onChange={set('gewicht')} placeholder="0" />
             </Field>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Field label="Länge (cm)" {...fieldInherit('laenge')}>
                 <input className={inputCls} value={f.laenge} onChange={set('laenge')} placeholder="0" />
               </Field>
@@ -404,7 +404,7 @@ export function StammdatenEditPage() {
             <Field label="Verkaufseinheit">
               <input className={inputCls} value={f.verkaufseinheit} onChange={set('verkaufseinheit')} placeholder="1" />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Inhalt / Menge">
                 <input className={inputCls} value={f.inhalt_menge} onChange={set('inhalt_menge')} placeholder="0" />
               </Field>
@@ -425,7 +425,7 @@ export function StammdatenEditPage() {
               />
               <label htmlFor="grundpreis_ausweisen" className="text-sm text-gray-700 select-none">Grundpreis ausweisen</label>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Bezugsmenge">
                 <input className={inputCls} value={f.bezugsmenge} onChange={set('bezugsmenge')} placeholder="1" />
               </Field>
@@ -697,7 +697,7 @@ export function StammdatenEditPage() {
           </div>
         </div>
       </div>
-      <div className="shrink-0 flex items-center justify-between px-8 py-4 bg-white border-t border-gray-200">
+      <div className="shrink-0 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between px-4 md:px-8 py-3 md:py-4 bg-white border-t border-gray-200">
         <button
           onClick={() => handleSave(false)}
           disabled={saving}

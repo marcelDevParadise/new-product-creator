@@ -80,7 +80,7 @@ export function WarningsPage() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <PageHeader
         title="Warnhinweis-Manager"
         subtitle={`${warnings.length} Warnhinweis${warnings.length !== 1 ? 'e' : ''}`}
@@ -93,12 +93,12 @@ export function WarningsPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">{editId ? 'Warnhinweis bearbeiten' : 'Neuer Warnhinweis'}</h3>
             <button onClick={resetForm}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Code</label>
               <input value={code} onChange={e => setCode(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500" placeholder="z.B. W-FLAME" />
@@ -156,7 +156,7 @@ export function WarningsPage() {
           <p>Keine Warnhinweise vorhanden</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>

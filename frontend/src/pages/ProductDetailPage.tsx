@@ -90,18 +90,18 @@ export function ProductDetailPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-4 px-8 py-4 border-b bg-white">
-        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4 px-4 md:px-8 py-3 md:py-4 border-b bg-white">
+        <nav className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
           <button onClick={() => navigate('/products')} className="hover:text-foreground transition-colors">
             Produkte
           </button>
           <ChevronRight className="w-3.5 h-3.5" />
           <span className="text-foreground font-medium truncate max-w-[200px]">{product.artikelnummer}</span>
         </nav>
-        <div className="flex-1" />
-        <div className="flex-1 min-w-0">
+        <div className="hidden sm:block flex-1" />
+        <div className="w-full sm:flex-1 min-w-0 order-first sm:order-none">
           <h2 className="text-base font-semibold truncate">{product.artikelname}</h2>
-          <div className="flex items-center gap-3 mt-0.5">
+          <div className="flex items-center gap-x-3 gap-y-0.5 mt-0.5 flex-wrap">
             <span className="text-xs text-muted-foreground font-mono">{product.artikelnummer}</span>
             {product.ek != null && (
               <span className="text-xs text-muted-foreground">EK {product.ek.toFixed(2)} €</span>
@@ -116,31 +116,34 @@ export function ProductDetailPage() {
               <span className="text-xs text-muted-foreground">{product.hersteller}</span>
             )}
             {product.ean && (
-              <span className="text-xs text-muted-foreground font-mono">{product.ean}</span>
+              <span className="hidden sm:inline text-xs text-muted-foreground font-mono">{product.ean}</span>
             )}
           </div>
         </div>
-        {product.stammdaten_complete && (
-          <Button variant="outline" size="sm" onClick={handleSmartDefaults} className="shrink-0 gap-1.5">
-            <Wand2 className="w-3.5 h-3.5" />
-            Smart Defaults
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          {product.stammdaten_complete && (
+            <Button variant="outline" size="sm" onClick={handleSmartDefaults} className="shrink-0 gap-1.5">
+              <Wand2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Smart Defaults</span>
+              <span className="sm:hidden">Smart</span>
+            </Button>
+          )}
+          {product.exported && (
+            <Badge variant="secondary" className="shrink-0">Exportiert</Badge>
+          )}
+          <Button variant="outline" size="sm" onClick={handleArchive} className="shrink-0 gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50">
+            <Archive className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Archivieren</span>
           </Button>
-        )}
-        {product.exported && (
-          <Badge variant="secondary" className="shrink-0">Exportiert</Badge>
-        )}
-        <Button variant="outline" size="sm" onClick={handleArchive} className="shrink-0 gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50">
-          <Archive className="w-3.5 h-3.5" />
-          Archivieren
-        </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto flex flex-col">
         {/* Tabs */}
-        <div className="px-8 pt-4 flex gap-1 border-b bg-white">
+        <div className="px-4 md:px-8 pt-3 md:pt-4 flex gap-1 border-b bg-white overflow-x-auto">
           <button
             onClick={() => setTab('attributes')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 whitespace-nowrap min-h-[44px] ${
               tab === 'attributes' ? 'bg-gray-50 border border-b-white -mb-px text-indigo-700' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -149,7 +152,7 @@ export function ProductDetailPage() {
           </button>
           <button
             onClick={() => setTab('history')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 whitespace-nowrap min-h-[44px] ${
               tab === 'history' ? 'bg-gray-50 border border-b-white -mb-px text-indigo-700' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -158,7 +161,7 @@ export function ProductDetailPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-8 flex flex-col min-h-0">
+        <div className="flex-1 overflow-auto p-4 md:p-8 flex flex-col min-h-0">
           {tab === 'attributes' && (
             <>
               {!product.stammdaten_complete ? (

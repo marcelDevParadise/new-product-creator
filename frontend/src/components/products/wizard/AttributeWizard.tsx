@@ -245,14 +245,14 @@ export function AttributeWizard({
     <div className="flex flex-col h-full min-h-0 bg-card border rounded-lg overflow-hidden">
       {/* HEADER */}
       <div className="border-b bg-card shrink-0">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <div className="relative flex-1 max-w-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-3 sm:px-4 py-3">
+          <div className="relative w-full sm:flex-1 sm:max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Attribut suchen..."
-              className="h-8 pl-8 text-xs"
+              className="h-9 sm:h-8 pl-8 text-sm sm:text-xs"
             />
           </div>
 
@@ -281,13 +281,13 @@ export function AttributeWizard({
           </div>
 
           {headerSlot && (
-            <div className="flex items-center gap-2 shrink-0">{headerSlot}</div>
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{headerSlot}</div>
           )}
         </div>
 
         {/* Tab bar */}
         {!searchResults && (
-          <div className="px-4 -mb-px overflow-x-auto">
+          <div className="px-3 sm:px-4 -mb-px overflow-x-auto scrollbar-thin">
             <div className="flex gap-0.5 min-w-max">
               {categoryNames.map(cat => {
                 const stats = categoryStats.get(cat)!;
@@ -298,7 +298,7 @@ export function AttributeWizard({
                     key={cat}
                     onClick={() => setActiveCategory(cat)}
                     className={cn(
-                      'group inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap',
+                      'group inline-flex items-center gap-1.5 px-3 py-2.5 sm:py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap min-h-[44px] sm:min-h-0',
                       isActive
                         ? 'border-primary text-foreground'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
@@ -327,7 +327,7 @@ export function AttributeWizard({
 
       {/* BODY */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="p-4 space-y-3">
+        <div className="p-3 sm:p-4 space-y-3">
           {searchResults && searchResults.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-12">
               Keine Treffer für „{search}"
@@ -360,7 +360,6 @@ export function AttributeWizard({
             {visibleEntries.map(entry => (
               <WizardFieldRow
                 key={entry.key}
-                attrKey={entry.key}
                 def={entry.def}
                 category={entry.category}
                 value={values[entry.key]}
@@ -380,13 +379,13 @@ export function AttributeWizard({
       </ScrollArea>
 
       {/* FOOTER */}
-      <div className="border-t bg-card px-4 py-3 shrink-0 flex items-center gap-3">
+      <div className="border-t bg-card px-3 sm:px-4 py-2.5 sm:py-3 shrink-0 flex items-center gap-2 sm:gap-3">
         {!searchResults && (
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2"
+              className="h-11 w-11 sm:h-8 sm:w-auto sm:px-2"
               onClick={() => goToTab('prev')}
               disabled={!canPrev}
               title="Vorherige Kategorie (Strg+←)"
@@ -396,7 +395,7 @@ export function AttributeWizard({
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-2"
+              className="h-11 w-11 sm:h-8 sm:w-auto sm:px-2"
               onClick={() => goToTab('next')}
               disabled={!canNext}
               title="Nächste Kategorie (Strg+→)"
@@ -406,7 +405,7 @@ export function AttributeWizard({
           </div>
         )}
 
-        <div className="flex-1 min-w-0 text-xs text-muted-foreground">
+        <div className="flex-1 min-w-0 text-xs text-muted-foreground hidden sm:block">
           {footerInfoSlot ?? (
             dirty
               ? <span className="text-amber-600 dark:text-amber-400">Ungespeicherte Änderungen</span>
@@ -414,7 +413,7 @@ export function AttributeWizard({
           )}
         </div>
 
-        <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2">
+        <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2 h-11 sm:h-9 flex-1 sm:flex-none">
           <Save className="w-4 h-4" />
           {saving ? 'Speichere...' : saveLabel}
         </Button>
@@ -426,7 +425,6 @@ export function AttributeWizard({
 // --- Single field row -----------------------------------------------------
 
 interface FieldRowProps {
-  attrKey: string;
   def: AttributeDefinition;
   category?: string;
   value: AttrValue | undefined;
@@ -436,7 +434,7 @@ interface FieldRowProps {
   onClear: () => void;
 }
 
-function WizardFieldRow({ attrKey, def, category, value, inheritedValue, isEmpty, onChange, onClear }: FieldRowProps) {
+function WizardFieldRow({ def, category, value, inheritedValue, isEmpty, onChange, onClear }: FieldRowProps) {
   const fieldType = getFieldType(def.id);
   const isInherited = isEmpty && inheritedValue !== undefined && inheritedValue !== '' && inheritedValue !== null;
   const displayValue: AttrValue | undefined = isInherited ? inheritedValue : value;
@@ -453,9 +451,9 @@ function WizardFieldRow({ attrKey, def, category, value, inheritedValue, isEmpty
         def.required && isEmpty && !isInherited && 'bg-red-50/40 dark:bg-red-950/10',
       )}
     >
-      <div className={cn('flex gap-3', isTagField ? 'flex-col' : 'items-start')}>
+      <div className={cn('flex gap-3', isTagField ? 'flex-col' : 'flex-col md:flex-row md:items-start')}>
         {/* Label column */}
-        <div className={cn('min-w-0', isTagField ? '' : 'w-64 shrink-0')}>
+        <div className={cn('min-w-0', isTagField ? '' : 'md:w-64 md:shrink-0')}>
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-sm font-medium">{def.name}</span>
             {def.required && (
@@ -488,7 +486,7 @@ function WizardFieldRow({ attrKey, def, category, value, inheritedValue, isEmpty
         </div>
 
         {/* Input column */}
-        <div className={cn('flex items-start gap-1.5', isTagField ? 'w-full' : 'flex-1 min-w-0')}>
+        <div className={cn('flex items-start gap-1.5', isTagField ? 'w-full' : 'w-full md:flex-1 md:min-w-0')}>
           <div className="flex-1 min-w-0">
             <FieldInput
               def={def}
@@ -502,7 +500,7 @@ function WizardFieldRow({ attrKey, def, category, value, inheritedValue, isEmpty
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+              className="h-9 w-9 md:h-7 md:w-7 shrink-0 text-muted-foreground hover:text-destructive md:opacity-0 md:group-hover:opacity-100 transition-opacity"
               onClick={onClear}
               title={isOverridden ? 'Auf Parent-Wert zurücksetzen' : 'Wert entfernen'}
             >

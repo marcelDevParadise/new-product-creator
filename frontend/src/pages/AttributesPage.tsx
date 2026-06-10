@@ -177,7 +177,7 @@ export function AttributesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <PageHeader
           title="Attribute verwalten"
           description={`${totalCount} Attribute in ${allCategoryNames.length} Kategorien`}
@@ -191,9 +191,57 @@ export function AttributesPage() {
         />
       </div>
 
-      <div className="flex flex-1 min-h-0 px-8 pb-8 gap-6">
-        {/* Sidebar — Category navigation */}
-        <div className="w-56 shrink-0 flex flex-col gap-3">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0 px-4 md:px-8 pb-4 md:pb-8 gap-4 md:gap-6">
+        {/* Mobile-only controls: search + category select + filter */}
+        <div className="md:hidden flex flex-col gap-2 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Attribute suchen…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 h-11 text-sm"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select
+              value={activeCategory ?? ''}
+              onValueChange={cat => { setActiveCategory(cat); setSearch(''); }}
+            >
+              <SelectTrigger className="flex-1 h-11">
+                <SelectValue placeholder="Kategorie wählen…" />
+              </SelectTrigger>
+              <SelectContent>
+                {allCategoryNames.map(cat => {
+                  const count = categoryCounts.get(cat) ?? 0;
+                  return (
+                    <SelectItem key={cat} value={cat}>
+                      <span className="flex items-center justify-between gap-3 w-full">
+                        <span>{cat}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={() => setRequiredFilter(v => !v)}
+              className={`shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-md text-xs font-medium border transition-colors ${
+                requiredFilter
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-input text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+              title="Nur Pflichtfelder"
+            >
+              <Filter className="w-4 h-4" />
+              Pflicht
+            </button>
+          </div>
+        </div>
+
+        {/* Sidebar — Category navigation (desktop only) */}
+        <div className="hidden md:flex w-56 shrink-0 flex-col gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -286,12 +334,15 @@ export function AttributesPage() {
           ) : (
             <>
               {/* List header */}
-              <div className="flex items-center px-5 py-3 border-b text-xs font-medium text-muted-foreground shrink-0">
-                <span className="flex-1">
+              <div className="flex items-center px-4 sm:px-5 py-3 border-b text-xs font-medium text-muted-foreground shrink-0">
+                <span className="flex-1 truncate">
                   {search ? `Ergebnisse für „${search}"` : activeCategory}
                 </span>
-                <span className="w-44 shrink-0 text-right">
+                <span className="hidden sm:block w-44 shrink-0 text-right">
                   {filteredEntries.length} {filteredEntries.length === 1 ? 'Attribut' : 'Attribute'}
+                </span>
+                <span className="sm:hidden text-right">
+                  {filteredEntries.length}
                 </span>
               </div>
 
@@ -307,7 +358,7 @@ export function AttributesPage() {
                     {filteredEntries.map(({ key, def }) => (
                       <div
                         key={key}
-                        className="flex items-center gap-4 px-5 py-3.5 group hover:bg-accent/40 transition-colors"
+                        className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 sm:px-5 py-3 sm:py-3.5 group hover:bg-accent/40 transition-colors"
                       >
                         {/* Left: Name + Description */}
                         <div className="flex-1 min-w-0">
@@ -325,7 +376,7 @@ export function AttributesPage() {
                         </div>
 
                         {/* Middle: Key + meta */}
-                        <div className="w-44 shrink-0 text-right space-y-0.5">
+                        <div className="sm:w-44 shrink-0 sm:text-right space-y-0.5">
                           <code className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-mono">
                             {key}
                           </code>
@@ -337,13 +388,13 @@ export function AttributesPage() {
                         </div>
 
                         {/* Right: Actions */}
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        <div className="flex items-center gap-0.5 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 self-end sm:self-auto">
                           {!search && (
                             <>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-9 w-9 md:h-7 md:w-7"
                                 onClick={() => handleMove(key, 'up')}
                                 title="Nach oben"
                               >
@@ -352,7 +403,7 @@ export function AttributesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7"
+                                className="h-9 w-9 md:h-7 md:w-7"
                                 onClick={() => handleMove(key, 'down')}
                                 title="Nach unten"
                               >
@@ -363,7 +414,7 @@ export function AttributesPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7"
+                            className="h-9 w-9 md:h-7 md:w-7"
                             onClick={() => setEditingKey(key)}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -371,7 +422,7 @@ export function AttributesPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            className="h-9 w-9 md:h-7 md:w-7 text-destructive hover:text-destructive"
                             onClick={() => setShowDeleteConfirm(key)}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -522,7 +573,7 @@ function EditAttributeDialog({
               <Tag className="w-3.5 h-3.5" />
               Grundangaben
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Anzeigename</Label>
                 <Input
@@ -742,7 +793,7 @@ function CreateAttributeDialog({
               <Hash className="w-3.5 h-3.5" />
               Kennungen
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Key (eindeutig)</Label>
                 <Input
@@ -784,7 +835,7 @@ function CreateAttributeDialog({
               <Tag className="w-3.5 h-3.5" />
               Grundangaben
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Anzeigename</Label>
                 <Input

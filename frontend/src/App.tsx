@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { Menu, Layers } from 'lucide-react';
 import { Sidebar } from './components/layout/Sidebar';
 import { ToastProvider } from './components/ui/Toast';
 import { SearchDialog } from './components/ui/SearchDialog';
@@ -24,6 +25,7 @@ import { IngredientsPage } from './pages/IngredientsPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
@@ -40,10 +42,34 @@ function Layout() {
   return (
     <ToastProvider>
       <div className="flex h-screen bg-background">
-        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((v) => !v)} onSearch={() => setSearchOpen(true)} />
-        <main className="flex-1 overflow-auto">
-          <Outlet />
-        </main>
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed((v) => !v)}
+          mobileOpen={mobileSidebarOpen}
+          onMobileClose={() => setMobileSidebarOpen(false)}
+          onSearch={() => setSearchOpen(true)}
+        />
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Mobile-Topbar mit Burger-Toggle */}
+          <header className="md:hidden flex items-center gap-3 px-4 h-14 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900/80 backdrop-blur sticky top-0 z-30">
+            <button
+              onClick={() => setMobileSidebarOpen(true)}
+              className="p-2 -ml-2 rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/10 transition-colors"
+              aria-label="Menü öffnen"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 bg-indigo-500 rounded-lg flex items-center justify-center shrink-0">
+                <Layers className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">Attribut Generator</span>
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto">
+            <Outlet />
+          </main>
+        </div>
         <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       </div>
     </ToastProvider>

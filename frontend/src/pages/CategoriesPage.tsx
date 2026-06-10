@@ -238,16 +238,16 @@ export function CategoriesPage() {
         />
       )}
 
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <PageHeader
           title="Kategorien"
           description={`${rootKeys.length} Hauptkategorien · ${totalCount} Kategorien gesamt`}
         />
       </div>
 
-      <div className="flex-1 overflow-auto px-8 pb-8">
+      <div className="flex-1 overflow-auto px-4 md:px-8 pb-4 md:pb-8">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 sm:px-5 py-3 bg-gray-50 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <FolderTree className="w-4 h-4 text-gray-500" />
               <h3 className="text-sm font-semibold text-gray-700">Kategorie-Baum</h3>

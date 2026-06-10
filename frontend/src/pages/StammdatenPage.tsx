@@ -302,7 +302,7 @@ export function StammdatenPage() {
   };
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <PageHeader
         title="Stammdaten"
         description={`${products.length} aktiv · ${archivedProducts.length} archiviert`}
@@ -370,8 +370,8 @@ export function StammdatenPage() {
       />
 
       {/* Search + Archive toggle */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -381,7 +381,7 @@ export function StammdatenPage() {
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-white/5 dark:text-gray-200 dark:placeholder-gray-500"
           />
         </div>
-        <div className="flex gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1 self-start">
           <button
             onClick={() => { setShowArchive(false); setSelectedSkus(new Set()); }}
             className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
@@ -409,7 +409,7 @@ export function StammdatenPage() {
       {/* Inline Add Product Form */}
       {showAddForm && (
         <div className="bg-white dark:bg-white/5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 shadow-sm p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Artikelnummer *</label>
               <input type="text" value={newSku} onChange={(e) => setNewSku(e.target.value)} placeholder="z.B. CYL-00999"
@@ -491,7 +491,93 @@ export function StammdatenPage() {
           </button>
         </div>
       ) : !showArchive ? (
-        <div className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+        <>
+          {/* Mobile: Card-Liste (< md) */}
+          <div className="md:hidden space-y-2">
+            {groupedRows.map((row) => {
+              const p = row.product;
+              const isChild = row.type === 'child';
+              const isParent = row.type === 'parent';
+              const expanded = isParent && expandedGroups.has(p.artikelnummer);
+              const selected = selectedSkus.has(p.artikelnummer);
+              return (
+                <div
+                  key={p.artikelnummer}
+                  onClick={() => navigate(`/stammdaten/${encodeURIComponent(p.artikelnummer)}`)}
+                  className={`bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm p-3 active:bg-gray-50 dark:active:bg-white/10 transition-colors ${selected ? 'ring-2 ring-indigo-500/40' : ''} ${isChild ? 'ml-6 border-l-4 border-l-purple-300 dark:border-l-purple-600' : ''}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleSelect(p.artikelnummer)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1 rounded border-gray-300 w-5 h-5"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        {p.stammdaten_complete
+                          ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                          : <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />}
+                        <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{p.artikelnummer}</span>
+                        {isParent && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleGroupExpand(p.artikelnummer); }}
+                            className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium bg-purple-100 text-purple-700 rounded-full dark:bg-purple-900/30 dark:text-purple-300"
+                          >
+                            <GitBranch className="w-3 h-3" />
+                            Parent · {(row as { childCount: number }).childCount}
+                            {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          </button>
+                        )}
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {p.artikelname}
+                      </div>
+                      {isChild && Object.entries(p.variant_attributes).length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {Object.entries(p.variant_attributes).map(([k, v]) => (
+                            <span key={k} className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-purple-50 text-purple-600 rounded-full border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-700">
+                              {v}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        {p.preis != null && (
+                          <div><span className="text-gray-400">VK:</span> <span className="font-medium text-gray-900 dark:text-gray-100">{p.preis.toFixed(2)} €</span></div>
+                        )}
+                        {p.ek != null && (
+                          <div><span className="text-gray-400">EK:</span> <span className="text-gray-700 dark:text-gray-300">{p.ek.toFixed(2)} €</span></div>
+                        )}
+                        {p.gewicht != null && (
+                          <div><span className="text-gray-400">Gewicht:</span> <span className="text-gray-700 dark:text-gray-300">{p.gewicht} g</span></div>
+                        )}
+                        {p.hersteller && (
+                          <div className="truncate"><span className="text-gray-400">Hersteller:</span> <span className="text-gray-700 dark:text-gray-300">{p.hersteller}</span></div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => handleClone(p.artikelnummer, e)}
+                      className="p-2 -m-1 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                      title="Duplizieren"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {groupedRows.length === 0 && (
+              <div className="text-center py-12 text-sm text-gray-400 dark:text-gray-500">
+                Keine Treffer für „{searchQuery}"
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Tabelle (≥ md) */}
+          <div className="hidden md:block bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10">
@@ -689,9 +775,37 @@ export function StammdatenPage() {
             </table>
           </div>
         </div>
+        </>
       ) : (
         /* Archive view */
-        <div className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
+        <>
+          {/* Mobile: Card-Liste */}
+          <div className="md:hidden space-y-2">
+            {filteredArchived.map((p) => (
+              <div key={p.artikelnummer} className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-xs text-gray-600 dark:text-gray-400 mb-1">{p.artikelnummer}</div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{p.artikelname}</div>
+                  </div>
+                  <button
+                    onClick={() => handleUnarchive(p.artikelnummer)}
+                    className="px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 rounded-lg active:bg-indigo-50 dark:active:bg-indigo-500/10 shrink-0"
+                  >
+                    Wiederherstellen
+                  </button>
+                </div>
+              </div>
+            ))}
+            {filteredArchived.length === 0 && (
+              <div className="text-center py-12 text-sm text-gray-400 dark:text-gray-500">
+                Keine archivierten Produkte.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Tabelle */}
+          <div className="hidden md:block bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
           <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10">
@@ -727,6 +841,7 @@ export function StammdatenPage() {
             </table>
           </div>
         </div>
+        </>
       )}
 
       {showClearConfirm && (

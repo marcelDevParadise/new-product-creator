@@ -96,7 +96,7 @@ export function BundlesPage() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <PageHeader
         title="Bundles & Sets"
         subtitle={`${bundles.length} Bundle${bundles.length !== 1 ? 's' : ''}`}
@@ -109,12 +109,12 @@ export function BundlesPage() {
 
       {/* Create/Edit Form */}
       {showCreate && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">{editId ? 'Bundle bearbeiten' : 'Neues Bundle'}</h3>
             <button onClick={resetForm}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Name</label>
               <input value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Bundle-Name" />
@@ -158,7 +158,7 @@ export function BundlesPage() {
 
           {/* Items table */}
           {items.length > 0 && (
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-800">
                   <tr>
@@ -219,13 +219,13 @@ export function BundlesPage() {
       ) : (
         <div className="space-y-4">
           {bundles.map(bundle => (
-            <div key={bundle.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-              <div className="flex items-center justify-between mb-3">
+            <div key={bundle.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-lg">{bundle.name}</h3>
                   {bundle.description && <p className="text-sm text-gray-500 mt-0.5">{bundle.description}</p>}
                 </div>
-                <div className="flex items-center gap-4 text-sm text-gray-500">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-gray-500">
                   <span>{bundle.items.length} Produkt{bundle.items.length !== 1 ? 'e' : ''}</span>
                   {bundle.total_ek > 0 && <span>EK: {bundle.total_ek.toFixed(2)} €</span>}
                   {bundle.total_vk > 0 && <span>VK: {bundle.total_vk.toFixed(2)} €</span>}
@@ -233,7 +233,7 @@ export function BundlesPage() {
                   <button onClick={() => handleDelete(bundle.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
-              <div className="border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden">
+              <div className="border border-gray-100 dark:border-gray-800 rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>

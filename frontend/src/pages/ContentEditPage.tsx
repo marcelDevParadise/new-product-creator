@@ -112,7 +112,7 @@ export function ContentEditPage() {
       )}
 
       {/* Header */}
-      <div className="shrink-0 px-8 pt-6 pb-4">
+      <div className="shrink-0 px-4 md:px-8 pt-4 md:pt-6 pb-4">
         <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
           <button onClick={() => navigate('/stammdaten')} className="hover:text-gray-900 transition-colors">
             Stammdaten
@@ -161,7 +161,7 @@ export function ContentEditPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto px-8 pb-8">
+      <div className="flex-1 overflow-auto px-4 md:px-8 pb-8">
         <div className="max-w-4xl space-y-8">
           {/* Kurzbeschreibung */}
           <div>
@@ -282,7 +282,7 @@ export function ContentEditPage() {
       </div>
 
       {/* Footer */}
-      <div className="shrink-0 flex items-center justify-between px-8 py-4 bg-white border-t border-gray-200">
+      <div className="shrink-0 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between px-4 md:px-8 py-3 md:py-4 bg-white border-t border-gray-200">
         <button
           onClick={() => navigate(`/stammdaten/${encodeURIComponent(product.artikelnummer)}`)}
           className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"

@@ -159,7 +159,7 @@ export function TemplatesPage() {
   const templateCount = Object.keys(templates).length;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <PageHeader
         title="Vorlagen-Verwaltung"
         description={`${templateCount} Vorlagen · ${categories.length} Kategorien`}
@@ -189,7 +189,7 @@ export function TemplatesPage() {
       {/* Create inline */}
       {creating && (
         <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">Name</label>
               <input

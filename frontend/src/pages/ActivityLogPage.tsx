@@ -60,13 +60,13 @@ export function ActivityLogPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <PageHeader
         title="Aktivitätsprotokoll"
         description="Alle Aktivitäten im Überblick"
       />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Badge variant="outline">{activities.length} Einträge</Badge>
           <select
@@ -87,7 +87,8 @@ export function ActivityLogPage() {
       </div>
 
       <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
-        <Table>
+        <div className="overflow-x-auto">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-12"></TableHead>
@@ -131,6 +132,7 @@ export function ActivityLogPage() {
             })}
           </TableBody>
         </Table>
+        </div>
       </div>
     </div>
   );

@@ -23,11 +23,11 @@ export function BulkAttributeModal({ selectedSkus, attributeConfig, onClose, onS
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center bg-black/50 backdrop-blur-sm md:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-card rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+      <div className="bg-card shadow-2xl w-full md:max-w-5xl h-full md:h-[85vh] md:rounded-xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b shrink-0">
           <div>
             <h2 className="text-lg font-semibold">Bulk-Bearbeitung</h2>
             <p className="text-sm text-muted-foreground">

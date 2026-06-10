@@ -45,8 +45,8 @@ export function VariantGroupsPage() {
   const totalChildren = groups.reduce((sum, g) => sum + g.children.length, 0);
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8 space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader title="Variantengruppen" description="Übersicht aller Parent/Child-Beziehungen" />
         <div className="flex items-center gap-2">
           <button
@@ -61,7 +61,7 @@ export function VariantGroupsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Gruppen</CardTitle>
@@ -105,7 +105,7 @@ export function VariantGroupsPage() {
             return (
               <div key={g.parent.artikelnummer} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                 <div
-                  className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="flex flex-wrap items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => setExpandedParent(isExpanded ? null : g.parent.artikelnummer)}
                 >
                   <button className="text-gray-400">
@@ -120,7 +120,7 @@ export function VariantGroupsPage() {
                     </div>
                     <p className="text-sm text-gray-600 truncate">{g.parent.artikelname}</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
                     {g.variant_axes.length > 0 && (
                       <div className="flex gap-1">
                         {g.variant_axes.map((axis) => (
@@ -148,7 +148,7 @@ export function VariantGroupsPage() {
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t border-gray-100">
+                  <div className="border-t border-gray-100 overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>

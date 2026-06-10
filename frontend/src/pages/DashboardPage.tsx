@@ -113,7 +113,7 @@ export function DashboardPage() {
 
   if (error) {
     return (
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <PageHeader title="Dashboard" description="Übersicht über alle Produkte und Aktivitäten" />
         <div className="flex items-center gap-2 text-red-600">
           <AlertCircle className="w-5 h-5" />
@@ -125,9 +125,9 @@ export function DashboardPage() {
 
   if (!stats) {
     return (
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-6">
         <PageHeader title="Dashboard" description="Übersicht über alle Produkte und Aktivitäten" />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
               <CardHeader className="pb-2"><div className="h-4 w-24 bg-gray-100 rounded animate-pulse" /></CardHeader>
@@ -140,12 +140,12 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8 space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader title="Dashboard" description="Übersicht über alle Produkte und Aktivitäten" />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 sm:shrink-0">
           {lastRefresh && (
-            <span className="text-xs text-muted-foreground">
+            <span className="hidden sm:inline text-xs text-muted-foreground">
               Aktualisiert {formatRelativeTime(lastRefresh.toISOString().replace('Z', ''))}
             </span>
           )}
@@ -157,7 +157,7 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Cards - Primary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Produkte</CardTitle>
@@ -220,7 +220,7 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Cards - Secondary */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Content-Score</CardTitle>
@@ -295,7 +295,7 @@ export function DashboardPage() {
 
       {/* Price Stats */}
       {priceStats && (priceStats.avg_ek > 0 || priceStats.avg_vk > 0) && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">⌀ EK-Preis</CardTitle>
