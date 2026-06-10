@@ -733,7 +733,12 @@ function CreateAttributeDialog({
   const [useNewCategory, setUseNewCategory] = useState(false);
   const [idManuallyEdited, setIdManuallyEdited] = useState(false);
 
-  const buildMetafieldId = (key: string) => key ? `${key}:custom:single_line_text_field` : '';
+  const buildMetafieldId = (key: string) => {
+    const k = key.trim();
+    if (!k) return '';
+    const prefixed = k.startsWith('meta_') ? k : `meta_${k}`;
+    return `${prefixed}:custom:single_line_text_field`;
+  };
 
   const update = (field: string, value: unknown) =>
     setForm(prev => {
@@ -797,7 +802,7 @@ function CreateAttributeDialog({
             <DialogTitle className="text-base font-semibold">Neues Attribut erstellen</DialogTitle>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-            Lege ein neues Attribut an. Key muss eindeutig sein. Die Metafield ID wird automatisch aus dem Key gebaut.
+            Lege ein neues Attribut an. Key muss eindeutig sein. Die Metafield ID wird automatisch als <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">meta_&lt;key&gt;:custom:single_line_text_field</code> gebaut.
           </p>
         </div>
 
@@ -839,7 +844,7 @@ function CreateAttributeDialog({
                   className="font-mono text-xs"
                 />
                 <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                  Format: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">key:custom:single_line_text_field</code>
+                  Format: <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">meta_&lt;key&gt;:custom:single_line_text_field</code>
                 </p>
               </div>
             </div>
