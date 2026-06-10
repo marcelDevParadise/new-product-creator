@@ -1,6 +1,10 @@
 """Attributes router — config, definitions CRUD, and per-product attribute management."""
 
+import json
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel as PydanticBaseModel
 
 from state import state
@@ -41,6 +45,43 @@ def get_categories():
             seen.add(attr_def.category)
             categories.append(attr_def.category)
     return categories
+
+
+@router.get("/export")
+def export_attributes_json():
+    """Export all attribute definitions grouped by category as a JSON download."""
+    grouped: dict[str, list[dict]] = {}
+    category_order: list[str] = []
+    for key, attr_def in state.attribute_config.items():
+        cat = attr_def.category
+        if cat not in grouped:
+            grouped[cat] = []
+            category_order.append(cat)
+        entry = attr_def.model_dump()
+        entry["key"] = key
+        grouped[cat].append(entry)
+
+    payload = {
+        "exported_at": datetime.now().isoformat(timespec="seconds"),
+        "total_attributes": len(state.attribute_config),
+        "total_categories": len(category_order),
+        "categories": [
+            {
+                "name": cat,
+                "count": len(grouped[cat]),
+                "attributes": grouped[cat],
+            }
+            for cat in category_order
+        ],
+    }
+
+    content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    filename = f"attribute-export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    return Response(
+        content=content,
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.post("/definitions")

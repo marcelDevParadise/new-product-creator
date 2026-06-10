@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Search, Plus, Pencil, Trash2, X, Check, Filter, ArrowUp, ArrowDown,
-  Hash, Tag, FileText, List, Settings2, AlertCircle,
+  Hash, Tag, FileText, List, Settings2, AlertCircle, Download,
 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Input } from '@/components/ui/input';
@@ -183,10 +183,26 @@ export function AttributesPage() {
           description={`${totalCount} Attribute in ${allCategoryNames.length} Kategorien`}
           className='mb-4'
           actions={
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Neues Attribut
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await api.downloadAttributesJson();
+                    toast('JSON-Export gestartet', 'success');
+                  } catch (e) {
+                    toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');
+                  }
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                JSON exportieren
+              </Button>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Neues Attribut
+              </Button>
+            </div>
           }
         />
       </div>

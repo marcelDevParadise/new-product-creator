@@ -104,6 +104,20 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ordered_keys: orderedKeys }),
     }),
+  downloadAttributesJson: async () => {
+    const res = await fetch(`${BASE}/attributes/export`);
+    if (!res.ok) throw new Error('Attribut-Export fehlgeschlagen');
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename=([^\s;]+)/);
+    const filename = filenameMatch ? filenameMatch[1] : 'attribute-export.json';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   updateAttributes: (sku: string, attributes: Record<string, string | number | boolean>) =>
     request<Product>(`/attributes/products/${encodeURIComponent(sku)}`, {
       method: 'PUT',
