@@ -59,7 +59,7 @@ def export_ameise():
 
     log_activity("export_ameise", f"{len(products)} Produkte exportiert", len(products))
 
-    filename = _make_filename("ameise")
+    filename = _make_filename("attribute")
     total_rows = sum(len(p.attributes) for p in products)
     log_export("ameise", filename, len(products), total_rows)
 
