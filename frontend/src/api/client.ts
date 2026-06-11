@@ -149,7 +149,7 @@ export const api = {
     const blob = await res.blob();
     const disposition = res.headers.get('Content-Disposition') || '';
     const filenameMatch = disposition.match(/filename=([^\s;]+)/);
-    const filename = filenameMatch ? filenameMatch[1] : 'ameise_export.csv';
+    const filename = filenameMatch ? filenameMatch[1] : 'attribut_export.csv';
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
