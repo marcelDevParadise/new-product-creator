@@ -74,6 +74,12 @@ export const api = {
     }),
   unarchiveProduct: (sku: string) =>
     request<Product>(`/products/${encodeURIComponent(sku)}/unarchive`, { method: 'POST' }),
+  unarchiveProducts: (skus: string[]) =>
+    request<{ unarchived: number }>('/products/unarchive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artikelnummern: skus }),
+    }),
   getProductHistory: (sku: string, limit = 100) =>
     request<ProductHistoryEntry[]>(`/products/${encodeURIComponent(sku)}/history?limit=${limit}`),
   cloneProduct: (sku: string) =>

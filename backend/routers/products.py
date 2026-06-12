@@ -225,6 +225,21 @@ def archive_products(body: DeleteRequest):
     return {"archived": archived}
 
 
+@router.post("/unarchive")
+def unarchive_products(body: DeleteRequest):
+    """Unarchive multiple products by their Artikelnummern."""
+    unarchived = 0
+    for sku in body.artikelnummern:
+        product = state.get_product(sku)
+        if product and product.exported:
+            state.unarchive_product(sku)
+            log_product_history(sku, "unarchived")
+            unarchived += 1
+    if unarchived:
+        log_activity("product_unarchived", f"{unarchived} Produkte reaktiviert", unarchived)
+    return {"unarchived": unarchived}
+
+
 class StammdatenUpdate(BaseModel):
     artikelname: str | None = None
     ek: float | None = None

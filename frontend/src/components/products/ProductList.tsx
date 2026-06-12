@@ -1,11 +1,8 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ArchiveRestore, Upload, Archive, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronRight, ArchiveRestore, Upload, Archive, ArrowUp } from 'lucide-react';
 import { Button } from '../ui/button';
 import type { Product } from '../../types';
-
-type SortKey = 'artikelnummer' | 'artikelname' | 'attributes';
-type SortDir = 'asc' | 'desc';
 
 interface Props {
   products: Product[];
@@ -15,35 +12,14 @@ interface Props {
   onUnarchive?: (sku: string) => void;
 }
 
+function compareByArtikelnummer(a: Product, b: Product) {
+  return a.artikelnummer.localeCompare(b.artikelnummer, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 export function ProductList({ products, selectedSkus, onSelectionChange, archived, onUnarchive }: Props) {
   const navigate = useNavigate();
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const selectable = selectedSkus !== undefined && onSelectionChange !== undefined;
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  };
-
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-gray-300" />;
-    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500" /> : <ArrowDown className="w-3 h-3 text-indigo-500" />;
-  };
-
-  const sorted = sortKey
-    ? [...products].sort((a, b) => {
-        let cmp = 0;
-        if (sortKey === 'artikelnummer') cmp = a.artikelnummer.localeCompare(b.artikelnummer);
-        else if (sortKey === 'artikelname') cmp = a.artikelname.localeCompare(b.artikelname);
-        else if (sortKey === 'attributes') cmp = Object.keys(a.attributes).length - Object.keys(b.attributes).length;
-        return sortDir === 'desc' ? -cmp : cmp;
-      })
-    : products;
+  const sorted = useMemo(() => [...products].sort(compareByArtikelnummer), [products]);
 
   const allSelected = selectable && products.length > 0 && products.every((p) => selectedSkus.has(p.artikelnummer));
 
@@ -179,23 +155,17 @@ export function ProductList({ products, selectedSkus, onSelectionChange, archive
                     />
                   </th>
                 )}
-                <th
-                  className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                  onClick={() => toggleSort('artikelnummer')}
-                >
-                  <span className="inline-flex items-center gap-1">Artikelnummer <SortIcon col="artikelnummer" /></span>
+                <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1">
+                    Artikelnummer
+                    <ArrowUp className="w-3 h-3 text-indigo-500" />
+                  </span>
                 </th>
-                <th
-                  className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                  onClick={() => toggleSort('artikelname')}
-                >
-                  <span className="inline-flex items-center gap-1">Artikelname <SortIcon col="artikelname" /></span>
+                <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Artikelname
                 </th>
-                <th
-                  className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700"
-                  onClick={() => toggleSort('attributes')}
-                >
-                  <span className="inline-flex items-center gap-1">Attribute <SortIcon col="attributes" /></span>
+                <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Attribute
                 </th>
                 {archived && <th className="w-10" />}
                 <th className="w-10" />

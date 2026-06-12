@@ -119,13 +119,19 @@ class AppState:
         return self.products.get(artikelnummer)
 
     def get_all_products(self) -> list[Product]:
-        return list(self.products.values())
+        return sorted(self.products.values(), key=lambda p: p.artikelnummer.lower())
 
     def get_active_products(self) -> list[Product]:
-        return [p for p in self.products.values() if not p.exported]
+        return sorted(
+            (p for p in self.products.values() if not p.exported),
+            key=lambda p: p.artikelnummer.lower(),
+        )
 
     def get_archived_products(self) -> list[Product]:
-        return [p for p in self.products.values() if p.exported]
+        return sorted(
+            (p for p in self.products.values() if p.exported),
+            key=lambda p: p.artikelnummer.lower(),
+        )
 
     def archive_product(self, artikelnummer: str) -> None:
         p = self.products.get(artikelnummer)

@@ -18,6 +18,10 @@ interface SavedFilter {
 
 const FILTERS_STORAGE_KEY = 'attributGenerator_savedFilters_products';
 
+function compareByArtikelnummer(a: Product, b: Product) {
+  return a.artikelnummer.localeCompare(b.artikelnummer, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 function loadSavedFilters(): SavedFilter[] {
   try {
     const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
@@ -88,7 +92,7 @@ export function ProductsPage() {
     if (filterStammdaten === 'incomplete') list = list.filter((p) => !p.stammdaten_complete);
     if (filterAttributes === 'has') list = list.filter((p) => Object.keys(p.attributes).length > 0);
     if (filterAttributes === 'none') list = list.filter((p) => Object.keys(p.attributes).length === 0);
-    return list;
+    return [...list].sort(compareByArtikelnummer);
   }, [products, searchQuery, filterStammdaten, filterAttributes]);
 
   const reload = async () => {

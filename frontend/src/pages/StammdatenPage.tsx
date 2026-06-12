@@ -8,23 +8,12 @@ import { api } from '../api/client';
 import type { Product } from '../types';
 import { BulkStammdatenModal } from '../components/products/BulkStammdatenModal';
 import { VariantGroupModal } from '../components/products/VariantGroupModal';
-import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Archive, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy } from 'lucide-react';
+import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUp, Plus, Trash2, Archive, ArchiveRestore, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy } from 'lucide-react';
 
-type SortKey = 'artikelnummer' | 'artikelname' | 'ek' | 'preis' | 'gewicht' | 'hersteller' | 'ean' | 'status';
-type SortDir = 'asc' | 'desc';
 type EditingCell = { sku: string; field: string } | null;
 
-const SORT_STORAGE_KEY = 'stammdaten.sort.v1';
-
-function loadSort(): { key: SortKey | null; dir: SortDir } {
-  try {
-    const raw = localStorage.getItem(SORT_STORAGE_KEY);
-    if (!raw) return { key: null, dir: 'asc' };
-    const parsed = JSON.parse(raw) as { key: SortKey | null; dir: SortDir };
-    return { key: parsed.key ?? null, dir: parsed.dir === 'desc' ? 'desc' : 'asc' };
-  } catch {
-    return { key: null, dir: 'asc' };
-  }
+function compareByArtikelnummer(a: Product, b: Product) {
+  return a.artikelnummer.localeCompare(b.artikelnummer, undefined, { numeric: true, sensitivity: 'base' });
 }
 
 export function StammdatenPage() {
@@ -32,8 +21,6 @@ export function StammdatenPage() {
   const [archivedProducts, setArchivedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey | null>(() => loadSort().key);
-  const [sortDir, setSortDir] = useState<SortDir>(() => loadSort().dir);
   const [showArchive, setShowArchive] = useState(false);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
   const [showAddForm, setShowAddForm] = useState(false);
@@ -105,26 +92,6 @@ export function StammdatenPage() {
     });
   }, []);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  };
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify({ key: sortKey, dir: sortDir }));
-    } catch { /* localStorage unavailable */ }
-  }, [sortKey, sortDir]);
-
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 text-gray-300" />;
-    return sortDir === 'asc' ? <ArrowUp className="w-3 h-3 text-indigo-500" /> : <ArrowDown className="w-3 h-3 text-indigo-500" />;
-  };
-
   const filteredProducts = useMemo(() => {
     let list = products;
     if (searchQuery.trim()) {
@@ -135,23 +102,8 @@ export function StammdatenPage() {
           (p.ean && p.ean.toLowerCase().includes(q))
       );
     }
-    if (sortKey) {
-      list = [...list].sort((a, b) => {
-        let cmp = 0;
-        if (sortKey === 'status') cmp = Number(a.stammdaten_complete) - Number(b.stammdaten_complete);
-        else if (sortKey === 'ek') cmp = (a.ek ?? -1) - (b.ek ?? -1);
-        else if (sortKey === 'preis') cmp = (a.preis ?? -1) - (b.preis ?? -1);
-        else if (sortKey === 'gewicht') cmp = (a.gewicht ?? -1) - (b.gewicht ?? -1);
-        else {
-          const va = (a[sortKey] as string | null) ?? '';
-          const vb = (b[sortKey] as string | null) ?? '';
-          cmp = va.localeCompare(vb);
-        }
-        return sortDir === 'desc' ? -cmp : cmp;
-      });
-    }
-    return list;
-  }, [products, searchQuery, sortKey, sortDir]);
+    return [...list].sort(compareByArtikelnummer);
+  }, [products, searchQuery]);
 
   // Group products: parents with children, standalone products
   type GroupedRow = { type: 'standalone'; product: Product } | { type: 'parent'; product: Product; childCount: number } | { type: 'child'; product: Product; parentSku: string };
@@ -187,11 +139,14 @@ export function StammdatenPage() {
   }, [filteredProducts, expandedGroups]);
 
   const filteredArchived = useMemo(() => {
-    if (!searchQuery.trim()) return archivedProducts;
-    const q = searchQuery.toLowerCase();
-    return archivedProducts.filter(
-      (p) => p.artikelnummer.toLowerCase().includes(q) || p.artikelname.toLowerCase().includes(q)
-    );
+    let list = archivedProducts;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (p) => p.artikelnummer.toLowerCase().includes(q) || p.artikelname.toLowerCase().includes(q)
+      );
+    }
+    return [...list].sort(compareByArtikelnummer);
   }, [archivedProducts, searchQuery]);
 
   const reload = async () => {
@@ -251,10 +206,27 @@ export function StammdatenPage() {
   const handleUnarchive = async (sku: string) => {
     try {
       await api.unarchiveProduct(sku);
+      setSelectedSkus(prev => {
+        const next = new Set(prev);
+        next.delete(sku);
+        return next;
+      });
       toast('Produkt wiederhergestellt', 'success');
       reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Wiederherstellen fehlgeschlagen', 'error');
+    }
+  };
+
+  const handleUnarchiveSelected = async () => {
+    try {
+      const skus = Array.from(selectedSkus);
+      const res = await api.unarchiveProducts(skus);
+      setSelectedSkus(new Set());
+      toast(`${res.unarchived} Produkte reaktiviert`, 'success');
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Reaktivieren fehlgeschlagen', 'error');
     }
   };
 
@@ -285,11 +257,19 @@ export function StammdatenPage() {
   };
 
   const allSelected = filteredProducts.length > 0 && selectedSkus.size === filteredProducts.length;
+  const allArchivedSelected = filteredArchived.length > 0 && filteredArchived.every((p) => selectedSkus.has(p.artikelnummer));
   const toggleSelectAll = () => {
     if (allSelected) {
       setSelectedSkus(new Set());
     } else {
       setSelectedSkus(new Set(filteredProducts.map((p) => p.artikelnummer)));
+    }
+  };
+  const toggleSelectAllArchived = () => {
+    if (allArchivedSelected) {
+      setSelectedSkus(new Set());
+    } else {
+      setSelectedSkus(new Set(filteredArchived.map((p) => p.artikelnummer)));
     }
   };
   const toggleSelect = (sku: string) => {
@@ -355,6 +335,15 @@ export function StammdatenPage() {
                   {selectedSkus.size} löschen
                 </button>
               </>
+            )}
+            {selectedSkus.size > 0 && showArchive && (
+              <button
+                onClick={handleUnarchiveSelected}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+              >
+                <ArchiveRestore className="w-4 h-4" />
+                {selectedSkus.size} reaktivieren
+              </button>
             )}
             {products.length > 0 && (
               <button
@@ -590,30 +579,19 @@ export function StammdatenPage() {
                       className="rounded border-gray-300"
                     />
                   </th>
-                  <th className="w-8 px-4 py-3 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('status')}>
-                    <SortIcon col="status" />
+                  <th className="w-8 px-4 py-3" />
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px]">
+                    <span className="inline-flex items-center gap-1">
+                      Artikelnr.
+                      <ArrowUp className="w-3 h-3 text-indigo-500" />
+                    </span>
                   </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('artikelnummer')}>
-                    <span className="inline-flex items-center gap-1">Artikelnr. <SortIcon col="artikelnummer" /></span>
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('artikelname')}>
-                    <span className="inline-flex items-center gap-1">Artikelname <SortIcon col="artikelname" /></span>
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('ek')}>
-                    <span className="inline-flex items-center gap-1 justify-end">EK (Netto) <SortIcon col="ek" /></span>
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('preis')}>
-                    <span className="inline-flex items-center gap-1 justify-end">VK (Brutto) <SortIcon col="preis" /></span>
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('gewicht')}>
-                    <span className="inline-flex items-center gap-1 justify-end">Gewicht (g) <SortIcon col="gewicht" /></span>
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('hersteller')}>
-                    <span className="inline-flex items-center gap-1">Hersteller <SortIcon col="hersteller" /></span>
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px] cursor-pointer select-none hover:text-gray-700 dark:hover:text-gray-300" onClick={() => toggleSort('ean')}>
-                    <span className="inline-flex items-center gap-1">GTIN <SortIcon col="ean" /></span>
-                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">Artikelname</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">EK (Netto)</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">VK (Brutto)</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">Gewicht (g)</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px]">Hersteller</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px]">GTIN</th>
                   <th className="px-4 py-3 w-[80px]" />
                 </tr>
               </thead>
@@ -781,9 +759,31 @@ export function StammdatenPage() {
         <>
           {/* Mobile: Card-Liste */}
           <div className="md:hidden space-y-2">
-            {filteredArchived.map((p) => (
-              <div key={p.artikelnummer} className="bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm p-3">
+            {filteredArchived.length > 0 && (
+              <label className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 text-xs text-gray-600 dark:text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={allArchivedSelected}
+                  onChange={toggleSelectAllArchived}
+                  className="w-5 h-5 rounded border-gray-300"
+                />
+                <span>{allArchivedSelected ? 'Alle abwählen' : 'Alle auswählen'}</span>
+                {selectedSkus.size > 0 && (
+                  <span className="ml-auto text-indigo-600 dark:text-indigo-400 font-medium">{selectedSkus.size} ausgewählt</span>
+                )}
+              </label>
+            )}
+            {filteredArchived.map((p) => {
+              const selected = selectedSkus.has(p.artikelnummer);
+              return (
+              <div key={p.artikelnummer} className={`bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm p-3 ${selected ? 'ring-2 ring-indigo-500/40' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => toggleSelect(p.artikelnummer)}
+                    className="mt-1 rounded border-gray-300 w-5 h-5"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs text-gray-600 dark:text-gray-400 mb-1">{p.artikelnummer}</div>
                     <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{p.artikelname}</div>
@@ -796,7 +796,8 @@ export function StammdatenPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
             {filteredArchived.length === 0 && (
               <div className="text-center py-12 text-sm text-gray-400 dark:text-gray-500">
                 Keine archivierten Produkte.
@@ -810,14 +811,35 @@ export function StammdatenPage() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px]">Artikelnr.</th>
+                  <th className="w-8 px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allArchivedSelected}
+                      onChange={toggleSelectAllArchived}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[140px]">
+                    <span className="inline-flex items-center gap-1">
+                      Artikelnr.
+                      <ArrowUp className="w-3 h-3 text-indigo-500" />
+                    </span>
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">Artikelname</th>
                   <th className="px-4 py-3 w-[120px]" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-white/5">
                 {filteredArchived.map((p) => (
-                  <tr key={p.artikelnummer} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                  <tr key={p.artikelnummer} className={`hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${selectedSkus.has(p.artikelnummer) ? 'bg-indigo-50/50 dark:bg-indigo-500/10' : ''}`}>
+                    <td className="px-4 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedSkus.has(p.artikelnummer)}
+                        onChange={() => toggleSelect(p.artikelnummer)}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">{p.artikelnummer}</td>
                     <td className="px-4 py-2 text-gray-700 dark:text-gray-200">{p.artikelname}</td>
                     <td className="px-4 py-2 text-right">
@@ -832,7 +854,7 @@ export function StammdatenPage() {
                 ))}
                 {filteredArchived.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
+                    <td colSpan={4} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
                       Keine archivierten Produkte.
                     </td>
                   </tr>
