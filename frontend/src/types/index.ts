@@ -382,6 +382,15 @@ export interface ImportResult {
   warnings: ImportWarning[];
 }
 
+export interface AttributeImportResult {
+  imported: number;
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  warnings: ImportWarning[];
+}
+
 // Product History
 
 export interface ProductHistoryEntry {

@@ -36,9 +36,9 @@ Write-Host "    Message:      $Message"
 Write-Host ""
 
 git tag -a $tag -m $Message
-git push origin master --follow-tags
+git push origin $branch --follow-tags
 
 Write-Host ""
 Write-Host "Tag '$tag' gepusht. Pi deployed beim naechsten Cron-Run (max. 5 Min)." -ForegroundColor Green
 Write-Host "Status live mitlesen:" -ForegroundColor DarkGray
-Write-Host "  ssh marcel@100.87.118.91 'tail -f /var/log/attribut-generator-deploy.log'" -ForegroundColor DarkGray
+Write-Host "  ssh marcel@100.87.118.91 tail -n 80 -F /home/marcel/attribut-generator-deploy.log" -ForegroundColor DarkGray

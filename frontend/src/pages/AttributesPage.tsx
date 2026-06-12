@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
+import type { DragEvent } from 'react';
 import {
   Search, Plus, Pencil, Trash2, X, Check, Filter, ArrowUp, ArrowDown,
-  Hash, Tag, FileText, List, Settings2, AlertCircle, Download,
+  Hash, Tag, FileText, List, Settings2, AlertCircle, Download, Upload,
 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
-import type { AttributeConfig, AttributeDefinition } from '../types';
+import type { AttributeConfig, AttributeDefinition, AttributeImportResult } from '../types';
 
 export function AttributesPage() {
   const [config, setConfig] = useState<AttributeConfig>({});
@@ -29,6 +30,7 @@ export function AttributesPage() {
   const [requiredFilter, setRequiredFilter] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -184,6 +186,10 @@ export function AttributesPage() {
           className='mb-4'
           actions={
             <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                CSV importieren
+              </Button>
               <Button
                 variant="outline"
                 onClick={async () => {
@@ -486,6 +492,14 @@ export function AttributesPage() {
         />
       )}
 
+      {/* Import Dialog */}
+      {showImportDialog && (
+        <ImportAttributesDialog
+          onClose={() => setShowImportDialog(false)}
+          onImported={reload}
+        />
+      )}
+
       {/* Delete confirm */}
       {showDeleteConfirm && (
         <Dialog open onOpenChange={() => setShowDeleteConfirm(null)}>
@@ -509,6 +523,193 @@ export function AttributesPage() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+
+// --- Import Attributes Dialog ---
+
+function ImportAttributesDialog({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const { toast } = useToast();
+  const [dragOver, setDragOver] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<AttributeImportResult | null>(null);
+
+  const handleFile = useCallback(async (file: File) => {
+    setError(null);
+    setResult(null);
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setError('Nur CSV-Dateien sind erlaubt.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.importAttributeDefinitionsCsv(file);
+      setResult(res);
+      toast(`${res.imported} Attribute importiert`, 'success');
+      onImported();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Import fehlgeschlagen');
+    } finally {
+      setLoading(false);
+    }
+  }, [onImported, toast]);
+
+  const onDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }, [handleFile]);
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-3xl p-0 gap-0 overflow-hidden">
+        <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
+          <div className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <DialogTitle className="text-base font-semibold">Attribute per CSV importieren</DialogTitle>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+            UTF-8, Semikolon-getrennt. Bestehende Keys werden aktualisiert, neue Keys werden angelegt.
+          </p>
+        </div>
+
+        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto space-y-5">
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              Pflichtspalten
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                ['key', 'Eindeutiger technischer Attribut-Key'],
+                ['id', 'Metafield/Funktionsattribut-ID für den Export'],
+                ['category', 'Kategorie für Navigation und Gruppierung'],
+                ['name', 'Anzeigename im Editor'],
+              ].map(([column, description]) => (
+                <div key={column} className="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
+                  <code className="text-xs font-mono text-indigo-700 dark:text-indigo-300">{column}</code>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Optional: <code>description</code>, <code>required</code>, <code>default_value</code>, <code>suggested_values</code>. Mehrere vorgeschlagene Werte mit <code>|</code> trennen.
+            </p>
+          </section>
+
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+            className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
+              dragOver
+                ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/30'
+                : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950/30 hover:border-gray-400'
+            }`}
+          >
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFile(file);
+                e.target.value = '';
+              }}
+            />
+            <div className="flex flex-col items-center gap-3">
+              {loading ? (
+                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+              ) : (
+                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/50 rounded-lg flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  CSV hierher ziehen oder Datei auswählen
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Spalten: key; id; category; name
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg text-sm text-red-700 dark:text-red-300">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {result && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-lg text-sm text-green-700 dark:text-green-300">
+                <FileText className="w-4 h-4 flex-shrink-0" />
+                <div>
+                  <span className="font-medium">{result.imported} Attribute importiert</span>
+                  <span className="ml-1 text-green-600 dark:text-green-400">· {result.total} Attribute gesamt</span>
+                  <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-green-600 dark:text-green-400">
+                    <span>{result.created} neu</span>
+                    <span>{result.updated} aktualisiert</span>
+                    {result.skipped > 0 && <span className="text-amber-600 dark:text-amber-400">{result.skipped} übersprungen</span>}
+                  </div>
+                </div>
+              </div>
+
+              {result.warnings.length > 0 && (
+                <div className="border border-amber-200 dark:border-amber-900 rounded-lg overflow-hidden">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/30 text-sm text-amber-800 dark:text-amber-300 font-medium">
+                    {result.warnings.length} Hinweis{result.warnings.length !== 1 ? 'e' : ''} beim Import
+                  </div>
+                  <div className="divide-y divide-amber-100 dark:divide-amber-900 max-h-40 overflow-auto">
+                    {result.warnings.map((warning, i) => (
+                      <div key={i} className="px-3 py-2 text-xs text-amber-800 dark:text-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+                        <span className="font-mono">Zeile {warning.row}</span>
+                        <span className="mx-1.5">·</span>
+                        <span className="font-medium">{warning.field}</span>
+                        <span className="mx-1.5">-</span>
+                        {warning.message}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
+          <Button variant="outline" onClick={async () => {
+            try {
+              await api.downloadAttributeImportTemplate();
+            } catch (e) {
+              toast(e instanceof Error ? e.message : 'Download fehlgeschlagen', 'error');
+            }
+          }}>
+            <Download className="w-3.5 h-3.5 mr-1" />
+            Beispiel CSV
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            Schließen
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

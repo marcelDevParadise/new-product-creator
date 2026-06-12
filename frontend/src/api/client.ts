@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient } from '../types';
 
 const BASE = '/api';
 
@@ -82,6 +82,28 @@ export const api = {
   // Attributes
   getAttributeConfig: () => request<AttributeConfig>('/attributes/config'),
   getCategories: () => request<string[]>('/attributes/categories'),
+  importAttributeDefinitionsCsv: async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<AttributeImportResult>('/attributes/definitions/import', {
+      method: 'POST',
+      body: form,
+    });
+  },
+  downloadAttributeImportTemplate: async () => {
+    const res = await fetch(`${BASE}/attributes/definitions/import/template`);
+    if (!res.ok) throw new Error('Import-Vorlage konnte nicht heruntergeladen werden');
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename=([^\s;]+)/);
+    const filename = filenameMatch ? filenameMatch[1] : 'attribute-import-beispiel.csv';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
   createAttributeDefinition: (payload: AttributeDefinitionCreatePayload) =>
     request<Record<string, unknown>>('/attributes/definitions', {
       method: 'POST',

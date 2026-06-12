@@ -1,10 +1,12 @@
 """Attributes router — config, definitions CRUD, and per-product attribute management."""
 
 import json
+import csv
+import io
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel
 
 from state import state
@@ -15,13 +17,60 @@ from models.attribute import (
     AttributeUpdate,
     BulkAttributeUpdate,
 )
-from services.database import log_product_history, log_product_history_batch
+from services.database import log_activity, log_product_history, log_product_history_batch
 
 router = APIRouter(prefix="/api/attributes", tags=["attributes"])
 
 
 class ReorderRequest(PydanticBaseModel):
     ordered_keys: list[str]
+
+
+class AttributeImportWarning(PydanticBaseModel):
+    row: int
+    field: str
+    message: str
+
+
+REQUIRED_IMPORT_COLUMNS = {"key", "id", "category", "name"}
+IMPORT_COLUMN_ALIASES = {
+    "key": {"key", "attribute_key", "attribut_key"},
+    "id": {"id", "metafield_id", "funktionsattribut_id"},
+    "category": {"category", "kategorie"},
+    "name": {"name", "anzeigename", "attributname"},
+    "description": {"description", "beschreibung"},
+    "required": {"required", "pflicht", "pflichtfeld"},
+    "default_value": {"default_value", "standardwert"},
+    "suggested_values": {"suggested_values", "vorgeschlagene_werte", "werte"},
+}
+
+
+def _normalize_import_header(header: str) -> str:
+    normalized = header.strip().lower().replace(" ", "_").replace("-", "_")
+    for canonical, aliases in IMPORT_COLUMN_ALIASES.items():
+        if normalized in aliases:
+            return canonical
+    return normalized
+
+
+def _parse_required(value: str, row_idx: int, warnings: list[AttributeImportWarning]) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"", "0", "false", "nein", "no", "n"}:
+        return False
+    if normalized in {"1", "true", "ja", "yes", "y", "x", "pflicht"}:
+        return True
+    warnings.append(AttributeImportWarning(
+        row=row_idx,
+        field="required",
+        message=f"Ungültiger Pflichtfeld-Wert '{value}' wurde als false importiert.",
+    ))
+    return False
+
+
+def _parse_suggested_values(value: str) -> list[str]:
+    if not value.strip():
+        return []
+    return [item.strip() for item in value.replace("\n", "|").split("|") if item.strip()]
 
 
 # --- Attribute definitions CRUD ---
@@ -82,6 +131,160 @@ def export_attributes_json():
         media_type="application/json; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+@router.get("/definitions/import/template")
+def download_attribute_import_template():
+    """Download a UTF-8 CSV template for bulk importing attribute definitions."""
+    columns = ["key", "id", "category", "name", "description", "required", "default_value", "suggested_values"]
+    examples = [
+        [
+            "meta_material",
+            "meta_material:custom:single_line_text_field",
+            "Material",
+            "Material",
+            "Material oder Materialmix des Produkts",
+            "true",
+            "",
+            "Baumwolle|Polyester|Silikon",
+        ],
+        [
+            "meta_color",
+            "meta_color:custom:single_line_text_field",
+            "Optik",
+            "Farbe",
+            "Hauptfarbe des Produkts",
+            "false",
+            "",
+            "Schwarz|Weiß|Rot|Blau",
+        ],
+    ]
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_MINIMAL, lineterminator="\n")
+    writer.writerow(columns)
+    writer.writerows(examples)
+    content = output.getvalue().encode("utf-8-sig")
+
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": "attachment; filename=attribute-import-beispiel.csv"},
+    )
+
+
+@router.post("/definitions/import")
+async def import_attribute_definitions(file: UploadFile):
+    """Bulk import attribute definitions from a semicolon-separated UTF-8 CSV."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(400, "Nur CSV-Dateien sind erlaubt.")
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "CSV muss UTF-8 codiert sein.")
+
+    reader = csv.DictReader(io.StringIO(text), delimiter=";")
+    if reader.fieldnames is None:
+        raise HTTPException(400, "CSV enthält keine Header-Zeile.")
+
+    normalized_fieldnames = [_normalize_import_header(field) for field in reader.fieldnames]
+    missing = REQUIRED_IMPORT_COLUMNS - set(normalized_fieldnames)
+    if missing:
+        raise HTTPException(400, f"Fehlende Spalten: {', '.join(sorted(missing))}")
+
+    warnings: list[AttributeImportWarning] = []
+    created = 0
+    updated = 0
+    skipped = 0
+    imported_keys: set[str] = set()
+
+    for row_idx, row in enumerate(reader, start=2):
+        normalized_row: dict[str, str] = {}
+        for key, value in row.items():
+            if key is None:
+                continue
+            normalized_row[_normalize_import_header(key)] = value.strip() if isinstance(value, str) else ""
+
+        key = normalized_row.get("key", "")
+
+        if not key:
+            skipped += 1
+            warnings.append(AttributeImportWarning(
+                row=row_idx,
+                field="key",
+                message="Zeile übersprungen: key fehlt.",
+            ))
+            continue
+
+        if key in imported_keys:
+            skipped += 1
+            warnings.append(AttributeImportWarning(
+                row=row_idx,
+                field="key",
+                message=f"Zeile übersprungen: key '{key}' ist in dieser Datei doppelt.",
+            ))
+            continue
+
+        missing_values = [column for column in REQUIRED_IMPORT_COLUMNS if not normalized_row.get(column)]
+        if missing_values:
+            skipped += 1
+            warnings.append(AttributeImportWarning(
+                row=row_idx,
+                field=", ".join(missing_values),
+                message=f"Zeile übersprungen: Pflichtwerte fehlen ({', '.join(missing_values)}).",
+            ))
+            continue
+
+        existing = state.attribute_config.get(key)
+        data = existing.model_dump() if existing else {
+            "description": "",
+            "required": False,
+            "required_for_types": [],
+            "default_value": None,
+            "suggested_values": [],
+            "smart_defaults": [],
+        }
+
+        data.update({
+            "id": normalized_row["id"],
+            "category": normalized_row["category"],
+            "name": normalized_row["name"],
+        })
+
+        present_columns = set(normalized_fieldnames)
+        if "description" in present_columns:
+            data["description"] = normalized_row.get("description", "")
+        if "required" in present_columns:
+            data["required"] = _parse_required(normalized_row.get("required", ""), row_idx, warnings)
+        if "default_value" in present_columns:
+            default_value = normalized_row.get("default_value", "")
+            data["default_value"] = default_value or None
+        if "suggested_values" in present_columns:
+            data["suggested_values"] = _parse_suggested_values(normalized_row.get("suggested_values", ""))
+
+        attr = AttributeDefinition(**data)
+        if existing:
+            state.update_attribute_definition(key, attr)
+            updated += 1
+        else:
+            state.add_attribute_definition(key, attr)
+            created += 1
+        imported_keys.add(key)
+
+    imported = created + updated
+    if imported:
+        log_activity("attribute_import", f"{imported} Attribute importiert", imported)
+
+    return {
+        "imported": imported,
+        "total": len(state.attribute_config),
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "warnings": [warning.model_dump() for warning in warnings],
+    }
 
 
 @router.post("/definitions")
