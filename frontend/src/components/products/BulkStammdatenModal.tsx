@@ -4,6 +4,8 @@ import { api } from '../../api/client';
 import { useToast } from '../ui/Toast';
 import type { CategoryTree } from '../../types';
 
+const EINHEITEN_FALLBACK = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
+
 function getCategoryOptions(tree: CategoryTree, path: string[]): string[] {
   let node = tree;
   for (const segment of path) {
@@ -22,6 +24,12 @@ const BULK_FIELDS = [
   { key: 'laenge', label: 'Länge (cm)', type: 'number' },
   { key: 'breite', label: 'Breite (cm)', type: 'number' },
   { key: 'hoehe', label: 'Höhe (cm)', type: 'number' },
+  { key: 'verkaufseinheit', label: 'Verkaufseinheit', type: 'number' },
+  { key: 'inhalt_menge', label: 'Inhalt / Menge', type: 'number' },
+  { key: 'inhalt_einheit', label: 'Inhalt Einheit', type: 'unit' },
+  { key: 'grundpreis_ausweisen', label: 'Grundpreis ausweisen', type: 'boolean' },
+  { key: 'bezugsmenge', label: 'Bezugsmenge', type: 'number' },
+  { key: 'bezugsmenge_einheit', label: 'Bezugsmenge Einheit', type: 'unit' },
   { key: 'lieferant_name', label: 'Lieferant Name', type: 'text' },
   { key: 'lieferant_artikelnummer', label: 'Lieferant Artikelnummer', type: 'text' },
   { key: 'lieferant_artikelname', label: 'Lieferant Artikelname', type: 'text' },
@@ -42,13 +50,15 @@ interface Props {
 
 export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [saving, setSaving] = useState(false);
   const [categoryTree, setCategoryTree] = useState<CategoryTree>({});
+  const [einheiten, setEinheiten] = useState<string[]>(EINHEITEN_FALLBACK);
   const { toast } = useToast();
 
   useEffect(() => {
     api.getCategoryTree().then(setCategoryTree).catch(() => {});
+    api.getEinheiten().then(setEinheiten).catch(() => {});
   }, []);
 
   const toggleField = (key: string) => {
@@ -63,13 +73,22 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
     });
   };
 
+  const getStringValue = (key: string) => {
+    const value = values[key];
+    return typeof value === 'string' ? value : '';
+  };
+
   const handleSave = async () => {
-    const fields: Record<string, string | number | null> = {};
+    const fields: Record<string, string | number | boolean | null> = {};
     for (const key of selectedFields) {
       const fieldDef = BULK_FIELDS.find((f) => f.key === key);
-      const raw = values[key]?.trim() ?? '';
+      const value = values[key];
+      const raw = typeof value === 'string' ? value.trim() : '';
+
       if (fieldDef?.type === 'number') {
         fields[key] = raw ? parseFloat(raw.replace(',', '.')) : null;
+      } else if (fieldDef?.type === 'boolean') {
+        fields[key] = value === true;
       } else {
         fields[key] = raw || null;
       }
@@ -96,8 +115,7 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white shadow-xl w-full md:max-w-lg h-full md:h-auto md:max-h-[80vh] md:rounded-xl flex flex-col">
-        {/* Header */}
+      <div className="relative bg-white shadow-xl w-full md:max-w-2xl h-full md:h-auto md:max-h-[80vh] md:rounded-xl flex flex-col">
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b">
           <div>
             <h2 className="text-base font-semibold text-gray-900">Stammdaten Bulk-Bearbeitung</h2>
@@ -108,7 +126,6 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
           </button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-auto p-5 space-y-3">
           <p className="text-xs text-gray-500 mb-3">
             Wähle die Felder aus, die du ändern möchtest. Nur ausgewählte Felder werden überschrieben.
@@ -116,16 +133,20 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
           {BULK_FIELDS.map((field) => {
             const isSelected = selectedFields.has(field.key);
             const isCategoryField = field.type === 'category';
+            const isUnitField = field.type === 'unit';
+            const isBooleanField = field.type === 'boolean';
             let categoryOptions: string[] = [];
             if (isCategoryField) {
               const path: string[] = [];
               for (let i = 0; i < (field as { level: number }).level; i++) {
                 const parentKey = `kategorie_${i + 1}`;
-                if (values[parentKey]) path.push(values[parentKey]);
+                const parentValue = getStringValue(parentKey);
+                if (parentValue) path.push(parentValue);
                 else break;
               }
               categoryOptions = getCategoryOptions(categoryTree, path);
             }
+
             return (
               <div key={field.key} className="flex items-center gap-3">
                 <input
@@ -134,17 +155,46 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
                   onChange={() => toggleField(field.key)}
                   className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                <label className="text-sm text-gray-700 w-40 shrink-0">{field.label}</label>
-                {isCategoryField && categoryOptions.length > 0 ? (
+                <label className="text-sm text-gray-700 w-44 shrink-0">{field.label}</label>
+                {isBooleanField ? (
+                  <div className="flex-1">
+                    <label className={`inline-flex items-center gap-2 text-sm ${
+                      isSelected ? 'text-gray-700' : 'text-gray-400'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={values[field.key] === true}
+                        onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.checked }))}
+                        disabled={!isSelected}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                      />
+                      Ja
+                    </label>
+                  </div>
+                ) : isUnitField ? (
                   <select
-                    value={values[field.key] ?? ''}
+                    value={getStringValue(field.key)}
                     onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
                     disabled={!isSelected}
                     className={`flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
                       isSelected ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 text-gray-400'
                     }`}
                   >
-                    <option value="">– wählen –</option>
+                    <option value="">- wählen -</option>
+                    {einheiten.map((unit) => (
+                      <option key={unit} value={unit}>{unit}</option>
+                    ))}
+                  </select>
+                ) : isCategoryField && categoryOptions.length > 0 ? (
+                  <select
+                    value={getStringValue(field.key)}
+                    onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    disabled={!isSelected}
+                    className={`flex-1 px-3 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                      isSelected ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-50 text-gray-400'
+                    }`}
+                  >
+                    <option value="">- wählen -</option>
                     {categoryOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
@@ -152,7 +202,7 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
                 ) : (
                   <input
                     type="text"
-                    value={values[field.key] ?? ''}
+                    value={getStringValue(field.key)}
                     onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
                     disabled={!isSelected}
                     placeholder={field.type === 'number' ? '0' : ''}
@@ -166,7 +216,6 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
           })}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-5 py-4 border-t bg-gray-50 rounded-b-xl">
           <span className="text-xs text-gray-500">
             {selectedFields.size} Feld{selectedFields.size !== 1 ? 'er' : ''} ausgewählt
@@ -183,7 +232,7 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
               disabled={saving || selectedFields.size === 0}
               className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
-              {saving ? 'Speichere…' : `${selectedSkus.length} Produkte aktualisieren`}
+              {saving ? 'Speichere...' : `${selectedSkus.length} Produkte aktualisieren`}
             </button>
           </div>
         </div>
