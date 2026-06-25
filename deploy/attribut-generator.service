@@ -21,7 +21,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=__REPO__/backend
+ReadWritePaths=__REPO__/backend /srv/images
 
 [Install]
 WantedBy=multi-user.target

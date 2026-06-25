@@ -47,6 +47,11 @@ fi
 "${VENV_DIR}/bin/pip" install --upgrade pip
 "${VENV_DIR}/bin/pip" install -r "${REPO_DIR}/backend/requirements.txt"
 
+echo "==> Image Library vorbereiten"
+sudo install -d -o "${RUN_USER}" -g "${RUN_USER}" -m 0755 /srv/images
+sudo chown -R "${RUN_USER}:${RUN_USER}" /srv/images
+sudo install -m 0755 "${REPO_DIR}/rebuild-image-index.py" /usr/local/bin/rebuild-image-index
+
 if [ ! -f "${REPO_DIR}/backend/.env" ]; then
 	echo ""
 	echo "!! backend/.env fehlt."
@@ -54,6 +59,21 @@ if [ ! -f "${REPO_DIR}/backend/.env" ]; then
 	echo "!! Vorlage: cp backend/.env.example backend/.env"
 	exit 1
 fi
+
+if ! grep -q '^IMAGE_LIBRARY_ROOT=' "${REPO_DIR}/backend/.env"; then
+	echo "IMAGE_LIBRARY_ROOT=/srv/images" >> "${REPO_DIR}/backend/.env"
+fi
+
+if ! grep -q '^IMAGE_UPLOAD_TOKEN=' "${REPO_DIR}/backend/.env"; then
+	IMAGE_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+	echo "IMAGE_UPLOAD_TOKEN=${IMAGE_TOKEN}" >> "${REPO_DIR}/backend/.env"
+	echo ""
+	echo "==> Neuer Image-Upload-Token:"
+	echo "    ${IMAGE_TOKEN}"
+	echo "    Speichere ihn fuer Upload-Skripte."
+fi
+
+sudo -u "${RUN_USER}" env IMAGE_LIBRARY_ROOT=/srv/images /usr/local/bin/rebuild-image-index || true
 
 echo "==> Frontend bauen (npm ci + build)"
 cd "${REPO_DIR}/frontend"

@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import products, attributes, export, templates, settings, stats, validation, categories, variants, bundles, warnings, ingredients
+from routers import products, attributes, export, templates, settings, stats, validation, categories, variants, bundles, warnings, ingredients, images
 from state import state
 
 
@@ -46,6 +46,7 @@ app.include_router(variants.router)
 app.include_router(bundles.router)
 app.include_router(warnings.router)
 app.include_router(ingredients.router)
+app.include_router(images.router)
 
 
 @app.get("/api/health")
