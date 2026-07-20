@@ -26,10 +26,13 @@ vorlagen/
 
 # Pi-Laufzeit-Dateien
 .last-deployed-tag
+backend/.env
+backend/data/settings.local.json
 
 backend/backend/*.db
 backend/backend/*.db-shm
 backend/backend/*.db-wal
+backend/backend/services/
 
 Umsetzung/
 Umsetzung/*md

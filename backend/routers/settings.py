@@ -1,6 +1,7 @@
 """Settings router — pricing, export, and unit configuration."""
 
 import json
+import os
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -9,7 +10,9 @@ from integrations.artikelwerk.schemas import ArtikelwerkSettings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-SETTINGS_PATH = Path(__file__).parent.parent / "data" / "settings.json"
+DATA_DIR = Path(__file__).parent.parent / "data"
+DEFAULT_SETTINGS_PATH = DATA_DIR / "settings.json"
+SETTINGS_PATH = Path(os.environ.get("SETTINGS_PATH", DATA_DIR / "settings.local.json"))
 
 _DEFAULTS: dict = {
     "mwst_prozent": 19.0,
@@ -71,8 +74,9 @@ class DefaultValues(BaseModel):
 
 
 def _load_settings() -> dict:
-    if SETTINGS_PATH.exists():
-        raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+    source = SETTINGS_PATH if SETTINGS_PATH.exists() else DEFAULT_SETTINGS_PATH
+    if source.exists():
+        raw = json.loads(source.read_text(encoding="utf-8"))
         # Merge with defaults so new keys are always present
         merged = json.loads(json.dumps(_DEFAULTS))
         merged.update(raw)
