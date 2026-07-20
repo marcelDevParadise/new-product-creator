@@ -22,6 +22,7 @@ import { VariantGroupsPage } from './pages/VariantGroupsPage';
 import { BundlesPage } from './pages/BundlesPage';
 import { WarningsPage } from './pages/WarningsPage';
 import { IngredientsPage } from './pages/IngredientsPage';
+import { ArtikelwerkPage } from './pages/ArtikelwerkPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -98,6 +99,7 @@ const router = createBrowserRouter([
       { path: '/bundles', element: <BundlesPage /> },
       { path: '/warnings', element: <WarningsPage /> },
       { path: '/ingredients', element: <IngredientsPage /> },
+      { path: '/artikelwerk', element: <ArtikelwerkPage /> },
     ],
   },
 ]);

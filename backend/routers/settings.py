@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+from integrations.artikelwerk.schemas import ArtikelwerkSettings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -37,6 +38,17 @@ _DEFAULTS: dict = {
         ],
         "variant_axes": ["Größe", "Farbe", "Material", "Ausführung"],
     },
+    "artikelwerk": {
+        "tenant_ids": [],
+        "language_id": 1,
+        "platform_id": 1,
+        "inventory_tracking": True,
+        "publish_images": True,
+        "publish_descriptions": True,
+        "publish_attributes": True,
+        "publish_base_price": True,
+        "publish_variants": True,
+    },
 }
 
 
@@ -64,7 +76,7 @@ def _load_settings() -> dict:
         # Merge with defaults so new keys are always present
         merged = json.loads(json.dumps(_DEFAULTS))
         merged.update(raw)
-        for section in ("export", "standard_werte", "varianten"):
+        for section in ("export", "standard_werte", "varianten", "artikelwerk"):
             if section in _DEFAULTS and isinstance(_DEFAULTS[section], dict):
                 merged[section] = {**_DEFAULTS[section], **raw.get(section, {})}
         return merged
@@ -122,9 +134,10 @@ def get_pricing():
 
 @router.put("/pricing")
 def update_pricing(body: PricingSettings):
-    data = body.model_dump()
+    data = _load_settings()
+    data.update(body.model_dump())
     _save_settings(data)
-    return data
+    return body.model_dump()
 
 
 @router.post("/pricing/calculate")
@@ -213,6 +226,17 @@ def update_varianten(body: VariantenSettings):
     data["varianten"] = body.model_dump()
     _save_settings(data)
     return data["varianten"]
+
+
+def get_artikelwerk_settings() -> ArtikelwerkSettings:
+    return ArtikelwerkSettings(**_load_settings().get("artikelwerk", {}))
+
+
+def save_artikelwerk_settings(body: ArtikelwerkSettings) -> ArtikelwerkSettings:
+    data = _load_settings()
+    data["artikelwerk"] = body.model_dump()
+    _save_settings(data)
+    return body
 
 
 # --- All Settings (combined read) ---

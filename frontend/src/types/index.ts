@@ -491,3 +491,74 @@ export interface Ingredient {
   percentage?: string;
   position?: number;
 }
+
+// Artikelwerk integration
+
+export interface ArtikelwerkSettings {
+  tenant_ids: number[];
+  language_id: number;
+  platform_id: number;
+  inventory_tracking: boolean;
+  publish_images: boolean;
+  publish_descriptions: boolean;
+  publish_attributes: boolean;
+  publish_base_price: boolean;
+  publish_variants: boolean;
+}
+
+export interface ArtikelwerkConnection {
+  configured: boolean;
+  reachable: boolean;
+  base_url: string | null;
+  provider: string | null;
+  features: Record<string, boolean>;
+  error: string | null;
+  request_id: string | null;
+}
+
+export interface ArtikelwerkContext {
+  capabilities: { provider: string; features: Record<string, boolean> };
+  context: {
+    tenants: { id: number; name: string; articleCount: number; isDefault: boolean }[];
+    units: { id: number; name: string; code: string | null }[];
+    attributes: { id: string; name: string; dataType?: string; allowsCustomValue?: boolean }[];
+  };
+}
+
+export interface ArtikelwerkPreviewIssue {
+  severity: 'error' | 'warning';
+  code: string;
+  message: string;
+  field: string | null;
+}
+
+export interface ArtikelwerkPreview {
+  sku: string;
+  is_group: boolean;
+  valid: boolean;
+  issues: ArtikelwerkPreviewIssue[];
+  steps: { operation: string; resource_key: string; payload: Record<string, unknown> }[];
+  unsupported_fields: string[];
+}
+
+export interface ArtikelwerkJob {
+  job_id: string;
+  root_sku: string;
+  status: string;
+  current_phase: string | null;
+  progress_current: number;
+  progress_total: number;
+  last_error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface ArtikelwerkPublication {
+  artikelnummer: string;
+  remote_article_id?: string | null;
+  status: string;
+  last_error_code?: string | null;
+  last_error_message?: string | null;
+  last_request_id?: string | null;
+}

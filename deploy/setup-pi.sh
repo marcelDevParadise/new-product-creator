@@ -59,6 +59,13 @@ if [ ! -f "${REPO_DIR}/backend/.env" ]; then
 	echo "!! Vorlage: cp backend/.env.example backend/.env"
 	exit 1
 fi
+chmod 600 "${REPO_DIR}/backend/.env"
+
+if ! grep -q '^ARTIKELWERK_BASE_URL=.' "${REPO_DIR}/backend/.env" || ! grep -q '^ARTIKELWERK_API_KEY=.' "${REPO_DIR}/backend/.env"; then
+	echo "!! Artikelwerk ist noch nicht vollstaendig konfiguriert."
+	echo "!! Auf demselben Pi bevorzugt: ARTIKELWERK_BASE_URL=http://127.0.0.1:<PORT>/api/integrations/v1"
+	echo "!! Der Generator bleibt lauffaehig; die Artikelwerk-Funktionen zeigen 'Nicht konfiguriert'."
+fi
 
 if ! grep -q '^IMAGE_LIBRARY_ROOT=' "${REPO_DIR}/backend/.env"; then
 	echo "IMAGE_LIBRARY_ROOT=/srv/images" >> "${REPO_DIR}/backend/.env"
@@ -88,6 +95,21 @@ sed -e "s|__USER__|${RUN_USER}|g" -e "s|__REPO__|${REPO_DIR}|g" \
 sudo systemctl daemon-reload
 sudo systemctl enable attribut-generator.service
 sudo systemctl restart attribut-generator.service
+
+echo "==> Lokalen Backend-Start pruefen"
+BACKEND_READY=0
+for _ in $(seq 1 30); do
+	if curl -fsS http://127.0.0.1:8000/api/health >/dev/null; then
+		BACKEND_READY=1
+		break
+	fi
+	sleep 1
+done
+if [ "${BACKEND_READY}" -ne 1 ]; then
+	echo "!! Backend wurde nicht rechtzeitig bereit."
+	sudo journalctl -u attribut-generator.service -n 80 --no-pager
+	exit 1
+fi
 
 echo "==> Caddy konfigurieren"
 sed -e "s|__REPO__|${REPO_DIR}|g" "${REPO_DIR}/deploy/Caddyfile" \

@@ -179,8 +179,61 @@ def init_db() -> None:
                 FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS articlewerk_publications (
+                artikelnummer TEXT PRIMARY KEY,
+                remote_article_id TEXT,
+                status TEXT NOT NULL DEFAULT 'not_published',
+                payload_hash TEXT,
+                last_error_code TEXT,
+                last_error_message TEXT,
+                last_request_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS articlewerk_jobs (
+                job_id TEXT PRIMARY KEY,
+                root_sku TEXT NOT NULL,
+                status TEXT NOT NULL,
+                current_phase TEXT,
+                progress_current INTEGER NOT NULL DEFAULT 0,
+                progress_total INTEGER NOT NULL DEFAULT 0,
+                preview_json TEXT NOT NULL DEFAULT '{}',
+                last_error TEXT,
+                created_at TEXT NOT NULL,
+                started_at TEXT,
+                finished_at TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS articlewerk_operations (
+                operation_id TEXT PRIMARY KEY,
+                job_id TEXT NOT NULL,
+                artikelnummer TEXT NOT NULL,
+                operation_type TEXT NOT NULL,
+                resource_key TEXT NOT NULL,
+                idempotency_key TEXT,
+                payload_hash TEXT NOT NULL,
+                status TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                remote_operation_id TEXT,
+                response_json TEXT,
+                error_code TEXT,
+                request_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE (artikelnummer, operation_type, resource_key, payload_hash)
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_articlewerk_jobs_status
+            ON articlewerk_jobs (status, created_at)
+        """)
         _migrate_product_columns(cur)
         _migrate_template_columns(cur)
+        _migrate_articlewerk_columns(cur)
 
 
 def _migrate_product_columns(cur: psycopg.Cursor) -> None:
@@ -245,6 +298,184 @@ def _migrate_template_columns(cur: psycopg.Cursor) -> None:
     """Add metadata columns (category, description) to templates table."""
     cur.execute("ALTER TABLE templates ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT ''")
     cur.execute("ALTER TABLE templates ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''")
+
+
+def _migrate_articlewerk_columns(cur: psycopg.Cursor) -> None:
+    cur.execute("ALTER TABLE articlewerk_jobs ADD COLUMN IF NOT EXISTS preview_json TEXT NOT NULL DEFAULT '{}'")
+
+
+# --- Artikelwerk publication state ---
+
+def create_articlewerk_job(job_id: str, root_sku: str, total: int, preview: dict) -> None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO articlewerk_jobs "
+            f"(job_id, root_sku, status, current_phase, progress_current, progress_total, preview_json, created_at) "
+            f"VALUES (%s, %s, 'queued', 'queued', 0, %s, %s, {_NOW_SQL})",
+            (job_id, root_sku, total, json.dumps(preview, ensure_ascii=False)),
+        )
+
+
+def update_articlewerk_job(
+    job_id: str,
+    *,
+    status: str,
+    phase: str | None = None,
+    progress: int | None = None,
+    last_error: str | None = None,
+) -> None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE articlewerk_jobs SET status=%s, current_phase=%s, "
+            f"progress_current=COALESCE(%s, progress_current), last_error=%s, "
+            f"started_at=CASE WHEN %s='publishing' AND started_at IS NULL THEN {_NOW_SQL} ELSE started_at END, "
+            f"finished_at=CASE WHEN %s IN ('published','failed','partial') THEN {_NOW_SQL} ELSE finished_at END "
+            f"WHERE job_id=%s",
+            (status, phase, progress, last_error, status, status, job_id),
+        )
+
+
+def get_articlewerk_job(job_id: str) -> dict | None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT job_id, root_sku, status, current_phase, progress_current, progress_total, "
+            "last_error, created_at, started_at, finished_at FROM articlewerk_jobs WHERE job_id=%s",
+            (job_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    keys = ("job_id", "root_sku", "status", "current_phase", "progress_current", "progress_total",
+            "last_error", "created_at", "started_at", "finished_at")
+    return dict(zip(keys, row))
+
+
+def list_articlewerk_jobs(limit: int = 50) -> list[dict]:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT job_id, root_sku, status, current_phase, progress_current, progress_total, "
+            "last_error, created_at, started_at, finished_at FROM articlewerk_jobs "
+            "ORDER BY created_at DESC LIMIT %s",
+            (limit,),
+        )
+        rows = cur.fetchall()
+    keys = ("job_id", "root_sku", "status", "current_phase", "progress_current", "progress_total",
+            "last_error", "created_at", "started_at", "finished_at")
+    return [dict(zip(keys, row)) for row in rows]
+
+
+def list_resumable_articlewerk_jobs() -> list[dict]:
+    """Return queued/interrupted jobs including their immutable preview."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT job_id, preview_json FROM articlewerk_jobs "
+            "WHERE status IN ('queued', 'publishing') ORDER BY created_at"
+        )
+        rows = cur.fetchall()
+    result = []
+    for job_id, preview_json in rows:
+        try:
+            preview = json.loads(preview_json)
+        except (TypeError, json.JSONDecodeError):
+            preview = None
+        if preview:
+            result.append({"job_id": job_id, "preview": preview})
+    return result
+
+
+def upsert_articlewerk_publication(
+    artikelnummer: str,
+    *,
+    status: str,
+    remote_article_id: str | None = None,
+    payload_hash: str | None = None,
+    error_code: str | None = None,
+    error_message: str | None = None,
+    request_id: str | None = None,
+) -> None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO articlewerk_publications "
+            f"(artikelnummer, remote_article_id, status, payload_hash, last_error_code, "
+            f"last_error_message, last_request_id, created_at, updated_at) "
+            f"VALUES (%s,%s,%s,%s,%s,%s,%s,{_NOW_SQL},{_NOW_SQL}) "
+            f"ON CONFLICT (artikelnummer) DO UPDATE SET "
+            f"remote_article_id=COALESCE(excluded.remote_article_id, articlewerk_publications.remote_article_id), "
+            f"status=excluded.status, payload_hash=COALESCE(excluded.payload_hash, articlewerk_publications.payload_hash), "
+            f"last_error_code=excluded.last_error_code, last_error_message=excluded.last_error_message, "
+            f"last_request_id=excluded.last_request_id, updated_at={_NOW_SQL}",
+            (artikelnummer, remote_article_id, status, payload_hash, error_code, error_message, request_id),
+        )
+
+
+def get_articlewerk_publication(artikelnummer: str) -> dict | None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT artikelnummer, remote_article_id, status, payload_hash, last_error_code, "
+            "last_error_message, last_request_id, created_at, updated_at "
+            "FROM articlewerk_publications WHERE artikelnummer=%s",
+            (artikelnummer,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    keys = ("artikelnummer", "remote_article_id", "status", "payload_hash", "last_error_code",
+            "last_error_message", "last_request_id", "created_at", "updated_at")
+    return dict(zip(keys, row))
+
+
+def get_articlewerk_operation(
+    artikelnummer: str, operation_type: str, resource_key: str, payload_hash: str,
+) -> dict | None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT operation_id, job_id, artikelnummer, operation_type, resource_key, idempotency_key, "
+            "payload_hash, status, attempts, remote_operation_id, response_json, error_code, request_id "
+            "FROM articlewerk_operations WHERE artikelnummer=%s AND operation_type=%s "
+            "AND resource_key=%s AND payload_hash=%s",
+            (artikelnummer, operation_type, resource_key, payload_hash),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    keys = ("operation_id", "job_id", "artikelnummer", "operation_type", "resource_key", "idempotency_key",
+            "payload_hash", "status", "attempts", "remote_operation_id", "response_json", "error_code", "request_id")
+    result = dict(zip(keys, row))
+    result["response"] = json.loads(result.pop("response_json")) if result.get("response_json") else None
+    return result
+
+
+def save_articlewerk_operation(
+    operation_id: str,
+    job_id: str,
+    artikelnummer: str,
+    operation_type: str,
+    resource_key: str,
+    payload_hash: str,
+    *,
+    status: str,
+    idempotency_key: str | None = None,
+    response: dict | None = None,
+    remote_operation_id: str | None = None,
+    error_code: str | None = None,
+    request_id: str | None = None,
+) -> None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO articlewerk_operations "
+            f"(operation_id, job_id, artikelnummer, operation_type, resource_key, idempotency_key, "
+            f"payload_hash, status, attempts, remote_operation_id, response_json, error_code, request_id, created_at, updated_at) "
+            f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,{_NOW_SQL},{_NOW_SQL}) "
+            f"ON CONFLICT (artikelnummer, operation_type, resource_key, payload_hash) DO UPDATE SET "
+            f"job_id=excluded.job_id, status=excluded.status, "
+            f"attempts=CASE WHEN excluded.status='pending' THEN articlewerk_operations.attempts+1 ELSE articlewerk_operations.attempts END, "
+            f"remote_operation_id=COALESCE(excluded.remote_operation_id, articlewerk_operations.remote_operation_id), "
+            f"response_json=COALESCE(excluded.response_json, articlewerk_operations.response_json), "
+            f"error_code=excluded.error_code, request_id=excluded.request_id, updated_at={_NOW_SQL}",
+            (operation_id, job_id, artikelnummer, operation_type, resource_key, idempotency_key,
+             payload_hash, status, remote_operation_id, json.dumps(response) if response is not None else None,
+             error_code, request_id),
+        )
 
 
 # --- Products ---

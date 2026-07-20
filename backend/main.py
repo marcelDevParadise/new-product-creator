@@ -1,20 +1,33 @@
 """Attribut Generator — FastAPI Backend."""
 
 import os
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import products, attributes, export, templates, settings, stats, validation, categories, variants, bundles, warnings, ingredients, images
+from routers import products, attributes, export, templates, settings, stats, validation, categories, variants, bundles, warnings, ingredients, images, articlewerk
 from state import state
+from services.database import list_resumable_articlewerk_jobs
+from integrations.artikelwerk.publisher import run_publication
+from integrations.artikelwerk.schemas import PublicationPreview
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: reload state from DB so hot-reloads pick up latest data
     state.reload_from_db()
+    resumed_tasks: set[asyncio.Task] = set()
+    for pending in list_resumable_articlewerk_jobs():
+        preview = PublicationPreview.model_validate(pending["preview"])
+        task = asyncio.create_task(run_publication(pending["job_id"], preview))
+        resumed_tasks.add(task)
+        task.add_done_callback(resumed_tasks.discard)
+    app.state.articlewerk_tasks = resumed_tasks
     yield
+    for task in resumed_tasks:
+        task.cancel()
 
 
 app = FastAPI(title="Attribut Generator", version="1.0.0", lifespan=lifespan)
@@ -47,6 +60,7 @@ app.include_router(bundles.router)
 app.include_router(warnings.router)
 app.include_router(ingredients.router)
 app.include_router(images.router)
+app.include_router(articlewerk.router)
 
 
 @app.get("/api/health")

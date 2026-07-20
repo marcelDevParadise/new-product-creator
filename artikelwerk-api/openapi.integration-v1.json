@@ -1,0 +1,199 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Artikelwerk Integrations-API",
+    "version": "1.0.0",
+    "description": "Verbindlicher Vertrag der aktuell implementierten Generator-API. Nicht implementierte Schreibbereiche stehen ausschließlich unter x-artikelwerk-planned-operations."
+  },
+  "servers": [{ "url": "/api/integrations/v1" }],
+  "security": [{ "bearerAuth": [] }],
+  "x-artikelwerk-contract": {
+    "requestBodyLimitBytes": 15728640,
+    "rateLimit": { "requests": 120, "windowSeconds": 60, "key": "authenticated API token", "retryHeader": "Retry-After" },
+    "idempotencyKey": { "pattern": "^[A-Za-z0-9_.:-]{8,100}$", "requiredFor": ["createArticle", "uploadArticleImage", "createVariation", "createChildArticle"] },
+    "existingSku": "POST /articles returns 409 CONFLICT and never updates an existing article.",
+    "contextValues": "Only active, non-excluded tenants are returned. Writes reject tenants that were deleted, disabled or excluded after context retrieval. Missing attribute values are rejected with 400."
+  },
+  "x-artikelwerk-planned-operations": [
+    { "area": "sales-and-purchase-prices", "status": "not-implemented", "decisionRequired": "customer group, currency, gross/net semantics, valid-from and concurrency" },
+    { "area": "categories", "status": "not-implemented", "decisionRequired": "replace versus add/remove and primary category semantics" },
+    { "area": "suppliers", "status": "not-implemented", "decisionRequired": "supplier master creation, article mapping, tiers and default supplier" },
+    { "area": "manufacturers", "status": "not-implemented", "decisionRequired": "create, reuse by normalized name or require existing manufacturer ID" },
+    { "area": "inventory", "status": "not-implemented", "decisionRequired": "warehouse ownership, absolute versus delta update and reservation protection" },
+    { "area": "update-existing-article", "status": "not-implemented", "decisionRequired": "mutable fields, optimistic concurrency and partial-update null semantics" },
+    { "area": "deactivate-or-delete-article", "status": "not-implemented", "decisionRequired": "deactivation should precede hard deletion; deletion dependencies and retention must be confirmed" }
+  ],
+  "paths": {
+    "/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "summary": "Aktivierte Integrationsfähigkeiten laden",
+        "responses": {
+          "200": { "description": "Aktuelle Fähigkeiten", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Capabilities" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/context": {
+      "get": {
+        "operationId": "getContext",
+        "summary": "Aktive Mandanten, Maßeinheiten und Attribute laden",
+        "responses": {
+          "200": { "description": "Schreibkontext", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IntegrationContext" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/context/attributes/{id}/values": {
+      "get": {
+        "operationId": "getAttributeValues",
+        "summary": "Aktuelle Werte eines schreibbaren Attributs laden",
+        "parameters": [{ "$ref": "#/components/parameters/AttributeId" }],
+        "responses": {
+          "200": { "description": "Attributwerte", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/AttributeValue" } }, "example": [{ "id": "17", "attributeId": "material", "label": "Leder" }] } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/articles": {
+      "post": {
+        "operationId": "createArticle",
+        "summary": "Artikel idempotent anlegen",
+        "description": "Eine vorhandene SKU wird niemals aktualisiert, sondern mit 409 abgewiesen.",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateArticleInput" } } } },
+        "responses": {
+          "201": { "description": "Artikel angelegt", "headers": { "X-Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateArticleResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "409": { "$ref": "#/components/responses/Conflict" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/articles/{id}/attributes": {
+      "post": {
+        "operationId": "setArticleAttribute",
+        "summary": "Attributwert setzen oder bei Tag-Attributen ergänzen",
+        "parameters": [{ "$ref": "#/components/parameters/ArticleId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetAttributeInput" } } } },
+        "responses": {
+          "200": { "description": "Vorhandener Wert geändert", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetAttributeResponse" } } } },
+          "201": { "description": "Wert neu zugewiesen", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetAttributeResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/articles/{id}/images": {
+      "post": {
+        "operationId": "uploadArticleImage",
+        "summary": "Artikelbild idempotent hochladen",
+        "parameters": [{ "$ref": "#/components/parameters/ArticleId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateImageInput" } } } },
+        "responses": {
+          "201": { "description": "Bild angelegt", "headers": { "X-Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateImageResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/articles/{id}/variations": {
+      "post": {
+        "operationId": "createVariation",
+        "summary": "Variation und Werte idempotent anlegen",
+        "parameters": [{ "$ref": "#/components/parameters/ArticleId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateVariationInput" } } } },
+        "responses": {
+          "201": { "description": "Variation angelegt", "headers": { "X-Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateVariationResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/articles/{id}/children": {
+      "post": {
+        "operationId": "createChildArticle",
+        "summary": "Kindartikel anlegen oder vorhandenen Artikel idempotent zuordnen",
+        "parameters": [{ "$ref": "#/components/parameters/ArticleId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateChildInput" } } } },
+        "responses": {
+          "201": { "description": "Kindartikel angelegt oder zugeordnet", "headers": { "X-Idempotent-Replay": { "$ref": "#/components/headers/IdempotentReplay" } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateChildResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/articles/{id}/base-price": {
+      "patch": {
+        "operationId": "updateBasePrice",
+        "summary": "Grundpreisangaben zustandsorientiert ersetzen",
+        "description": "Die API rechnet Einheiten nicht um. measureQuantity und basePriceQuantity beziehen sich auf die über /context gelieferten JTL-Maßeinheiten.",
+        "parameters": [{ "$ref": "#/components/parameters/ArticleId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateBasePriceInput" } } } },
+        "responses": {
+          "200": { "description": "Grundpreis aktualisiert", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateBasePriceResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/articles/{id}/descriptions": {
+      "put": {
+        "operationId": "upsertDescription",
+        "summary": "Vollständigen Beschreibungskontext ersetzen oder anlegen",
+        "description": "PUT-Ersetzungssemantik: nicht übermittelte optionale Inhaltsfelder werden als null gespeichert.",
+        "parameters": [{ "$ref": "#/components/parameters/ArticleId" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpsertDescriptionInput" } } } },
+        "responses": {
+          "200": { "description": "Vorhandener Kontext ersetzt", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpsertDescriptionResponse" } } } },
+          "201": { "description": "Kontext angelegt", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpsertDescriptionResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "409": { "$ref": "#/components/responses/Conflict" }, "413": { "$ref": "#/components/responses/PayloadTooLarge" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "Artikelwerk API token (aw_…)" } },
+    "parameters": {
+      "ArticleId": { "name": "id", "in": "path", "required": true, "description": "Numerische JTL-Artikel-ID als String, nicht die SKU.", "schema": { "type": "string", "minLength": 1, "maxLength": 200 }, "example": "12345" },
+      "AttributeId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "minLength": 1, "maxLength": 100 }, "example": "material" },
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "description": "Beim Retry derselben fachlichen Operation unverändert wiederverwenden.", "schema": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{8,100}$" }, "example": "job-4711-create-article" }
+    },
+    "headers": { "IdempotentReplay": { "description": "true, wenn die gespeicherte Antwort eines identischen Requests wiedergegeben wurde.", "schema": { "type": "string", "const": "true" } } },
+    "responses": {
+      "BadRequest": { "description": "Request oder fachlicher Wert ungültig", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unauthorized": { "description": "Bearer-Token fehlt oder ist ungültig", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Forbidden": { "description": "Erforderlicher Scope fehlt", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "NotFound": { "description": "Artikel oder Vaterartikel nicht gefunden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Conflict": { "description": "SKU, Kontext, Mandant, Idempotency-Key oder parallele Änderung kollidiert", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "PayloadTooLarge": { "description": "JSON-Request überschreitet 15 MiB", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "RateLimited": { "description": "Mehr als 120 Requests pro Minute für den Token", "headers": { "Retry-After": { "description": "Wartezeit in Sekunden", "schema": { "type": "integer", "minimum": 1 } }, "X-RateLimit-Limit": { "schema": { "type": "integer", "example": 120 } }, "X-RateLimit-Remaining": { "schema": { "type": "integer", "minimum": 0 } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "InternalError": { "description": "Interner oder SQL-Fehler", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Error": { "type": "object", "required": ["code", "error", "requestId"], "properties": { "code": { "type": "string", "enum": ["BAD_REQUEST", "VALIDATION_ERROR", "UNAUTHORIZED", "FORBIDDEN", "NOT_FOUND", "CONFLICT", "PAYLOAD_TOO_LARGE", "RATE_LIMITED", "INTERNAL_ERROR"] }, "error": { "type": "string" }, "requestId": { "type": "string" }, "details": {} }, "example": { "code": "CONFLICT", "error": "Der Idempotency-Key wurde bereits für einen anderen Request verwendet.", "requestId": "req-17" } },
+      "Capabilities": { "type": "object", "required": ["provider", "context", "features"], "properties": { "provider": { "type": "string", "enum": ["mock", "jtl-wawi"] }, "context": { "type": "object", "required": ["attributeScope", "attributeGroup", "attributeShopKey", "attributeLanguageKey"], "properties": { "attributeScope": { "type": "string", "const": "global" }, "attributeGroup": { "type": "string" }, "attributeShopKey": { "type": "integer" }, "attributeLanguageKey": { "type": "integer" } } }, "features": { "$ref": "#/components/schemas/FeatureFlags" } }, "example": { "provider": "jtl-wawi", "context": { "attributeScope": "global", "attributeGroup": "Shopify-Attribute", "attributeShopKey": 0, "attributeLanguageKey": 0 }, "features": { "articleSearch": true, "articleRead": true, "articleWrite": true, "attributeRead": true, "attributeWrite": true, "descriptionRead": true, "descriptionWrite": true, "imageRead": true, "imageWrite": true, "variationWrite": true, "childArticleWrite": true, "basePriceWrite": true, "shopRead": true } } },
+      "FeatureFlags": { "type": "object", "additionalProperties": false, "required": ["articleSearch", "articleRead", "articleWrite", "attributeRead", "attributeWrite", "descriptionRead", "descriptionWrite", "imageRead", "imageWrite", "variationWrite", "childArticleWrite", "basePriceWrite", "shopRead"], "properties": { "articleSearch": { "type": "boolean" }, "articleRead": { "type": "boolean" }, "articleWrite": { "type": "boolean" }, "attributeRead": { "type": "boolean" }, "attributeWrite": { "type": "boolean" }, "descriptionRead": { "type": "boolean" }, "descriptionWrite": { "type": "boolean" }, "imageRead": { "type": "boolean" }, "imageWrite": { "type": "boolean" }, "variationWrite": { "type": "boolean" }, "childArticleWrite": { "type": "boolean" }, "basePriceWrite": { "type": "boolean" }, "shopRead": { "type": "boolean" } } },
+      "IntegrationContext": { "type": "object", "required": ["tenants", "units", "attributes"], "properties": { "tenants": { "type": "array", "items": { "$ref": "#/components/schemas/Tenant" } }, "units": { "type": "array", "items": { "$ref": "#/components/schemas/Unit" } }, "attributes": { "type": "array", "items": { "$ref": "#/components/schemas/Attribute" } } }, "example": { "tenants": [{ "id": 4, "name": "CleanYourLeather", "articleCount": 1520, "isDefault": true }], "units": [{ "id": 1, "name": "Milliliter", "code": "ml" }], "attributes": [{ "id": "material", "name": "Material", "dataType": "text", "allowsCustomValue": true }] } },
+      "Tenant": { "type": "object", "required": ["id", "name", "articleCount", "isDefault"], "properties": { "id": { "type": "integer", "minimum": 1 }, "name": { "type": "string" }, "articleCount": { "type": "integer", "minimum": 0 }, "isDefault": { "type": "boolean" } } },
+      "Unit": { "type": "object", "required": ["id", "name", "code"], "description": "JTL-Maßeinheit. IDs sind installationsabhängig und ausschließlich aus /context zu übernehmen. Artikelwerk führt keine automatische Umrechnung durch.", "properties": { "id": { "type": "integer", "minimum": 0 }, "name": { "type": "string" }, "code": { "type": ["string", "null"] } } },
+      "Attribute": { "type": "object", "required": ["id", "name"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "dataType": { "type": "string", "enum": ["integer", "decimal", "text", "date"] }, "allowsCustomValue": { "type": "boolean" } } },
+      "AttributeValue": { "type": "object", "required": ["id", "attributeId", "label"], "properties": { "id": { "type": "string" }, "attributeId": { "type": "string" }, "label": { "type": "string" } } },
+      "Dimensions": { "type": "object", "additionalProperties": false, "properties": { "length": { "type": "number", "minimum": 0, "default": 0 }, "width": { "type": "number", "minimum": 0, "default": 0 }, "height": { "type": "number", "minimum": 0, "default": 0 } } },
+      "CreateArticleInput": { "type": "object", "additionalProperties": false, "required": ["sku", "name", "tenantIds"], "properties": { "sku": { "type": "string", "minLength": 1, "maxLength": 100 }, "name": { "type": "string", "minLength": 1, "maxLength": 255 }, "tenantIds": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "integer", "minimum": 1 } }, "active": { "type": "boolean", "default": true }, "inventoryTracking": { "type": "boolean", "default": true }, "description": { "type": ["string", "null"], "maxLength": 2000000 }, "shortDescription": { "type": ["string", "null"], "maxLength": 2000000 }, "gtin": { "type": ["string", "null"], "maxLength": 255 }, "productGroupId": { "type": "integer", "minimum": 0, "default": 0 }, "manufacturerId": { "type": "integer", "minimum": 0, "default": 0 }, "taxClassId": { "type": "integer", "minimum": 0, "default": 0 }, "dimensions": { "$ref": "#/components/schemas/Dimensions" }, "weight": { "type": "number", "minimum": 0, "default": 0 }, "shippingWeight": { "type": "number", "minimum": 0, "default": 0 } }, "example": { "sku": "CYL-00999", "name": "Beispielartikel", "tenantIds": [4], "active": true, "inventoryTracking": true, "description": "Beschreibung", "shortDescription": "Kurzbeschreibung", "gtin": "4000000000000", "productGroupId": 0, "manufacturerId": 0, "taxClassId": 0, "dimensions": { "length": 0, "width": 0, "height": 0 }, "weight": 0, "shippingWeight": 0 } },
+      "CreatedArticle": { "type": "object", "required": ["id", "sku", "name", "tenantIds"], "properties": { "id": { "type": "string" }, "sku": { "type": "string" }, "name": { "type": "string" }, "tenantIds": { "type": "array", "items": { "type": "integer" } } } },
+      "CreateArticleResponse": { "type": "object", "required": ["operationId", "article"], "properties": { "operationId": { "type": "string", "format": "uuid" }, "article": { "$ref": "#/components/schemas/CreatedArticle" } }, "example": { "operationId": "f9be70ad-24b9-45b6-9301-32173972f457", "article": { "id": "12345", "sku": "CYL-00999", "name": "Beispielartikel", "tenantIds": [4] } } },
+      "SetAttributeInput": { "type": "object", "additionalProperties": false, "required": ["attributeId", "value"], "properties": { "attributeId": { "type": "string", "minLength": 1, "maxLength": 100 }, "value": { "type": "string", "minLength": 1, "maxLength": 4000 } }, "example": { "attributeId": "material", "value": "Leder" } },
+      "SetAttributeResponse": { "type": "object", "required": ["operationId", "articleId", "attributeId", "previousValue", "value", "action"], "properties": { "operationId": { "type": "string", "format": "uuid" }, "articleId": { "type": "string" }, "attributeId": { "type": "string" }, "previousValue": { "type": ["string", "null"] }, "value": { "type": "string" }, "action": { "type": "string", "enum": ["insert", "append", "overwrite"] } }, "example": { "operationId": "f9be70ad-24b9-45b6-9301-32173972f457", "articleId": "12345", "attributeId": "material", "previousValue": null, "value": "Leder", "action": "insert" } },
+      "CreateImageInput": { "type": "object", "additionalProperties": false, "required": ["filename", "imageBase64", "tenantIds"], "properties": { "filename": { "type": "string", "minLength": 1, "maxLength": 255, "pattern": "\\.(jpe?g|png|webp)$" }, "imageBase64": { "type": "string", "minLength": 16, "maxLength": 14000000, "contentEncoding": "base64" }, "tenantIds": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "integer", "minimum": 1 } }, "order": { "type": "integer", "minimum": 1, "maximum": 1000 } }, "example": { "filename": "CYL-00999-01.jpg", "imageBase64": "<BASE64>", "tenantIds": [4], "order": 1 } },
+      "CreatedImage": { "type": "object", "required": ["id", "articleId", "filename", "width", "height", "previewWidth", "previewHeight", "order", "tenantIds"], "properties": { "id": { "type": "string" }, "articleId": { "type": "string" }, "filename": { "type": "string" }, "width": { "type": "integer" }, "height": { "type": "integer" }, "previewWidth": { "type": "integer" }, "previewHeight": { "type": "integer" }, "order": { "type": "integer" }, "tenantIds": { "type": "array", "items": { "type": "integer" } } } },
+      "CreateImageResponse": { "type": "object", "required": ["operationId", "image"], "properties": { "operationId": { "type": "string", "format": "uuid" }, "image": { "$ref": "#/components/schemas/CreatedImage" } }, "example": { "operationId": "f9be70ad-24b9-45b6-9301-32173972f457", "image": { "id": "765", "articleId": "12345", "filename": "CYL-00999-01.jpg", "width": 1600, "height": 1200, "previewWidth": 200, "previewHeight": 150, "order": 1, "tenantIds": [4] } } },
+      "VariationValueInput": { "type": "object", "additionalProperties": false, "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 255 }, "sku": { "type": ["string", "null"], "maxLength": 100 }, "gtin": { "type": ["string", "null"], "maxLength": 255 }, "surchargeNet": { "type": "number", "default": 0 }, "weightDelta": { "type": "number", "default": 0 }, "stock": { "type": "number", "default": 0 }, "active": { "type": "boolean", "default": true } } },
+      "CreateVariationInput": { "type": "object", "additionalProperties": false, "required": ["name", "values"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 255 }, "type": { "type": "string", "enum": ["SELECTBOX", "IMGSWATCHES"], "default": "SELECTBOX" }, "values": { "type": "array", "minItems": 1, "maxItems": 200, "items": { "$ref": "#/components/schemas/VariationValueInput" } } }, "example": { "name": "Größe", "type": "SELECTBOX", "values": [{ "name": "250 ml", "sku": "CYL-00999-250", "gtin": null, "surchargeNet": 0, "weightDelta": 0, "stock": 0, "active": true }] } },
+      "CreatedVariation": { "type": "object", "required": ["id", "articleId", "name", "values"], "properties": { "id": { "type": "string" }, "articleId": { "type": "string" }, "name": { "type": "string" }, "values": { "type": "array", "items": { "type": "object", "required": ["id", "name"], "properties": { "id": { "type": "string" }, "name": { "type": "string" } } } } } },
+      "CreateVariationResponse": { "type": "object", "required": ["operationId", "variation"], "properties": { "operationId": { "type": "string", "format": "uuid" }, "variation": { "$ref": "#/components/schemas/CreatedVariation" } }, "example": { "operationId": "f9be70ad-24b9-45b6-9301-32173972f457", "variation": { "id": "850", "articleId": "12345", "name": "Größe", "values": [{ "id": "987", "name": "250 ml" }] } } },
+      "CreateChildInput": { "type": "object", "additionalProperties": false, "required": ["valueIds"], "properties": { "existingArticleId": { "type": "string", "pattern": "^\\d+$" }, "sku": { "type": "string", "minLength": 1, "maxLength": 100 }, "name": { "type": "string", "minLength": 1, "maxLength": 255 }, "tenantIds": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "type": "integer", "minimum": 1 } }, "valueIds": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "string", "pattern": "^\\d+$" } }, "active": { "type": "boolean", "default": true }, "inventoryTracking": { "type": "boolean", "default": true }, "gtin": { "type": ["string", "null"], "maxLength": 255 } }, "oneOf": [{ "required": ["existingArticleId"] }, { "required": ["sku", "name", "tenantIds"] }], "example": { "sku": "CYL-00999-250", "name": "Beispielartikel 250 ml", "tenantIds": [4], "valueIds": ["987"], "active": true, "inventoryTracking": true, "gtin": null } },
+      "CreatedChild": { "type": "object", "required": ["id", "parentId", "sku", "name", "valueIds", "created"], "properties": { "id": { "type": "string" }, "parentId": { "type": "string" }, "sku": { "type": "string" }, "name": { "type": "string" }, "valueIds": { "type": "array", "items": { "type": "string" } }, "created": { "type": "boolean" } } },
+      "CreateChildResponse": { "type": "object", "required": ["operationId", "child"], "properties": { "operationId": { "type": "string", "format": "uuid" }, "child": { "$ref": "#/components/schemas/CreatedChild" } }, "example": { "operationId": "f9be70ad-24b9-45b6-9301-32173972f457", "child": { "id": "12346", "parentId": "12345", "sku": "CYL-00999-250", "name": "Beispielartikel 250 ml", "valueIds": ["987"], "created": true } } },
+      "UpdateBasePriceInput": { "type": "object", "additionalProperties": false, "required": ["measureUnitId", "measureQuantity", "basePriceUnitId", "basePriceQuantity"], "properties": { "measureUnitId": { "type": "integer", "minimum": 0 }, "measureQuantity": { "type": "number", "minimum": 0 }, "basePriceUnitId": { "type": "integer", "minimum": 0 }, "basePriceQuantity": { "type": "number", "exclusiveMinimum": 0 } }, "example": { "measureUnitId": 1, "measureQuantity": 500, "basePriceUnitId": 2, "basePriceQuantity": 1000 } },
+      "UpdatedBasePrice": { "allOf": [{ "type": "object", "required": ["articleId"], "properties": { "articleId": { "type": "string" } } }, { "$ref": "#/components/schemas/UpdateBasePriceInput" }] },
+      "UpdateBasePriceResponse": { "type": "object", "required": ["operationId", "basePrice"], "properties": { "operationId": { "type": "string", "format": "uuid" }, "basePrice": { "$ref": "#/components/schemas/UpdatedBasePrice" } }, "example": { "operationId": "f9be70ad-24b9-45b6-9301-32173972f457", "basePrice": { "articleId": "12345", "measureUnitId": 1, "measureQuantity": 500, "basePriceUnitId": 2, "basePriceQuantity": 1000 } } },
+      "UpsertDescriptionInput": { "type": "object", "additionalProperties": false, "required": ["languageId", "platformId", "tenantId"], "properties": { "languageId": { "type": "integer", "minimum": 0 }, "platformId": { "type": "integer", "minimum": 0 }, "tenantId": { "type": "integer", "minimum": 0 }, "name": { "type": ["string", "null"], "maxLength": 255 }, "description": { "type": ["string", "null"], "maxLength": 2000000 }, "shortDescription": { "type": ["string", "null"], "maxLength": 2000000 }, "urlPath": { "type": ["string", "null"], "maxLength": 255 }, "metaDescription": { "type": ["string", "null"], "maxLength": 2000000 }, "titleTag": { "type": ["string", "null"], "maxLength": 4000 }, "metaKeywords": { "type": ["string", "null"], "maxLength": 4000 } }, "example": { "languageId": 1, "platformId": 1, "tenantId": 4, "name": "Beispielartikel", "description": "<p>Lange Beschreibung</p>", "shortDescription": "<p>Kurzbeschreibung</p>", "urlPath": "beispielartikel", "metaDescription": "Meta-Description", "titleTag": "Beispielartikel kaufen", "metaKeywords": "pflege, leder" } },
+      "UpdatedDescription": { "type": "object", "required": ["articleId", "languageId", "platformId", "tenantId", "created"], "properties": { "articleId": { "type": "string" }, "languageId": { "type": "integer" }, "platformId": { "type": "integer" }, "tenantId": { "type": "integer" }, "created": { "type": "boolean" } } },
+      "UpsertDescriptionResponse": { "type": "object", "required": ["operationId", "description"], "properties": { "operationId": { "type": "string", "format": "uuid" }, "description": { "$ref": "#/components/schemas/UpdatedDescription" } }, "example": { "operationId": "f9be70ad-24b9-45b6-9301-32173972f457", "description": { "articleId": "12345", "languageId": 1, "platformId": 1, "tenantId": 4, "created": false } } }
+    }
+  }
+}

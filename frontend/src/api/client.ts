@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication } from '../types';
 
 const BASE = '/api';
 
@@ -8,7 +8,11 @@ async function request<T>(url: string, options?: RequestInit, retries = 2): Prom
       const res = await fetch(`${BASE}${url}`, options);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.detail || `Request failed: ${res.status}`);
+        const detail = body.detail;
+        const message = typeof detail === 'string'
+          ? detail
+          : detail?.message || body.error || `Request failed: ${res.status}`;
+        throw new Error(message);
       }
       return res.json();
     } catch (err) {
@@ -24,6 +28,24 @@ async function request<T>(url: string, options?: RequestInit, retries = 2): Prom
 
 export const api = {
   health: () => request<{ status: string }>('/health'),
+
+  // Artikelwerk
+  getArtikelwerkConnection: () => request<ArtikelwerkConnection>('/articlewerk/connection'),
+  getArtikelwerkContext: () => request<ArtikelwerkContext>('/articlewerk/context'),
+  getArtikelwerkSettings: () => request<ArtikelwerkSettings>('/articlewerk/settings'),
+  updateArtikelwerkSettings: (settings: ArtikelwerkSettings) =>
+    request<ArtikelwerkSettings>('/articlewerk/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings),
+    }),
+  previewArtikelwerk: (sku: string) =>
+    request<ArtikelwerkPreview>(`/articlewerk/products/${encodeURIComponent(sku)}/preview`, { method: 'POST' }),
+  publishArtikelwerk: (sku: string) =>
+    request<{ job_id: string; status: string; steps: number }>(`/articlewerk/products/${encodeURIComponent(sku)}/publish`, { method: 'POST' }),
+  getArtikelwerkPublication: (sku: string) =>
+    request<ArtikelwerkPublication>(`/articlewerk/products/${encodeURIComponent(sku)}/status`),
+  getArtikelwerkJobs: (limit = 50) => request<ArtikelwerkJob[]>(`/articlewerk/jobs?limit=${limit}`),
+  retryArtikelwerkJob: (jobId: string) =>
+    request<{ job_id: string; status: string; steps: number; retry_of: string }>(`/articlewerk/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' }),
 
   // Stats
   getStats: () => request<DashboardStats>('/stats'),

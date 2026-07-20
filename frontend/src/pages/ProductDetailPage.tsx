@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, AlertTriangle, Wand2, Archive, History, Layers } from 'lucide-react';
+import { ChevronRight, AlertTriangle, Wand2, Archive, History, Layers, CloudUpload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
 import { AttributeWizard } from '../components/products/wizard/AttributeWizard';
 import { api } from '../api/client';
-import type { Product, AttributeConfig, ProductHistoryEntry } from '../types';
+import type { Product, AttributeConfig, ProductHistoryEntry, ArtikelwerkPreview, ArtikelwerkPublication } from '../types';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
@@ -19,6 +20,9 @@ export function ProductDetailPage() {
   const [tab, setTab] = useState<'attributes' | 'history'>('attributes');
   const [history, setHistory] = useState<ProductHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [artikelwerkPreview, setArtikelwerkPreview] = useState<ArtikelwerkPreview | null>(null);
+  const [artikelwerkStatus, setArtikelwerkStatus] = useState<ArtikelwerkPublication | null>(null);
+  const [artikelwerkLoading, setArtikelwerkLoading] = useState(false);
   const { toast } = useToast();
 
   const handleSmartDefaults = async () => {
@@ -43,6 +47,29 @@ export function ProductDetailPage() {
     }
   };
 
+  const handleArtikelwerkPreview = async () => {
+    if (!product) return;
+    setArtikelwerkLoading(true);
+    try {
+      setArtikelwerkPreview(await api.previewArtikelwerk(product.artikelnummer));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Artikelwerk-Prüfung fehlgeschlagen', 'error');
+    } finally { setArtikelwerkLoading(false); }
+  };
+
+  const handleArtikelwerkPublish = async () => {
+    if (!product) return;
+    setArtikelwerkLoading(true);
+    try {
+      const result = await api.publishArtikelwerk(product.artikelnummer);
+      toast(`Artikelwerk-Job mit ${result.steps} Schritten gestartet`, 'success');
+      setArtikelwerkPreview(null);
+      setArtikelwerkStatus({ artikelnummer: product.artikelnummer, status: 'queued' });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Veröffentlichung fehlgeschlagen', 'error');
+    } finally { setArtikelwerkLoading(false); }
+  };
+
   useEffect(() => {
     if (!sku) return;
     const decodedSku = decodeURIComponent(sku);
@@ -52,6 +79,7 @@ export function ProductDetailPage() {
         setConfig(c);
       })
       .catch((e) => setError(e.message));
+    api.getArtikelwerkPublication(decodedSku).then(setArtikelwerkStatus).catch(() => {});
   }, [sku]);
 
   // Fetch parent attributes if this is a variant child, for inheritance display.
@@ -131,6 +159,15 @@ export function ProductDetailPage() {
           {product.exported && (
             <Badge variant="secondary" className="shrink-0">Exportiert</Badge>
           )}
+          {artikelwerkStatus && artikelwerkStatus.status !== 'not_published' && (
+            <Badge variant="secondary" className="shrink-0">Artikelwerk: {artikelwerkStatus.status}</Badge>
+          )}
+          {!product.parent_sku && (
+            <Button variant="outline" size="sm" onClick={handleArtikelwerkPreview} disabled={artikelwerkLoading} className="shrink-0 gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+              <CloudUpload className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Artikelwerk</span>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleArchive} className="shrink-0 gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50">
             <Archive className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Archivieren</span>
@@ -202,6 +239,35 @@ export function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={artikelwerkPreview !== null} onOpenChange={open => { if (!open) setArtikelwerkPreview(null); }}>
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Artikelwerk-Veröffentlichung prüfen</DialogTitle>
+            <DialogDescription>{artikelwerkPreview?.steps.length || 0} API-Schritte für {product.artikelnummer}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {artikelwerkPreview?.issues.length === 0 && <p className="text-sm text-green-700 bg-green-50 rounded-lg p-3">Keine Mapping-Probleme gefunden.</p>}
+            {artikelwerkPreview?.issues.map((issue, index) => (
+              <div key={`${issue.code}-${index}`} className={`rounded-lg border p-3 text-sm ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                <span className="font-medium">{issue.code}</span>: {issue.message}
+              </div>
+            ))}
+            <div className="rounded-lg border p-3 text-sm">
+              <p className="font-medium mb-2">Geplante Schritte</p>
+              <div className="flex flex-wrap gap-1.5">
+                {artikelwerkPreview?.steps.map(step => <Badge key={step.resource_key} variant="secondary">{step.operation}</Badge>)}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArtikelwerkPreview(null)}>Abbrechen</Button>
+            <Button onClick={handleArtikelwerkPublish} disabled={!artikelwerkPreview?.valid || artikelwerkLoading}>
+              <CloudUpload className="w-4 h-4" />{artikelwerkLoading ? 'Startet…' : 'Veröffentlichen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

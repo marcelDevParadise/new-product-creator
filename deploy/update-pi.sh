@@ -10,6 +10,12 @@ RUN_USER="$(id -un)"
 
 cd "${REPO_DIR}"
 
+if [ ! -f backend/.env ]; then
+	echo "!! backend/.env fehlt - Update abgebrochen."
+	exit 1
+fi
+chmod 600 backend/.env
+
 # git pull nur wenn wir auf einem Branch sind (nicht im detached-HEAD-Tag-Modus von auto-update.sh)
 if git symbolic-ref -q HEAD >/dev/null; then
 	echo "==> git pull"
@@ -36,6 +42,9 @@ if ! grep -q '^IMAGE_UPLOAD_TOKEN=' backend/.env; then
 	echo "    ${IMAGE_TOKEN}"
 	echo "    Speichere ihn fuer Upload-Skripte."
 fi
+if ! grep -q '^ARTIKELWERK_BASE_URL=.' backend/.env || ! grep -q '^ARTIKELWERK_API_KEY=.' backend/.env; then
+	echo "!! Artikelwerk ist noch nicht vollstaendig konfiguriert; der restliche Dienst wird trotzdem aktualisiert."
+fi
 sudo -u "${RUN_USER}" env IMAGE_LIBRARY_ROOT=/srv/images /usr/local/bin/rebuild-image-index || true
 
 echo "==> Frontend neu bauen"
@@ -55,6 +64,21 @@ sed -e "s|__REPO__|${REPO_DIR}|g" "${REPO_DIR}/deploy/Caddyfile" \
 
 echo "==> Backend-Service neu starten"
 sudo systemctl restart attribut-generator.service
+
+echo "==> Lokalen Backend-Start pruefen"
+BACKEND_READY=0
+for _ in $(seq 1 30); do
+	if curl -fsS http://127.0.0.1:8000/api/health >/dev/null; then
+		BACKEND_READY=1
+		break
+	fi
+	sleep 1
+done
+if [ "${BACKEND_READY}" -ne 1 ]; then
+	echo "!! Backend wurde nicht rechtzeitig bereit."
+	sudo journalctl -u attribut-generator.service -n 80 --no-pager
+	exit 1
+fi
 
 echo "==> Caddy reloaden"
 sudo systemctl reload caddy || sudo systemctl restart caddy
