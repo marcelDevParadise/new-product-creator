@@ -115,6 +115,9 @@ class ArtikelwerkClient:
         result = await self.request("GET", f"context/attributes/{attribute_id}/values")
         return result if isinstance(result, list) else []
 
+    async def next_article_number(self, tenant_id: int) -> dict[str, Any]:
+        return await self.request("GET", f"tenants/{tenant_id}/next-article-number")  # type: ignore[return-value]
+
     async def create_article(self, payload: dict[str, Any], key: str) -> dict[str, Any]:
         return await self.request("POST", "articles", json=payload, idempotency_key=key)  # type: ignore[return-value]
 

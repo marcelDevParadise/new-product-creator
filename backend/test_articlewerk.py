@@ -91,6 +91,22 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(caught.exception.code, "CONFLICT")
         self.assertEqual(caught.exception.request_id, "req-1")
 
+    async def test_loads_next_article_number_for_tenant(self):
+        seen = {}
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            seen["path"] = request.url.path
+            return httpx.Response(200, json={
+                "tenantId": 4, "tenantName": "CleanYourLeather", "prefix": "CYL-",
+                "number": "CYL-00999", "sequence": 999,
+            })
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await client.next_article_number(4)
+        self.assertEqual(seen["path"], "/api/integrations/v1/tenants/4/next-article-number")
+        self.assertEqual(result["number"], "CYL-00999")
+
 
 if __name__ == "__main__":
     unittest.main()

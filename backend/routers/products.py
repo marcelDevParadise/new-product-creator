@@ -10,6 +10,8 @@ from state import state
 from models.product import Product
 from services.csv_handler import parse_csv
 from services.database import log_activity, log_product_history, log_product_history_batch, get_product_history
+from integrations.artikelwerk.article_numbers import get_next_article_sku
+from integrations.artikelwerk.client import ArtikelwerkError
 
 import csv
 import io
@@ -38,18 +40,15 @@ def _slugify(text: str) -> str:
     return s
 
 @router.get("/next-sku")
-def next_sku():
-    """Return the next available CYL-XXXXX article number."""
-    pattern = re.compile(r'^CYL-(\d+)$', re.IGNORECASE)
-    max_num = 0
-    for sku in state.products:
-        m = pattern.match(sku)
-        if m:
-            num = int(m.group(1))
-            if num > max_num:
-                max_num = num
-    next_num = max_num + 1
-    return {"sku": f"CYL-{next_num:05d}"}
+async def next_sku():
+    """Return the next CYL number from Artikelwerk, reconciled locally."""
+    try:
+        return {"sku": await get_next_article_sku(state.products)}
+    except ArtikelwerkError as exc:
+        raise HTTPException(
+            exc.status_code,
+            {"code": exc.code, "message": str(exc), "requestId": exc.request_id, "details": exc.details},
+        ) from exc
 
 
 @router.post("")
@@ -378,22 +377,16 @@ def bulk_update_stammdaten(body: BulkStammdatenUpdate):
 
 
 @router.post("/{artikelnummer}/clone")
-def clone_product(artikelnummer: str):
+async def clone_product(artikelnummer: str):
     """Clone a product with a new auto-generated SKU."""
     source = state.get_product(artikelnummer)
     if source is None:
         raise HTTPException(404, "Produkt nicht gefunden")
 
-    # Generate next SKU
-    pattern_re = re.compile(r'^CYL-(\d+)$', re.IGNORECASE)
-    max_num = 0
-    for sku in state.products:
-        m = pattern_re.match(sku)
-        if m:
-            num = int(m.group(1))
-            if num > max_num:
-                max_num = num
-    new_sku = f"CYL-{max_num + 1:05d}"
+    try:
+        new_sku = await get_next_article_sku(state.products)
+    except ArtikelwerkError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
 
     # Copy all fields except identity/variant/status
     data = source.model_dump()

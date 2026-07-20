@@ -55,6 +55,18 @@
         }
       }
     },
+    "/tenants/{tenantId}/next-article-number": {
+      "get": {
+        "operationId": "getNextArticleNumber",
+        "summary": "Nächste freie Artikelnummer für CleanYourLeather laden",
+        "description": "Liefert die nächste Nummer nach der höchsten global vorhandenen CYL-Nummer. Die Nummer ist eine Vorschau; erst POST /articles reserviert sie verbindlich.",
+        "parameters": [{ "name": "tenantId", "in": "path", "required": true, "schema": { "type": "integer", "minimum": 1 }, "example": 4 }],
+        "responses": {
+          "200": { "description": "Nächste freie Artikelnummer", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NextArticleNumber" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "$ref": "#/components/responses/Forbidden" }, "404": { "$ref": "#/components/responses/NotFound" }, "429": { "$ref": "#/components/responses/RateLimited" }, "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
     "/articles": {
       "post": {
         "operationId": "createArticle",
@@ -169,6 +181,7 @@
       "FeatureFlags": { "type": "object", "additionalProperties": false, "required": ["articleSearch", "articleRead", "articleWrite", "attributeRead", "attributeWrite", "descriptionRead", "descriptionWrite", "imageRead", "imageWrite", "variationWrite", "childArticleWrite", "basePriceWrite", "shopRead"], "properties": { "articleSearch": { "type": "boolean" }, "articleRead": { "type": "boolean" }, "articleWrite": { "type": "boolean" }, "attributeRead": { "type": "boolean" }, "attributeWrite": { "type": "boolean" }, "descriptionRead": { "type": "boolean" }, "descriptionWrite": { "type": "boolean" }, "imageRead": { "type": "boolean" }, "imageWrite": { "type": "boolean" }, "variationWrite": { "type": "boolean" }, "childArticleWrite": { "type": "boolean" }, "basePriceWrite": { "type": "boolean" }, "shopRead": { "type": "boolean" } } },
       "IntegrationContext": { "type": "object", "required": ["tenants", "units", "attributes"], "properties": { "tenants": { "type": "array", "items": { "$ref": "#/components/schemas/Tenant" } }, "units": { "type": "array", "items": { "$ref": "#/components/schemas/Unit" } }, "attributes": { "type": "array", "items": { "$ref": "#/components/schemas/Attribute" } } }, "example": { "tenants": [{ "id": 4, "name": "CleanYourLeather", "articleCount": 1520, "isDefault": true }], "units": [{ "id": 1, "name": "Milliliter", "code": "ml" }], "attributes": [{ "id": "material", "name": "Material", "dataType": "text", "allowsCustomValue": true }] } },
       "Tenant": { "type": "object", "required": ["id", "name", "articleCount", "isDefault"], "properties": { "id": { "type": "integer", "minimum": 1 }, "name": { "type": "string" }, "articleCount": { "type": "integer", "minimum": 0 }, "isDefault": { "type": "boolean" } } },
+      "NextArticleNumber": { "type": "object", "required": ["tenantId", "tenantName", "prefix", "number", "sequence"], "properties": { "tenantId": { "type": "integer", "minimum": 1 }, "tenantName": { "type": "string", "const": "CleanYourLeather" }, "prefix": { "type": "string", "const": "CYL-" }, "number": { "type": "string", "pattern": "^CYL-[0-9]{5,}$" }, "sequence": { "type": "integer", "minimum": 1 } }, "example": { "tenantId": 4, "tenantName": "CleanYourLeather", "prefix": "CYL-", "number": "CYL-00999", "sequence": 999 } },
       "Unit": { "type": "object", "required": ["id", "name", "code"], "description": "JTL-Maßeinheit. IDs sind installationsabhängig und ausschließlich aus /context zu übernehmen. Artikelwerk führt keine automatische Umrechnung durch.", "properties": { "id": { "type": "integer", "minimum": 0 }, "name": { "type": "string" }, "code": { "type": ["string", "null"] } } },
       "Attribute": { "type": "object", "required": ["id", "name"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "dataType": { "type": "string", "enum": ["integer", "decimal", "text", "date"] }, "allowsCustomValue": { "type": "boolean" } } },
       "AttributeValue": { "type": "object", "required": ["id", "attributeId", "label"], "properties": { "id": { "type": "string" }, "attributeId": { "type": "string" }, "label": { "type": "string" } } },

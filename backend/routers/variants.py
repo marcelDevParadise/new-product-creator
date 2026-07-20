@@ -10,6 +10,8 @@ from state import state
 from models.product import Product
 from services.database import log_activity
 from routers.settings import get_varianten_settings
+from integrations.artikelwerk.article_numbers import get_next_article_sku
+from integrations.artikelwerk.client import ArtikelwerkError
 
 router = APIRouter(prefix="/api/variants", tags=["variants"])
 
@@ -279,22 +281,16 @@ class CreateChildRequest(BaseModel):
 
 
 @router.post("/groups/{parent_sku}/children/create", status_code=201)
-def create_variant_child(parent_sku: str, body: CreateChildRequest):
+async def create_variant_child(parent_sku: str, body: CreateChildRequest):
     """Create a brand-new product as a child of the given parent, inheriting fields."""
     parent = state.get_product(parent_sku)
     if not parent or not parent.is_parent:
         raise HTTPException(404, f"Varianten-Gruppe '{parent_sku}' nicht gefunden")
 
-    # Generate next SKU
-    import re as _re
-    max_num = 0
-    for sku in state.products:
-        m = _re.match(r'^CYL-(\d+)$', sku, _re.IGNORECASE)
-        if m:
-            num = int(m.group(1))
-            if num > max_num:
-                max_num = num
-    new_sku = f"CYL-{max_num + 1:05d}"
+    try:
+        new_sku = await get_next_article_sku(state.products)
+    except ArtikelwerkError as exc:
+        raise HTTPException(exc.status_code, str(exc)) from exc
 
     # Build child from parent's inheritable fields
     settings = get_varianten_settings()
