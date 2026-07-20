@@ -30,9 +30,6 @@ vorlagen/
 backend/backend/*.db
 backend/backend/*.db-shm
 backend/backend/*.db-wal
-backend/data/*.db
-backend/services/*.db
-backend/services/data/*.db
 
 Umsetzung/
 Umsetzung/*md
