@@ -181,6 +181,11 @@ class ArtikelwerkClient:
             "search": search, "page": page, "pageSize": page_size,
         })  # type: ignore[return-value]
 
+    async def create_manufacturer(self, payload: dict[str, Any], key: str) -> dict[str, Any]:
+        return await self.request(
+            "POST", "manufacturers", json=payload, idempotency_key=key,
+        )  # type: ignore[return-value]
+
     async def search_categories(
         self, search: str | None = None, *, page: int = 1, page_size: int = 100,
     ) -> dict[str, Any]:

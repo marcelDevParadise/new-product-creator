@@ -38,6 +38,35 @@ def _new_idempotency_key(operation: str) -> str:
     return f"attrgen:{clean}:{uuid.uuid4().hex}"[:100]
 
 
+def _manufacturer_id(response: dict[str, Any]) -> str | None:
+    manufacturer = response.get("manufacturer")
+    if isinstance(manufacturer, dict):
+        value = manufacturer.get("id") or manufacturer.get("manufacturerId")
+        if value is not None:
+            return str(value)
+    value = response.get("id") or response.get("manufacturerId")
+    return str(value) if value is not None else None
+
+
+async def _create_or_find_manufacturer(
+    client: ArtikelwerkClient, payload: dict[str, Any], key: str,
+) -> dict[str, Any]:
+    try:
+        return await client.create_manufacturer(payload, key)
+    except ArtikelwerkError as exc:
+        if exc.status_code != 409:
+            raise
+        result = await client.search_manufacturers(str(payload["name"]), page_size=100)
+        items = result.get("items", []) if isinstance(result, dict) else result
+        matches = [
+            item for item in items if isinstance(item, dict)
+            and str(item.get("name", "")).strip().casefold() == str(payload["name"]).strip().casefold()
+        ] if isinstance(items, list) else []
+        if len(matches) != 1:
+            raise
+        return {"manufacturer": matches[0], "idempotentConflictResolved": True}
+
+
 def _image_path(source: str) -> Path:
     root = Path(os.environ.get("IMAGE_LIBRARY_ROOT", "/srv/images")).resolve()
     value = source.split("?", 1)[0]
@@ -126,6 +155,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
     upsert_articlewerk_publication(preview.sku, status="publishing")
     completed = 0
     remote_article_id: str | None = None
+    manufacturer_id: str | None = None
     variation_ids: dict[str, dict[str, str]] = {}
 
     try:
@@ -136,10 +166,22 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                 update_articlewerk_job(job_id, status="publishing", phase=step.operation, progress=completed)
                 payload = dict(step.payload)
 
-                if step.operation == "create_article":
+                if step.operation == "create_manufacturer":
+                    response = await _execute_operation(
+                        client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=True,
+                        invoke=lambda key: _create_or_find_manufacturer(client, payload, key or ""),
+                    )
+                    manufacturer_id = _manufacturer_id(response)
+                    if not manufacturer_id:
+                        raise ArtikelwerkError(
+                            "Artikelwerk-Antwort enthält keine Hersteller-ID.", code="INVALID_RESPONSE",
+                        )
+                elif step.operation == "create_article":
                     if remote_article_id:
                         completed += 1
                         continue
+                    if manufacturer_id:
+                        payload["manufacturerId"] = int(manufacturer_id)
                     response = await _execute_operation(
                         client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=True,
                         invoke=lambda key: client.create_article(payload, key or ""),

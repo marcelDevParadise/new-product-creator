@@ -37,6 +37,31 @@ CONTEXT = {
 
 
 class MapperTests(unittest.TestCase):
+    def test_creates_missing_manufacturer_before_article(self):
+        product = Product(artikelnummer="CYL-MAN", artikelname="Test", hersteller="Neue Marke")
+        preview = build_preview(
+            product, children=[], attribute_config={},
+            context={**CONTEXT, "manufacturerNeedsCreate": True}, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        self.assertEqual([step.operation for step in preview.steps[:2]], ["create_manufacturer", "create_article"])
+        self.assertEqual(preview.steps[0].payload, {"name": "Neue Marke"})
+
+    def test_uses_stable_context_attribute_id(self):
+        product = Product(artikelnummer="CYL-ATTR", artikelname="Test", attributes={"meta_brand": "Acme"})
+        definition = AttributeDefinition(
+            id="meta_brand:custom:single_line_text_field", category="Shopify", name="Marke",
+        )
+        preview = build_preview(
+            product, children=[], attribute_config={"meta_brand": definition},
+            context={**CONTEXT, "attributes": [{"id": "meta_brand", "name": "meta_brand", "allowsCustomValue": True}]},
+            capabilities=CAPABILITIES, settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        attribute_step = next(step for step in preview.steps if step.operation == "set_attribute")
+        self.assertEqual(attribute_step.payload["attributeId"], "meta_brand")
+
     def test_maps_price_purchase_manufacturer_and_categories_into_create(self):
         product = Product(
             artikelnummer="CYL-FULL", artikelname="Vollständig", preis=119, ek=40,
@@ -80,17 +105,36 @@ class MapperTests(unittest.TestCase):
         )
         self.assertEqual(preview.steps[0].payload["weight"], 0.25)
 
-    def test_unknown_attribute_blocks_publication(self):
+    def test_unknown_attribute_is_skipped_without_blocking_publication(self):
         product = Product(artikelnummer="CYL-TEST", artikelname="Test", attributes={"missing": "x"})
         preview = build_preview(
             product, children=[], attribute_config={}, context=CONTEXT,
             capabilities=CAPABILITIES, settings=ArtikelwerkSettings(tenant_ids=[4]),
         )
-        self.assertFalse(preview.valid)
-        self.assertIn("UNKNOWN_ATTRIBUTE", {issue.code for issue in preview.issues})
+        self.assertTrue(preview.valid)
+        self.assertIn("SKIPPED_ATTRIBUTE", {issue.code for issue in preview.issues})
+        self.assertNotIn("set_attribute", {step.operation for step in preview.steps})
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_creates_manufacturer_idempotently(self):
+        seen = {}
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            seen["path"] = request.url.path
+            seen["key"] = request.headers.get("Idempotency-Key")
+            seen["body"] = json.loads(request.content)
+            return httpx.Response(201, json={"manufacturer": {"id": 12, "name": "Acme"}})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await client.create_manufacturer({"name": "Acme"}, "manufacturer:acme")
+        self.assertEqual(seen, {
+            "path": "/api/integrations/v1/manufacturers",
+            "key": "manufacturer:acme", "body": {"name": "Acme"},
+        })
+        self.assertEqual(result["manufacturer"]["id"], 12)
+
     async def test_searches_manufacturers_and_categories(self):
         seen = []
 

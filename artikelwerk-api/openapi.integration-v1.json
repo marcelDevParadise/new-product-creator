@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Artikelwerk Integrations-API",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Verbindlicher Vertrag der implementierten P0-, P1- und P2-Integrations-API. Verkaufspreise werden netto geführt; Bruttowerte sind abgeleitet."
   },
   "servers": [{ "url": "/api/integrations/v1" }],
@@ -10,7 +10,7 @@
   "x-artikelwerk-contract": {
     "requestBodyLimitBytes": 15728640,
     "rateLimit": { "requests": 120, "windowSeconds": 60, "key": "authenticated API token", "retryHeader": "Retry-After" },
-    "idempotencyKey": { "pattern": "^[A-Za-z0-9_.:-]{8,100}$", "requiredFor": ["createArticle", "createSupplier", "uploadArticleImage", "createVariation", "createChildArticle", "adjustInventory", "activateArticle", "deactivateArticle"] },
+    "idempotencyKey": { "pattern": "^[A-Za-z0-9_.:-]{8,100}$", "requiredFor": ["createArticle", "createSupplier", "createManufacturer", "uploadArticleImage", "createVariation", "createChildArticle", "adjustInventory", "activateArticle", "deactivateArticle"] },
     "existingSku": "POST /articles returns 409 CONFLICT and never updates an existing article.",
     "contextValues": "Only active, non-excluded tenants are returned. Writes reject tenants that were deleted, disabled or excluded after context retrieval. Missing attribute values are rejected with 400."
   },
@@ -92,7 +92,8 @@
     "/articles/{id}/deactivate": { "post": { "operationId": "deactivateArticle", "summary": "Artikel sicher deaktivieren", "x-required-scope": "articles:lifecycle", "parameters": [{ "$ref": "#/components/parameters/ArticleId" }, { "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonObject" }, "responses": { "200": { "$ref": "#/components/responses/Mutation" } } } },
     "/articles/{id}/activate": { "post": { "operationId": "activateArticle", "summary": "Artikel reaktivieren", "x-required-scope": "articles:lifecycle", "parameters": [{ "$ref": "#/components/parameters/ArticleId" }, { "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonObject" }, "responses": { "200": { "$ref": "#/components/responses/Mutation" } } } },
     "/manufacturers": {
-      "get": { "operationId": "searchManufacturers", "summary": "Herstellerstamm suchen", "x-required-scope": "articles:read", "parameters": [{ "name": "search", "in": "query", "schema": { "type": "string", "maxLength": 255 } }, { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } }, { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } }], "responses": { "200": { "description": "Paginierte Hersteller" }, "403": { "$ref": "#/components/responses/Forbidden" } } }
+      "get": { "operationId": "searchManufacturers", "summary": "Herstellerstamm suchen", "x-required-scope": "manufacturers:read", "parameters": [{ "name": "search", "in": "query", "schema": { "type": "string", "maxLength": 255 } }, { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } }, { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } }], "responses": { "200": { "description": "Paginierte Hersteller" }, "403": { "$ref": "#/components/responses/Forbidden" } } },
+      "post": { "operationId": "createManufacturer", "summary": "Hersteller idempotent anlegen", "x-required-scope": "manufacturers:write", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "required": ["name"], "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 255 } }, "example": { "name": "24B'MOONS CO., LTD." } } } } }, "responses": { "201": { "description": "Hersteller angelegt" }, "409": { "$ref": "#/components/responses/Conflict" } } }
     },
     "/categories": {
       "get": { "operationId": "searchCategories", "summary": "Globalen Kategoriebaum suchen", "x-required-scope": "categories:read", "parameters": [{ "name": "search", "in": "query", "schema": { "type": "string", "maxLength": 255 } }, { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } }, { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } }], "responses": { "200": { "description": "Paginierte Kategorien mit parentId und vollständigem Pfad" }, "403": { "$ref": "#/components/responses/Forbidden" } } }

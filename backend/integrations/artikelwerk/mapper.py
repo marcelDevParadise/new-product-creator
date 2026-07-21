@@ -74,13 +74,21 @@ def build_preview(
     }
     if settings.publish_manufacturer and _present(product.hersteller):
         manufacturer_id = context.get("resolvedManufacturerId")
-        if manufacturer_id is None:
-            issues.append(PreviewIssue(
-                severity="error", code="UNKNOWN_MANUFACTURER",
-                message=f"Hersteller '{product.hersteller}' wurde in Artikelwerk nicht eindeutig gefunden.", field="hersteller",
+        if manufacturer_id is not None:
+            article_payload["manufacturerId"] = int(manufacturer_id)
+        elif context.get("manufacturerNeedsCreate"):
+            steps.append(PublicationStep(
+                operation="create_manufacturer", resource_key=f"manufacturer:{product.hersteller}",
+                payload={"name": product.hersteller},
             ))
         else:
-            article_payload["manufacturerId"] = int(manufacturer_id)
+            issues.append(PreviewIssue(
+                severity="error", code="UNKNOWN_MANUFACTURER",
+                message=(f"Hersteller '{product.hersteller}' wurde im globalen Artikelwerk-Herstellerstamm "
+                         "mehrfach gefunden. Den Herstellerstamm bereinigen oder die "
+                         "Hersteller-Übertragung in den Artikelwerk-Einstellungen deaktivieren."),
+                field="hersteller",
+            ))
 
     if settings.publish_price and product.preis is not None:
         if not features.get("priceWrite", False):
@@ -162,11 +170,15 @@ def build_preview(
             issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Attribute sind nicht freigeschaltet."))
         for key, value in product.attributes.items():
             definition = attribute_config.get(key)
-            remote_id = str(getattr(definition, "id", key))
+            stable_id = key.casefold()
+            configured_id = str(getattr(definition, "id", key))
+            remote_id = stable_id if stable_id in remote_attributes else configured_id
             if remote_id not in remote_attributes:
                 issues.append(PreviewIssue(
-                    severity="error", code="UNKNOWN_ATTRIBUTE",
-                    message=f"Attribut '{key}' ({remote_id}) ist in Artikelwerk nicht schreibbar.", field=f"attributes.{key}",
+                    severity="warning", code="SKIPPED_ATTRIBUTE",
+                    message=(f"Attribut '{key}' ({remote_id}) gehört nicht zum schreibbaren "
+                             "Artikelwerk-Attributstamm und wird übersprungen."),
+                    field=f"attributes.{key}",
                 ))
                 continue
             text_value = _value_as_string(value)

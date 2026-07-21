@@ -52,6 +52,10 @@ async def _resolve_create_references(
         matches = _exact_named(_items(await client.search_manufacturers(product.hersteller)), product.hersteller)
         if len(matches) == 1 and _reference_id(matches[0], "manufacturer") is not None:
             context["resolvedManufacturerId"] = _reference_id(matches[0], "manufacturer")
+        elif not matches:
+            context["manufacturerNeedsCreate"] = True
+        else:
+            context["manufacturerMatchCount"] = len(matches)
 
     if settings.publish_purchase and product.lieferant_name:
         local = next(
@@ -124,7 +128,9 @@ async def _preview(sku: str) -> PublicationPreview:
             values: dict[str, list] = {}
             for key in product.attributes:
                 definition = state.attribute_config.get(key)
-                remote_id = str(getattr(definition, "id", key))
+                stable_id = key.casefold()
+                configured_id = str(getattr(definition, "id", key))
+                remote_id = stable_id if stable_id in remote_attributes else configured_id
                 if remote_attributes.get(remote_id, {}).get("allowsCustomValue") is False:
                     values[remote_id] = await client.attribute_values(remote_id)
             context["attributeValues"] = values
