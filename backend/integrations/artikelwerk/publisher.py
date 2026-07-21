@@ -169,9 +169,11 @@ async def _sync_price(
         matches = items
     if len(matches) != 1:
         raise ArtikelwerkError(
-            "Der zu aktualisierende Artikelwerk-Verkaufspreis wurde nicht eindeutig gefunden.",
+            "Am vorhandenen Artikel existiert kein eindeutig aktualisierbarer Verkaufspreis. "
+            "Die Artikelwerk-v1-Route kann nur einen vorhandenen Preis per priceId aktualisieren; "
+            "ein fehlender Preis kann laut aktuellem API-Vertrag nur bei der Artikelanlage erzeugt werden.",
             status_code=409,
-            code="PRICE_NOT_FOUND",
+            code="MISSING_REMOTE_PRICE",
             details={"tenantId": payload["tenantId"], "customerGroupId": payload["customerGroupId"],
                      "availablePrices": items},
         )
@@ -388,6 +390,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
     remote_article_id: str | None = None
     manufacturer_id: str | None = None
     variation_ids: dict[str, dict[str, str]] = {}
+    article_created_with_price = False
 
     try:
         publication = get_articlewerk_publication(preview.sku)
@@ -439,6 +442,9 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                         invoke=lambda key: _create_or_reuse_article(client, payload, key or ""),
                     )
                     article = response.get("article", {})
+                    article_created_with_price = (
+                        "price" in payload and not bool(response.get("reusedExisting"))
+                    )
                     remote_article_id = str(article.get("id", ""))
                     if not remote_article_id:
                         raise ArtikelwerkError("Artikelwerk-Antwort enthält keine Artikel-ID.", code="INVALID_RESPONSE")
@@ -467,6 +473,12 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                             reuse_success=False,
                         )
                     elif step.operation == "sync_price":
+                        # POST /articles already creates the price in the same
+                        # transaction. The separate PUT route is only needed
+                        # when an already existing article was reused.
+                        if article_created_with_price:
+                            completed += 1
+                            continue
                         await _execute_operation(
                             client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
                             invoke=lambda _key: _sync_price(client, remote_article_id or "", payload),

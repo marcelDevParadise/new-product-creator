@@ -34,6 +34,7 @@ def build_preview(
 ) -> PublicationPreview:
     issues: list[PreviewIssue] = []
     steps: list[PublicationStep] = []
+    state_sync_steps: list[PublicationStep] = []
     features = capabilities.get("features", {})
     tenants = {int(t["id"]): t for t in context.get("tenants", [])}
     units = {str(u.get("code", "")).casefold(): int(u["id"]) for u in context.get("units", []) if u.get("code")}
@@ -146,7 +147,7 @@ def build_preview(
     # steps as well: an existing SKU is deliberately reused and POST /articles
     # never updates it.
     if "price" in article_payload:
-        steps.append(PublicationStep(
+        state_sync_steps.append(PublicationStep(
             operation="sync_price",
             resource_key=(f"price:{article_payload['price']['tenantId']}:"
                           f"{article_payload['price']['customerGroupId']}:1"),
@@ -156,7 +157,7 @@ def build_preview(
         purchase_payload = dict(article_payload["purchase"])
         if _present(product.lieferant_artikelname):
             purchase_payload["articleName"] = product.lieferant_artikelname
-        steps.append(PublicationStep(
+        state_sync_steps.append(PublicationStep(
             operation="sync_supplier",
             resource_key=f"supplier:{purchase_payload['supplierId']}",
             payload=purchase_payload,
@@ -310,6 +311,11 @@ def build_preview(
                     "_variationValues": child.variant_attributes,
                 },
             ))
+
+    # State updates come last so a missing legacy price or supplier assignment
+    # cannot prevent descriptions, base-price data, images or variants from
+    # reaching Artikelwerk.
+    steps.extend(state_sync_steps)
 
     unsupported: list[str] = []
 

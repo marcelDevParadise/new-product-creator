@@ -98,6 +98,8 @@ class MapperTests(unittest.TestCase):
         supplier_step = next(step for step in preview.steps if step.operation == "sync_supplier")
         self.assertEqual(price_step.payload["net"], 100)
         self.assertEqual(supplier_step.payload["articleName"], "Name beim Lieferanten")
+        self.assertEqual(preview.steps[-2].operation, "sync_price")
+        self.assertEqual(preview.steps[-1].operation, "sync_supplier")
         self.assertEqual(payload["categories"], {"categoryIds": [600, 615], "defaultCategoryId": 615})
         self.assertEqual(preview.unsupported_fields, [])
 
