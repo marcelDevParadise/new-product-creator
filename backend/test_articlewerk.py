@@ -174,7 +174,10 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_exposes_stable_error_fields(self):
         async def handler(_request: httpx.Request) -> httpx.Response:
-            return httpx.Response(409, json={"code": "CONFLICT", "error": "Schon vorhanden", "requestId": "req-1"})
+            return httpx.Response(409, json={
+                "code": "CONFLICT", "error": "Schon vorhanden", "requestId": "req-1",
+                "details": {"field": "sku", "reason": "CYL-1 ist bereits vergeben"},
+            })
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
@@ -182,6 +185,21 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
                 await client.create_article({"sku": "CYL-1"}, "job:create:123")
         self.assertEqual(caught.exception.code, "CONFLICT")
         self.assertEqual(caught.exception.request_id, "req-1")
+        self.assertEqual(caught.exception.details["field"], "sku")
+
+    async def test_reads_fastapi_validation_details_and_request_header(self):
+        async def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(422, headers={"X-Request-ID": "req-validation"}, json={
+                "detail": [{"loc": ["body", "manufacturerId"], "msg": "Referenz unbekannt", "type": "value_error"}],
+            })
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await client.create_article({"sku": "CYL-1"}, "job:create:123")
+        self.assertEqual(caught.exception.status_code, 422)
+        self.assertEqual(caught.exception.request_id, "req-validation")
+        self.assertEqual(caught.exception.details[0]["loc"], ["body", "manufacturerId"])
 
     async def test_loads_next_article_number_for_tenant(self):
         seen = {}

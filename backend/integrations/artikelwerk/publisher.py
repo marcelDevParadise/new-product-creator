@@ -27,6 +27,10 @@ from services.database import (
 # queued in the database while another publication is active.
 _publication_lock = asyncio.Lock()
 
+_SENSITIVE_ERROR_KEYS = {
+    "authorization", "api_key", "apikey", "password", "secret", "token", "access_token", "refresh_token",
+}
+
 
 def _payload_hash(payload: dict[str, Any]) -> str:
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -36,6 +40,32 @@ def _payload_hash(payload: dict[str, Any]) -> str:
 def _new_idempotency_key(operation: str) -> str:
     clean = re.sub(r"[^A-Za-z0-9_.:-]", "-", operation)[:45]
     return f"attrgen:{clean}:{uuid.uuid4().hex}"[:100]
+
+
+def _safe_error_details(value: Any, depth: int = 0) -> Any:
+    if depth > 6:
+        return "…"
+    if isinstance(value, dict):
+        return {
+            str(key): "[ausgeblendet]" if str(key).casefold() in _SENSITIVE_ERROR_KEYS
+            else _safe_error_details(item, depth + 1)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_safe_error_details(item, depth + 1) for item in value[:50]]
+    if isinstance(value, str):
+        return value[:4000]
+    return value
+
+
+def _artikelwerk_error_text(exc: ArtikelwerkError) -> str:
+    parts = [f"{exc.code}: {exc}", f"HTTP {exc.status_code}"]
+    if exc.details not in (None, "", [], {}):
+        details = json.dumps(_safe_error_details(exc.details), ensure_ascii=False, separators=(",", ": "))
+        parts.append(f"API-Details: {details}")
+    if exc.request_id:
+        parts.append(f"Request-ID: {exc.request_id}")
+    return " · ".join(parts)
 
 
 def _manufacturer_id(response: dict[str, Any]) -> str | None:
@@ -261,14 +291,14 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
         update_articlewerk_job(job_id, status="published", phase="complete", progress=len(preview.steps))
     except ArtikelwerkError as exc:
         status = "partial" if remote_article_id else "failed"
+        error_text = _artikelwerk_error_text(exc)
         upsert_articlewerk_publication(
             preview.sku, status=status, error_code=exc.code,
-            error_message=str(exc), request_id=exc.request_id,
+            error_message=error_text, request_id=exc.request_id,
         )
         update_articlewerk_job(
             job_id, status=status, phase=active_operation, progress=completed,
-            last_error=(f"{exc.code}: {exc}"
-                        + (f" · Request-ID: {exc.request_id}" if exc.request_id else "")),
+            last_error=error_text,
         )
     except Exception as exc:
         # Keep unexpected mapper/database/runtime failures visible instead of

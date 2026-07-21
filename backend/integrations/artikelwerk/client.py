@@ -150,12 +150,28 @@ class ArtikelwerkClient:
             body = response.json()
         except ValueError:
             body = {}
+        if not isinstance(body, dict):
+            body = {"details": body}
+        raw_error = body.get("error")
+        nested_error = raw_error if isinstance(raw_error, dict) else {}
+        detail = body.get("detail")
+        message = (
+            raw_error if isinstance(raw_error, str) else None
+        ) or body.get("message") or nested_error.get("message") or nested_error.get("error")
+        if not message and isinstance(detail, str):
+            message = detail
+        details = body.get("details")
+        if details is None:
+            details = nested_error.get("details")
+        if details is None and isinstance(detail, (dict, list)):
+            details = detail
         return ArtikelwerkError(
-            body.get("error") or f"Artikelwerk antwortete mit HTTP {response.status_code}.",
+            str(message or f"Artikelwerk antwortete mit HTTP {response.status_code}."),
             status_code=response.status_code,
-            code=body.get("code", "INTEGRATION_ERROR"),
-            request_id=body.get("requestId"),
-            details=body.get("details"),
+            code=str(body.get("code") or nested_error.get("code") or "INTEGRATION_ERROR"),
+            request_id=(body.get("requestId") or nested_error.get("requestId")
+                        or response.headers.get("X-Request-ID")),
+            details=details,
         )
 
     async def capabilities(self) -> dict[str, Any]:
