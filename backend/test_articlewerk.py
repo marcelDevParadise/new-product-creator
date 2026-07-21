@@ -23,6 +23,9 @@ CAPABILITIES = {
         "variationWrite": True,
         "childArticleWrite": True,
         "basePriceWrite": True,
+        "priceWrite": True,
+        "supplierWrite": True,
+        "categoryWrite": True,
     },
 }
 
@@ -34,6 +37,30 @@ CONTEXT = {
 
 
 class MapperTests(unittest.TestCase):
+    def test_maps_price_purchase_manufacturer_and_categories_into_create(self):
+        product = Product(
+            artikelnummer="CYL-FULL", artikelname="Vollständig", preis=119, ek=40,
+            hersteller="Acme", lieferant_name="Supply", lieferant_artikelnummer="SUP-1",
+            lieferant_netto_ek=35, kategorie_1="Pflege", kategorie_2="Leder",
+        )
+        context = {
+            **CONTEXT, "resolvedManufacturerId": 12,
+            "resolvedSupplier": {"id": "42", "currency": "EUR"},
+            "resolvedCategoryIds": [600, 615],
+        }
+        preview = build_preview(
+            product, children=[], attribute_config={}, context=context, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4], tax_rate=19),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        payload = preview.steps[0].payload
+        self.assertEqual(payload["manufacturerId"], 12)
+        self.assertEqual(payload["price"]["net"], 100)
+        self.assertEqual(payload["purchase"]["supplierId"], "42")
+        self.assertEqual(payload["purchase"]["purchasePriceNet"], 35)
+        self.assertEqual(payload["categories"], {"categoryIds": [600, 615], "defaultCategoryId": 615})
+        self.assertEqual(preview.unsupported_fields, [])
+
     def test_maps_article_attribute_description_and_base_price(self):
         product = Product(
             artikelnummer="CYL-TEST", artikelname="Test", beschreibung="Lang", gewicht=250,
@@ -64,6 +91,23 @@ class MapperTests(unittest.TestCase):
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_searches_manufacturers_and_categories(self):
+        seen = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            seen.append((request.url.path, dict(request.url.params)))
+            return httpx.Response(200, json={"items": []})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            await client.search_manufacturers("Acme")
+            await client.search_categories("Leder")
+
+        self.assertEqual(seen[0][0], "/api/integrations/v1/manufacturers")
+        self.assertEqual(seen[0][1]["search"], "Acme")
+        self.assertEqual(seen[1][0], "/api/integrations/v1/categories")
+        self.assertEqual(seen[1][1]["pageSize"], "100")
+
     async def test_sends_bearer_and_idempotency_headers(self):
         seen = {}
 

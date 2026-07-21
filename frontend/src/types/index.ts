@@ -531,6 +531,13 @@ export interface ArtikelwerkSettings {
   language_id: number;
   platform_id: number;
   inventory_tracking: boolean;
+  customer_group_id: number;
+  currency: string;
+  tax_rate: number;
+  publish_price: boolean;
+  publish_purchase: boolean;
+  publish_manufacturer: boolean;
+  publish_categories: boolean;
   publish_images: boolean;
   publish_descriptions: boolean;
   publish_attributes: boolean;

@@ -23,6 +23,78 @@ from state import state
 router = APIRouter(prefix="/api/articlewerk", tags=["articlewerk"])
 
 
+def _items(result: object) -> list[dict]:
+    if isinstance(result, list):
+        return [item for item in result if isinstance(item, dict)]
+    if isinstance(result, dict):
+        values = result.get("items", [])
+        return [item for item in values if isinstance(item, dict)] if isinstance(values, list) else []
+    return []
+
+
+def _exact_named(items: list[dict], name: str) -> list[dict]:
+    target = name.strip().casefold()
+    return [
+        item for item in items
+        if str(item.get("name") or item.get("label") or "").strip().casefold() == target
+    ]
+
+
+def _reference_id(item: dict, kind: str) -> object | None:
+    return item.get("id") if item.get("id") is not None else item.get(f"{kind}Id")
+
+
+async def _resolve_create_references(
+    client: ArtikelwerkClient, product, context: dict, settings: ArtikelwerkSettings,
+) -> None:
+    """Resolve human-readable local master data to global Artikelwerk IDs."""
+    if settings.publish_manufacturer and product.hersteller:
+        matches = _exact_named(_items(await client.search_manufacturers(product.hersteller)), product.hersteller)
+        if len(matches) == 1 and _reference_id(matches[0], "manufacturer") is not None:
+            context["resolvedManufacturerId"] = _reference_id(matches[0], "manufacturer")
+
+    if settings.publish_purchase and product.lieferant_name:
+        local = next(
+            (item for item in state.get_suppliers()
+             if str(item.get("name", "")).strip().casefold() == product.lieferant_name.strip().casefold()),
+            None,
+        )
+        if local and local.get("articlewerk_supplier_id"):
+            context["resolvedSupplier"] = {
+                "id": local["articlewerk_supplier_id"], "currency": local.get("currency") or "EUR",
+            }
+        else:
+            result = await client.search_suppliers(name=product.lieferant_name, active=True, page_size=100)
+            matches = _exact_named(_items(result), product.lieferant_name)
+            if len(matches) == 1 and _reference_id(matches[0], "supplier") is not None:
+                context["resolvedSupplier"] = {**matches[0], "id": _reference_id(matches[0], "supplier")}
+
+    category_names = [value for value in (
+        product.kategorie_1, product.kategorie_2, product.kategorie_3,
+        product.kategorie_4, product.kategorie_5, product.kategorie_6,
+    ) if value] if settings.publish_categories else []
+    resolved_ids: list[object] = []
+    parent_id: object | None = None
+    for name in category_names:
+        matches = _exact_named(_items(await client.search_categories(name)), name)
+        if parent_id is None:
+            matches = [
+                item for item in matches
+                if (item.get("parentId") if "parentId" in item else item.get("parentCategoryId")) in (None, 0, "0", "")
+            ]
+        else:
+            matches = [
+                item for item in matches
+                if str(item.get("parentId") if "parentId" in item else item.get("parentCategoryId")) == str(parent_id)
+            ]
+        category_id = _reference_id(matches[0], "category") if len(matches) == 1 else None
+        if category_id is None:
+            break
+        parent_id = category_id
+        resolved_ids.append(parent_id)
+    context["resolvedCategoryIds"] = resolved_ids
+
+
 def _http_error(exc: ArtikelwerkError) -> HTTPException:
     return HTTPException(
         status_code=exc.status_code,
@@ -44,6 +116,7 @@ async def _preview(sku: str) -> PublicationPreview:
         raise HTTPException(404, "Produkt nicht gefunden.")
     if product.parent_sku:
         raise HTTPException(409, "Kindartikel werden zusammen mit ihrer Variantengruppe veröffentlicht.")
+    settings = get_artikelwerk_settings()
     try:
         async with ArtikelwerkClient(get_artikelwerk_config()) as client:
             capabilities, context = await client.capabilities(), await client.context()
@@ -55,12 +128,13 @@ async def _preview(sku: str) -> PublicationPreview:
                 if remote_attributes.get(remote_id, {}).get("allowsCustomValue") is False:
                     values[remote_id] = await client.attribute_values(remote_id)
             context["attributeValues"] = values
+            await _resolve_create_references(client, product, context, settings)
     except ArtikelwerkError as exc:
         raise _http_error(exc) from exc
     children = state.get_variants(sku) if product.is_parent else []
     return build_preview(
         product, children=children, attribute_config=state.attribute_config,
-        context=context, capabilities=capabilities, settings=get_artikelwerk_settings(),
+        context=context, capabilities=capabilities, settings=settings,
     )
 
 

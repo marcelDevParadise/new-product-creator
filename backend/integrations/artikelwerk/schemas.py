@@ -14,6 +14,13 @@ class ArtikelwerkSettings(StrictModel):
     language_id: int = Field(default=1, ge=0)
     platform_id: int = Field(default=1, ge=0)
     inventory_tracking: bool = True
+    customer_group_id: int = Field(default=1, ge=1)
+    currency: str = Field(default="EUR", min_length=3, max_length=3)
+    tax_rate: float = Field(default=19.0, ge=0, le=100)
+    publish_price: bool = True
+    publish_purchase: bool = True
+    publish_manufacturer: bool = True
+    publish_categories: bool = True
     publish_images: bool = True
     publish_descriptions: bool = True
     publish_attributes: bool = True

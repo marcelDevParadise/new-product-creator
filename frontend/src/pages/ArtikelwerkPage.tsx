@@ -99,12 +99,17 @@ export function ArtikelwerkPage() {
             </label>
             <label className="text-sm">Sprach-ID<input type="number" min={0} className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.language_id} onChange={e => setSettings({ ...settings, language_id: Number(e.target.value) })} /></label>
             <label className="text-sm">Plattform-ID<input type="number" min={0} className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.platform_id} onChange={e => setSettings({ ...settings, platform_id: Number(e.target.value) })} /></label>
+            <label className="text-sm">Kundengruppen-ID<input type="number" min={1} className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.customer_group_id} onChange={e => setSettings({ ...settings, customer_group_id: Number(e.target.value) })} /></label>
+            <label className="text-sm">Währung<input maxLength={3} className="mt-1 w-full rounded-lg border px-3 py-2 uppercase" value={settings.currency} onChange={e => setSettings({ ...settings, currency: e.target.value.toUpperCase() })} /></label>
+            <label className="text-sm">Steuersatz (%)<input type="number" min={0} max={100} step="0.01" className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.tax_rate} onChange={e => setSettings({ ...settings, tax_rate: Number(e.target.value) })} /></label>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {([
               ['inventory_tracking', 'Bestandsführung aktivieren'], ['publish_descriptions', 'Beschreibungen'],
               ['publish_attributes', 'Attribute'], ['publish_images', 'Bilder'],
               ['publish_base_price', 'Grundpreis'], ['publish_variants', 'Varianten'],
+              ['publish_price', 'Verkaufspreis'], ['publish_purchase', 'Lieferant und EK'],
+              ['publish_manufacturer', 'Hersteller'], ['publish_categories', 'Kategorien'],
             ] as [keyof ArtikelwerkSettings, string][]).map(([key, label]) => (
               <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(settings[key])} onChange={() => toggle(key)} />{label}</label>
             ))}

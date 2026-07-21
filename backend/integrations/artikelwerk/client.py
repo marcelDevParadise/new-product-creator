@@ -174,6 +174,20 @@ class ArtikelwerkClient:
     async def create_article(self, payload: dict[str, Any], key: str) -> dict[str, Any]:
         return await self.request("POST", "articles", json=payload, idempotency_key=key)  # type: ignore[return-value]
 
+    async def search_manufacturers(
+        self, search: str | None = None, *, page: int = 1, page_size: int = 25,
+    ) -> dict[str, Any]:
+        return await self.request("GET", "manufacturers", params={
+            "search": search, "page": page, "pageSize": page_size,
+        })  # type: ignore[return-value]
+
+    async def search_categories(
+        self, search: str | None = None, *, page: int = 1, page_size: int = 100,
+    ) -> dict[str, Any]:
+        return await self.request("GET", "categories", params={
+            "search": search, "page": page, "pageSize": page_size,
+        })  # type: ignore[return-value]
+
     async def search_articles(
         self,
         tenant_id: int,

@@ -72,6 +72,65 @@ def build_preview(
         "weight": (product.gewicht / 1000) if product.gewicht is not None else 0,
         "shippingWeight": (product.gewicht / 1000) if product.gewicht is not None else 0,
     }
+    if settings.publish_manufacturer and _present(product.hersteller):
+        manufacturer_id = context.get("resolvedManufacturerId")
+        if manufacturer_id is None:
+            issues.append(PreviewIssue(
+                severity="error", code="UNKNOWN_MANUFACTURER",
+                message=f"Hersteller '{product.hersteller}' wurde in Artikelwerk nicht eindeutig gefunden.", field="hersteller",
+            ))
+        else:
+            article_payload["manufacturerId"] = int(manufacturer_id)
+
+    if settings.publish_price and product.preis is not None:
+        if not features.get("priceWrite", False):
+            issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Verkaufspreise sind in Artikelwerk nicht freigeschaltet.", field="preis"))
+        elif not settings.tenant_ids:
+            issues.append(PreviewIssue(severity="error", code="NO_TENANT", message="Für den Verkaufspreis fehlt ein Mandant.", field="preis"))
+        else:
+            # Local `preis` is Brutto-VK; Artikelwerk's create contract expects net.
+            net_price = product.preis / (1 + settings.tax_rate / 100)
+            article_payload["price"] = {
+                "tenantId": settings.tenant_ids[0], "customerGroupId": settings.customer_group_id,
+                "currency": settings.currency.upper(), "net": round(net_price, 4),
+                "taxRate": settings.tax_rate, "quantityFrom": 1,
+            }
+
+    purchase_price = product.lieferant_netto_ek if product.lieferant_netto_ek is not None else product.ek
+    if settings.publish_purchase and (_present(product.lieferant_name) or purchase_price is not None):
+        if not features.get("supplierWrite", False):
+            issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Lieferantenzuordnungen sind in Artikelwerk nicht freigeschaltet.", field="lieferant"))
+        elif not _present(product.lieferant_name):
+            issues.append(PreviewIssue(severity="error", code="MISSING_SUPPLIER", message="Ein Einkaufspreis kann nur zusammen mit einem Lieferanten übertragen werden.", field="ek"))
+        elif purchase_price is None:
+            issues.append(PreviewIssue(severity="error", code="MISSING_PURCHASE_PRICE", message="Für die Lieferantenzuordnung fehlt der Netto-Einkaufspreis.", field="lieferant_netto_ek"))
+        else:
+            supplier = context.get("resolvedSupplier") or {}
+            if not supplier.get("id"):
+                issues.append(PreviewIssue(severity="error", code="UNKNOWN_SUPPLIER", message=f"Lieferant '{product.lieferant_name}' wurde in Artikelwerk nicht eindeutig gefunden.", field="lieferant_name"))
+            else:
+                article_payload["purchase"] = {
+                    "supplierId": str(supplier["id"]), "articleNumber": product.lieferant_artikelnummer,
+                    "purchasePriceNet": purchase_price,
+                    "currency": str(supplier.get("currency") or settings.currency).upper(), "isDefault": True,
+                }
+
+    category_names = [value for value in (
+        product.kategorie_1, product.kategorie_2, product.kategorie_3,
+        product.kategorie_4, product.kategorie_5, product.kategorie_6,
+    ) if _present(value)]
+    if settings.publish_categories and category_names:
+        if not features.get("categoryWrite", False):
+            issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Kategorien sind in Artikelwerk nicht freigeschaltet.", field="kategorie_1"))
+        else:
+            category_ids = context.get("resolvedCategoryIds") or []
+            if len(category_ids) != len(category_names):
+                issues.append(PreviewIssue(severity="error", code="UNKNOWN_CATEGORY_PATH", message="Der Kategoriepfad wurde in Artikelwerk nicht vollständig und eindeutig gefunden.", field=f"kategorie_{len(category_ids) + 1}"))
+            else:
+                article_payload["categories"] = {
+                    "categoryIds": [int(value) for value in category_ids],
+                    "defaultCategoryId": int(category_ids[-1]),
+                }
     steps.append(PublicationStep(operation="create_article", resource_key="article", payload=article_payload))
 
     if settings.publish_descriptions and any(_present(v) for v in (
@@ -211,16 +270,7 @@ def build_preview(
                 },
             ))
 
-    unsupported = [name for name, value in (
-        ("preis", product.preis), ("ek", product.ek),
-        ("hersteller", product.hersteller), ("lieferant", product.lieferant_name),
-        ("kategorien", product.kategorie_1),
-    ) if _present(value)]
-    if unsupported:
-        issues.append(PreviewIssue(
-            severity="warning", code="UNSUPPORTED_FIELDS",
-            message="Diese Felder werden vom aktuellen Veröffentlichungsworkflow noch nicht geschrieben: " + ", ".join(unsupported),
-        ))
+    unsupported: list[str] = []
 
     return PublicationPreview(
         sku=product.artikelnummer,
