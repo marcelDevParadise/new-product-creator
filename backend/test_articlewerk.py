@@ -156,6 +156,40 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["reusedExisting"])
         self.assertEqual(result["article"]["id"], "12")
 
+    async def test_understands_nested_article_number_search_response(self):
+        methods = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            methods.append(request.method)
+            return httpx.Response(200, json={
+                "data": {"items": [{"articleId": "14", "articleNumber": "CYL-1"}], "total": 1},
+            })
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await _create_or_reuse_article(
+                client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
+            )
+        self.assertEqual(methods, ["GET"])
+        self.assertEqual(result["article"]["id"], "14")
+        self.assertEqual(result["article"]["sku"], "CYL-1")
+
+    async def test_blocks_create_for_unknown_search_response_shape(self):
+        methods = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            methods.append(request.method)
+            return httpx.Response(200, json={"unexpected": {"records": []}})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _create_or_reuse_article(
+                    client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
+                )
+        self.assertEqual(methods, ["GET"])
+        self.assertEqual(caught.exception.code, "INVALID_ARTICLE_SEARCH_RESPONSE")
+
     async def test_reconciles_failed_create_by_sku_without_reposting(self):
         methods = []
         searches = 0

@@ -80,30 +80,76 @@ def _manufacturer_id(response: dict[str, Any]) -> str | None:
     return str(value) if value is not None else None
 
 
-def _result_items(result: Any) -> list[dict[str, Any]]:
+def _article_search_items(result: Any, depth: int = 0) -> list[dict[str, Any]] | None:
+    """Parse known article search envelopes; None means an unsafe unknown shape."""
+    if depth > 3:
+        return None
     if isinstance(result, list):
         return [item for item in result if isinstance(item, dict)]
     if isinstance(result, dict):
-        for key in ("items", "articles", "data"):
+        for key in ("items", "articles", "results", "rows"):
             values = result.get(key)
             if isinstance(values, list):
                 return [item for item in values if isinstance(item, dict)]
-    return []
+        for key in ("data", "result", "page"):
+            if key in result:
+                nested = _article_search_items(result[key], depth + 1)
+                if nested is not None:
+                    return nested
+    return None
+
+
+def _article_sku(item: dict[str, Any]) -> str:
+    article = item.get("article") if isinstance(item.get("article"), dict) else item
+    for key in ("sku", "articleNumber", "artikelnummer", "number"):
+        value = article.get(key)
+        if value not in (None, ""):
+            return str(value)
+    identifiers = article.get("identifiers")
+    if isinstance(identifiers, dict):
+        for key in ("sku", "articleNumber", "artikelnummer"):
+            if identifiers.get(key) not in (None, ""):
+                return str(identifiers[key])
+    return ""
+
+
+def _normalized_article(item: dict[str, Any]) -> dict[str, Any]:
+    raw = item.get("article") if isinstance(item.get("article"), dict) else item
+    article = dict(raw)
+    if article.get("id") is None and article.get("articleId") is not None:
+        article["id"] = article["articleId"]
+    if not article.get("sku"):
+        article["sku"] = _article_sku(item)
+    return article
 
 
 async def _find_article_by_sku(
     client: ArtikelwerkClient, tenant_id: int, sku: str,
 ) -> dict[str, Any] | None:
     result = await client.search_articles(tenant_id, sku=sku)
+    items = _article_search_items(result)
+    if items is None:
+        raise ArtikelwerkError(
+            "Die Antwort der Artikelwerk-Artikelsuche hat kein vertraglich auswertbares Format. "
+            "Die Artikelanlage wurde zum Schutz vor Duplikaten abgebrochen.",
+            status_code=502, code="INVALID_ARTICLE_SEARCH_RESPONSE",
+            details={"responseType": type(result).__name__, "responseKeys": list(result.keys()) if isinstance(result, dict) else None},
+        )
     matches = [
-        item for item in _result_items(result)
-        if str(item.get("sku", "")).strip().casefold() == sku.strip().casefold()
+        item for item in items if _article_sku(item).strip().casefold() == sku.strip().casefold()
     ]
     if len(matches) > 1:
         raise ArtikelwerkError(
             f"Artikelnummer '{sku}' ist in Artikelwerk mehrfach vorhanden.",
             status_code=409, code="DUPLICATE_REMOTE_SKU",
-            details={"sku": sku, "articleIds": [item.get("id") or item.get("articleId") for item in matches]},
+            details={"sku": sku, "articleIds": [_normalized_article(item).get("id") for item in matches]},
+        )
+    if items and not matches:
+        raise ArtikelwerkError(
+            "Die exakte Artikelwerk-SKU-Suche lieferte Datensätze ohne eindeutig passende Artikelnummer. "
+            "Die Artikelanlage wurde zum Schutz vor Duplikaten abgebrochen.",
+            status_code=502, code="ARTICLE_SEARCH_MISMATCH",
+            details={"sku": sku, "returnedSkus": [_article_sku(item) or None for item in items]},
         )
     return matches[0] if matches else None
 
@@ -117,7 +163,7 @@ async def _create_or_reuse_article(
     sku = str(payload["sku"])
     existing = await _find_article_by_sku(client, int(tenant_ids[0]), sku)
     if existing:
-        return {"article": existing, "reusedExisting": True}
+        return {"article": _normalized_article(existing), "reusedExisting": True}
     try:
         return await client.create_article(payload, key)
     except ArtikelwerkError as exc:
@@ -127,7 +173,7 @@ async def _create_or_reuse_article(
         if not existing:
             raise
         return {
-            "article": existing, "createErrorReconciled": True,
+            "article": _normalized_article(existing), "createErrorReconciled": True,
             "originalRequestId": exc.request_id,
         }
 
