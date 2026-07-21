@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult } from '../types';
 
 const BASE = '/api';
 
@@ -44,6 +44,12 @@ export const api = {
   getArtikelwerkPublication: (sku: string) =>
     request<ArtikelwerkPublication>(`/articlewerk/products/${encodeURIComponent(sku)}/status`),
   getArtikelwerkJobs: (limit = 50) => request<ArtikelwerkJob[]>(`/articlewerk/jobs?limit=${limit}`),
+  getArtikelwerkLogs: (options: { limit?: number; status?: string; search?: string } = {}) => {
+    const params = new URLSearchParams({ limit: String(options.limit ?? 100) });
+    if (options.status) params.set('status', options.status);
+    if (options.search) params.set('search', options.search);
+    return request<ArtikelwerkLogResult>(`/articlewerk/logs?${params.toString()}`);
+  },
   retryArtikelwerkJob: (jobId: string) =>
     request<{ job_id: string; status: string; steps: number; retry_of: string }>(`/articlewerk/jobs/${encodeURIComponent(jobId)}/retry`, { method: 'POST' }),
 

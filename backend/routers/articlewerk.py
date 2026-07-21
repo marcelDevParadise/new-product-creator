@@ -14,6 +14,7 @@ from services.database import (
     create_articlewerk_job,
     get_articlewerk_job,
     get_articlewerk_publication,
+    list_articlewerk_logs,
     list_articlewerk_jobs,
     upsert_articlewerk_publication,
 )
@@ -207,6 +208,18 @@ def publication_status(sku: str):
 @router.get("/jobs")
 def jobs(limit: int = Query(default=50, ge=1, le=200)):
     return list_articlewerk_jobs(limit)
+
+
+@router.get("/logs")
+def publication_logs(
+    limit: int = Query(default=100, ge=1, le=500),
+    status: str | None = Query(default=None),
+    search: str | None = Query(default=None, max_length=200),
+):
+    allowed_statuses = {"queued", "publishing", "published", "failed", "partial", "errors"}
+    if status and status not in allowed_statuses:
+        raise HTTPException(400, "Ungültiger Log-Status.")
+    return list_articlewerk_logs(limit=limit, status=status, search=search)
 
 
 @router.get("/jobs/{job_id}")

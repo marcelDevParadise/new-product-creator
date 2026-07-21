@@ -593,6 +593,28 @@ export interface ArtikelwerkJob {
   finished_at: string | null;
 }
 
+export interface ArtikelwerkLogOperation {
+  operation_id: string;
+  operation_type: string;
+  resource_key: string;
+  status: string;
+  attempts: number;
+  remote_operation_id: string | null;
+  error_code: string | null;
+  request_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArtikelwerkLogJob extends ArtikelwerkJob {
+  operations: ArtikelwerkLogOperation[];
+}
+
+export interface ArtikelwerkLogResult {
+  items: ArtikelwerkLogJob[];
+  total: number;
+}
+
 export interface ArtikelwerkPublication {
   artikelnummer: string;
   remote_article_id?: string | null;

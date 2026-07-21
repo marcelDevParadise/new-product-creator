@@ -551,6 +551,70 @@ def list_articlewerk_jobs(limit: int = 50) -> list[dict]:
     return [dict(zip(keys, row)) for row in rows]
 
 
+def list_articlewerk_logs(
+    *, limit: int = 100, status: str | None = None, search: str | None = None,
+) -> dict:
+    """Return persisted publication jobs with their individual API operations."""
+    conditions: list[str] = []
+    params: list[object] = []
+    if status:
+        if status == "errors":
+            conditions.append("j.status IN ('failed', 'partial')")
+        else:
+            conditions.append("j.status=%s")
+            params.append(status)
+    if search:
+        pattern = f"%{search.strip()}%"
+        conditions.append(
+            "(LOWER(j.root_sku) LIKE LOWER(%s) OR LOWER(j.job_id) LIKE LOWER(%s) "
+            "OR LOWER(COALESCE(j.last_error, '')) LIKE LOWER(%s) OR EXISTS ("
+            "SELECT 1 FROM articlewerk_operations search_op WHERE search_op.job_id=j.job_id "
+            "AND (LOWER(COALESCE(search_op.request_id, '')) LIKE LOWER(%s) "
+            "OR LOWER(COALESCE(search_op.error_code, '')) LIKE LOWER(%s))))"
+        )
+        params.extend([pattern] * 5)
+    where = " WHERE " + " AND ".join(conditions) if conditions else ""
+
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(f"SELECT COUNT(*) FROM articlewerk_jobs j{where}", tuple(params))
+        total = int(cur.fetchone()[0])
+        cur.execute(
+            "SELECT j.job_id, j.root_sku, j.status, j.current_phase, j.progress_current, "
+            "j.progress_total, j.last_error, j.created_at, j.started_at, j.finished_at, "
+            "o.operation_id, o.operation_type, o.resource_key, o.status, o.attempts, "
+            "o.remote_operation_id, o.error_code, o.request_id, o.created_at, o.updated_at "
+            "FROM (SELECT * FROM articlewerk_jobs j" + where
+            + " ORDER BY j.created_at DESC LIMIT %s) j "
+            "LEFT JOIN articlewerk_operations o ON o.job_id=j.job_id "
+            "ORDER BY j.created_at DESC, o.created_at ASC",
+            tuple([*params, limit]),
+        )
+        rows = cur.fetchall()
+
+    jobs: list[dict] = []
+    by_id: dict[str, dict] = {}
+    for row in rows:
+        job_id = row[0]
+        job = by_id.get(job_id)
+        if job is None:
+            job = {
+                "job_id": job_id, "root_sku": row[1], "status": row[2],
+                "current_phase": row[3], "progress_current": row[4], "progress_total": row[5],
+                "last_error": row[6], "created_at": row[7], "started_at": row[8],
+                "finished_at": row[9], "operations": [],
+            }
+            by_id[job_id] = job
+            jobs.append(job)
+        if row[10] is not None:
+            job["operations"].append({
+                "operation_id": row[10], "operation_type": row[11], "resource_key": row[12],
+                "status": row[13], "attempts": row[14], "remote_operation_id": row[15],
+                "error_code": row[16], "request_id": row[17], "created_at": row[18],
+                "updated_at": row[19],
+            })
+    return {"items": jobs, "total": total}
+
+
 def list_resumable_articlewerk_jobs() -> list[dict]:
     """Return queued/interrupted jobs including their immutable preview."""
     with _conn() as conn, conn.cursor() as cur:

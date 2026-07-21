@@ -24,6 +24,7 @@ import { WarningsPage } from './pages/WarningsPage';
 import { IngredientsPage } from './pages/IngredientsPage';
 import { ArtikelwerkPage } from './pages/ArtikelwerkPage';
 import { SuppliersPage } from './pages/SuppliersPage';
+import { ArtikelwerkLogsPage } from './pages/ArtikelwerkLogsPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -102,6 +103,7 @@ const router = createBrowserRouter([
       { path: '/warnings', element: <WarningsPage /> },
       { path: '/ingredients', element: <IngredientsPage /> },
       { path: '/artikelwerk', element: <ArtikelwerkPage /> },
+      { path: '/logs', element: <ArtikelwerkLogsPage /> },
     ],
   },
 ]);

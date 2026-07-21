@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon, FileText, GitBranch, AlertTriangle, FlaskConical, X, CloudUpload, Truck } from 'lucide-react';
+import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon, FileText, GitBranch, AlertTriangle, FlaskConical, X, CloudUpload, Truck, ScrollText } from 'lucide-react';
 import { useTheme } from '../../lib/use-theme';
 
 interface NavItem {
@@ -45,6 +45,7 @@ const sections: NavSection[] = [
       { to: '/suppliers', label: 'Lieferanten', icon: Truck },
       { to: '/export', label: 'Export', icon: Download },
       { to: '/artikelwerk', label: 'Artikelwerk', icon: CloudUpload },
+      { to: '/logs', label: 'Logs', icon: ScrollText },
       { to: '/settings', label: 'Einstellungen', icon: SlidersHorizontal },
     ],
   },
