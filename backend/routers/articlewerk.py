@@ -16,6 +16,7 @@ from services.database import (
     get_articlewerk_publication,
     list_articlewerk_logs,
     list_articlewerk_jobs,
+    reset_deleted_articlewerk_publication,
     upsert_articlewerk_publication,
 )
 from state import state
@@ -191,6 +192,18 @@ async def publish_product(sku: str, background_tasks: BackgroundTasks):
     if not preview.valid:
         raise HTTPException(422, {"message": "Die Veröffentlichungsvorschau enthält Fehler.", "issues": [i.model_dump() for i in preview.issues]})
     publication = get_articlewerk_publication(sku)
+    if publication and publication.get("status") == "published" and publication.get("remote_article_id"):
+        create_step = next((step for step in preview.steps if step.operation == "create_article"), None)
+        tenant_ids = create_step.payload.get("tenantIds", []) if create_step else []
+        if tenant_ids:
+            try:
+                async with ArtikelwerkClient(get_artikelwerk_config()) as client:
+                    await client.get_article(str(publication["remote_article_id"]), int(tenant_ids[0]))
+            except ArtikelwerkError as exc:
+                if exc.status_code != 404:
+                    raise _http_error(exc) from exc
+                reset_deleted_articlewerk_publication(sku)
+                publication = None
     if publication and publication.get("status") in {"queued", "publishing", "published"}:
         raise HTTPException(409, "Produkt ist bereits eingeplant oder an Artikelwerk veröffentlicht.")
     job_id = str(uuid.uuid4())

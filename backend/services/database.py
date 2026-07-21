@@ -675,6 +675,23 @@ def get_articlewerk_publication(artikelnummer: str) -> dict | None:
     return dict(zip(keys, row))
 
 
+def reset_deleted_articlewerk_publication(artikelnummer: str) -> None:
+    """Forget a deleted remote article and invalidate its article-scoped operations."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE articlewerk_publications SET remote_article_id=NULL, status='not_published', "
+            f"payload_hash=NULL, last_error_code=NULL, last_error_message=NULL, last_request_id=NULL, "
+            f"updated_at={_NOW_SQL} WHERE artikelnummer=%s",
+            (artikelnummer,),
+        )
+        cur.execute(
+            f"UPDATE articlewerk_operations SET status='invalidated', idempotency_key=NULL, "
+            f"response_json=NULL, remote_operation_id=NULL, error_code=NULL, request_id=NULL, updated_at={_NOW_SQL} "
+            f"WHERE artikelnummer=%s AND operation_type<>'create_manufacturer'",
+            (artikelnummer,),
+        )
+
+
 def get_articlewerk_operation(
     artikelnummer: str, operation_type: str, resource_key: str, payload_hash: str,
 ) -> dict | None:
@@ -719,6 +736,7 @@ def save_articlewerk_operation(
             f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,{_NOW_SQL},{_NOW_SQL}) "
             f"ON CONFLICT (artikelnummer, operation_type, resource_key, payload_hash) DO UPDATE SET "
             f"job_id=excluded.job_id, status=excluded.status, "
+            f"idempotency_key=COALESCE(articlewerk_operations.idempotency_key, excluded.idempotency_key), "
             f"attempts=CASE WHEN excluded.status='pending' THEN articlewerk_operations.attempts+1 ELSE articlewerk_operations.attempts END, "
             f"remote_operation_id=COALESCE(excluded.remote_operation_id, articlewerk_operations.remote_operation_id), "
             f"response_json=COALESCE(excluded.response_json, articlewerk_operations.response_json), "

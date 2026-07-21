@@ -17,6 +17,7 @@ from integrations.artikelwerk.schemas import PublicationPreview, PublicationStep
 from services.database import (
     get_articlewerk_operation,
     get_articlewerk_publication,
+    reset_deleted_articlewerk_publication,
     save_articlewerk_operation,
     update_articlewerk_job,
     upsert_articlewerk_publication,
@@ -217,6 +218,26 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
         publication = get_articlewerk_publication(preview.sku)
         remote_article_id = publication.get("remote_article_id") if publication else None
         async with ArtikelwerkClient(get_artikelwerk_config()) as client:
+            if remote_article_id:
+                create_step = next(
+                    (step for step in preview.steps if step.operation == "create_article"), None,
+                )
+                tenant_ids = create_step.payload.get("tenantIds", []) if create_step else []
+                if not tenant_ids:
+                    raise ArtikelwerkError(
+                        "Mandant für die Prüfung des vorhandenen Artikels fehlt.", code="NO_TENANT",
+                    )
+                active_operation = "verify_article"
+                update_articlewerk_job(
+                    job_id, status="publishing", phase=active_operation, progress=completed,
+                )
+                try:
+                    await client.get_article(remote_article_id, int(tenant_ids[0]))
+                except ArtikelwerkError as exc:
+                    if exc.status_code != 404:
+                        raise
+                    reset_deleted_articlewerk_publication(preview.sku)
+                    remote_article_id = None
             for step in preview.steps:
                 active_operation = step.operation
                 update_articlewerk_job(job_id, status="publishing", phase=step.operation, progress=completed)
