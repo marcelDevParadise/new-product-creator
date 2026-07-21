@@ -54,7 +54,10 @@ async def _create_or_find_manufacturer(
     try:
         return await client.create_manufacturer(payload, key)
     except ArtikelwerkError as exc:
-        if exc.status_code != 409:
+        # A 5xx may occur after the SQL transaction was committed but before
+        # the response reached us. Reconcile by name before marking the job as
+        # failed; the same strategy also handles a concurrent 409 create.
+        if exc.status_code != 409 and exc.status_code < 500:
             raise
         result = await client.search_manufacturers(str(payload["name"]), page_size=100)
         items = result.get("items", []) if isinstance(result, dict) else result
@@ -64,7 +67,11 @@ async def _create_or_find_manufacturer(
         ] if isinstance(items, list) else []
         if len(matches) != 1:
             raise
-        return {"manufacturer": matches[0], "idempotentConflictResolved": True}
+        return {
+            "manufacturer": matches[0],
+            "createErrorReconciled": True,
+            "originalRequestId": exc.request_id,
+        }
 
 
 def _image_path(source: str) -> Path:
@@ -154,6 +161,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
     update_articlewerk_job(job_id, status="publishing", phase="connect", progress=0)
     upsert_articlewerk_publication(preview.sku, status="publishing")
     completed = 0
+    active_operation = "connect"
     remote_article_id: str | None = None
     manufacturer_id: str | None = None
     variation_ids: dict[str, dict[str, str]] = {}
@@ -163,6 +171,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
         remote_article_id = publication.get("remote_article_id") if publication else None
         async with ArtikelwerkClient(get_artikelwerk_config()) as client:
             for step in preview.steps:
+                active_operation = step.operation
                 update_articlewerk_job(job_id, status="publishing", phase=step.operation, progress=completed)
                 payload = dict(step.payload)
 
@@ -257,8 +266,9 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
             error_message=str(exc), request_id=exc.request_id,
         )
         update_articlewerk_job(
-            job_id, status=status, phase="failed", progress=completed,
-            last_error=f"{exc.code}: {exc}",
+            job_id, status=status, phase=active_operation, progress=completed,
+            last_error=(f"{exc.code}: {exc}"
+                        + (f" · Request-ID: {exc.request_id}" if exc.request_id else "")),
         )
     except Exception as exc:
         # Keep unexpected mapper/database/runtime failures visible instead of
@@ -269,6 +279,6 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
             preview.sku, status=status, error_code="INTERNAL_ERROR", error_message=message,
         )
         update_articlewerk_job(
-            job_id, status=status, phase="failed", progress=completed,
-            last_error=f"INTERNAL_ERROR: {message}",
+            job_id, status=status, phase=active_operation, progress=completed,
+            last_error=f"INTERNAL_ERROR in {active_operation}: {message}",
         )
