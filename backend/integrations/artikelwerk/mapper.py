@@ -156,7 +156,13 @@ def build_preview(
     if "purchase" in article_payload:
         purchase_payload = dict(article_payload["purchase"])
         if _present(product.lieferant_artikelname):
-            purchase_payload["articleName"] = product.lieferant_artikelname
+            issues.append(PreviewIssue(
+                severity="warning",
+                code="UNSUPPORTED_SUPPLIER_ARTICLE_NAME",
+                message=("Der Lieferanten-Artikelname wird von der aktuellen Artikelwerk-v1-Route "
+                         "noch nicht angenommen. Lieferant, Artikelnummer und EK werden Ã¼bertragen."),
+                field="lieferant_artikelname",
+            ))
         state_sync_steps.append(PublicationStep(
             operation="sync_supplier",
             resource_key=f"supplier:{purchase_payload['supplierId']}",

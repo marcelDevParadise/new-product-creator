@@ -97,7 +97,8 @@ class MapperTests(unittest.TestCase):
         price_step = next(step for step in preview.steps if step.operation == "sync_price")
         supplier_step = next(step for step in preview.steps if step.operation == "sync_supplier")
         self.assertEqual(price_step.payload["net"], 100)
-        self.assertEqual(supplier_step.payload["articleName"], "Name beim Lieferanten")
+        self.assertNotIn("articleName", supplier_step.payload)
+        self.assertIn("UNSUPPORTED_SUPPLIER_ARTICLE_NAME", {issue.code for issue in preview.issues})
         self.assertEqual(preview.steps[-2].operation, "sync_price")
         self.assertEqual(preview.steps[-1].operation, "sync_supplier")
         self.assertEqual(payload["categories"], {"categoryIds": [600, 615], "defaultCategoryId": 615})
@@ -203,7 +204,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/prices/retail")
         self.assertEqual(requests[1].headers["If-Match"], '"price-rev"')
 
-    async def test_syncs_supplier_article_name_with_etag(self):
+    async def test_syncs_supplier_with_etag(self):
         requests = []
 
         async def handler(request: httpx.Request) -> httpx.Response:
@@ -213,12 +214,12 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             return httpx.Response(200, json={"updated": True})
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
-        payload = {"supplierId": "42", "articleNumber": "SUP-1", "articleName": "Lieferantenname",
-                   "purchasePriceNet": 5, "currency": "EUR", "isDefault": True}
+        payload = {"supplierId": "42", "articleNumber": "SUP-1", "purchasePriceNet": 5,
+                   "currency": "EUR", "isDefault": True}
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
             await _sync_supplier(client, "12", payload)
         self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/suppliers/42")
-        self.assertEqual(json.loads(requests[1].content)["articleName"], "Lieferantenname")
+        self.assertNotIn("articleName", json.loads(requests[1].content))
 
     async def test_reuses_existing_article_without_second_create(self):
         methods = []
