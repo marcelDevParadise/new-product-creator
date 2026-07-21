@@ -80,6 +80,58 @@ def _manufacturer_id(response: dict[str, Any]) -> str | None:
     return str(value) if value is not None else None
 
 
+def _result_items(result: Any) -> list[dict[str, Any]]:
+    if isinstance(result, list):
+        return [item for item in result if isinstance(item, dict)]
+    if isinstance(result, dict):
+        for key in ("items", "articles", "data"):
+            values = result.get(key)
+            if isinstance(values, list):
+                return [item for item in values if isinstance(item, dict)]
+    return []
+
+
+async def _find_article_by_sku(
+    client: ArtikelwerkClient, tenant_id: int, sku: str,
+) -> dict[str, Any] | None:
+    result = await client.search_articles(tenant_id, sku=sku)
+    matches = [
+        item for item in _result_items(result)
+        if str(item.get("sku", "")).strip().casefold() == sku.strip().casefold()
+    ]
+    if len(matches) > 1:
+        raise ArtikelwerkError(
+            f"Artikelnummer '{sku}' ist in Artikelwerk mehrfach vorhanden.",
+            status_code=409, code="DUPLICATE_REMOTE_SKU",
+            details={"sku": sku, "articleIds": [item.get("id") or item.get("articleId") for item in matches]},
+        )
+    return matches[0] if matches else None
+
+
+async def _create_or_reuse_article(
+    client: ArtikelwerkClient, payload: dict[str, Any], key: str,
+) -> dict[str, Any]:
+    tenant_ids = payload.get("tenantIds") or []
+    if not tenant_ids:
+        raise ArtikelwerkError("Mandant für die Artikelanlage fehlt.", status_code=400, code="NO_TENANT")
+    sku = str(payload["sku"])
+    existing = await _find_article_by_sku(client, int(tenant_ids[0]), sku)
+    if existing:
+        return {"article": existing, "reusedExisting": True}
+    try:
+        return await client.create_article(payload, key)
+    except ArtikelwerkError as exc:
+        if exc.status_code != 409 and exc.status_code < 500:
+            raise
+        existing = await _find_article_by_sku(client, int(tenant_ids[0]), sku)
+        if not existing:
+            raise
+        return {
+            "article": existing, "createErrorReconciled": True,
+            "originalRequestId": exc.request_id,
+        }
+
+
 async def _create_or_find_manufacturer(
     client: ArtikelwerkClient, payload: dict[str, Any], key: str,
 ) -> dict[str, Any]:
@@ -261,7 +313,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                         payload["manufacturerId"] = int(manufacturer_id)
                     response = await _execute_operation(
                         client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=True,
-                        invoke=lambda key: client.create_article(payload, key or ""),
+                        invoke=lambda key: _create_or_reuse_article(client, payload, key or ""),
                     )
                     article = response.get("article", {})
                     remote_article_id = str(article.get("id", ""))

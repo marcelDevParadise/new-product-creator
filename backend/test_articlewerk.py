@@ -12,7 +12,7 @@ import httpx
 from config import ArtikelwerkConfig
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
 from integrations.artikelwerk.mapper import build_preview
-from integrations.artikelwerk.publisher import prepare_image_payload
+from integrations.artikelwerk.publisher import _create_or_reuse_article, prepare_image_payload
 from integrations.artikelwerk.schemas import ArtikelwerkSettings
 from models.attribute import AttributeDefinition
 from models.product import Product
@@ -138,6 +138,46 @@ class ImagePayloadTests(unittest.TestCase):
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reuses_existing_article_without_second_create(self):
+        methods = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            methods.append(request.method)
+            return httpx.Response(200, json={
+                "items": [{"id": "12", "sku": "CYL-1", "name": "Vorhanden"}],
+            })
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await _create_or_reuse_article(
+                client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
+            )
+        self.assertEqual(methods, ["GET"])
+        self.assertTrue(result["reusedExisting"])
+        self.assertEqual(result["article"]["id"], "12")
+
+    async def test_reconciles_failed_create_by_sku_without_reposting(self):
+        methods = []
+        searches = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal searches
+            methods.append(request.method)
+            if request.method == "POST":
+                return httpx.Response(500, json={"code": "INTERNAL_ERROR", "error": "Unklare Antwort"})
+            searches += 1
+            items = [] if searches == 1 else [{"id": "13", "sku": "CYL-1", "name": "Angelegt"}]
+            return httpx.Response(200, json={"items": items})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await _create_or_reuse_article(
+                client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
+            )
+        self.assertEqual(methods, ["GET", "POST", "GET"])
+        self.assertTrue(result["createErrorReconciled"])
+        self.assertEqual(result["article"]["id"], "13")
+
     async def test_creates_manufacturer_idempotently(self):
         seen = {}
 

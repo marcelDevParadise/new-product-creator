@@ -188,7 +188,11 @@ class ArtikelwerkClient:
         return await self.request("GET", f"tenants/{tenant_id}/next-article-number")  # type: ignore[return-value]
 
     async def create_article(self, payload: dict[str, Any], key: str) -> dict[str, Any]:
-        return await self.request("POST", "articles", json=payload, idempotency_key=key)  # type: ignore[return-value]
+        # A timed-out create is ambiguous. The publisher reconciles by exact
+        # SKU before deciding whether another POST is safe.
+        return await self.request(
+            "POST", "articles", json=payload, idempotency_key=key, max_attempts=1,
+        )  # type: ignore[return-value]
 
     async def search_manufacturers(
         self, search: str | None = None, *, page: int = 1, page_size: int = 25,
