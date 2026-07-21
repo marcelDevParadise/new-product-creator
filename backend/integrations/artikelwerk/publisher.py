@@ -9,6 +9,7 @@ import re
 import uuid
 from pathlib import Path
 from typing import Any, Awaitable, Callable
+from urllib.parse import unquote, urlsplit
 
 from config import get_artikelwerk_config
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
@@ -106,7 +107,23 @@ async def _create_or_find_manufacturer(
 
 def _image_path(source: str) -> Path:
     root = Path(os.environ.get("IMAGE_LIBRARY_ROOT", "/srv/images")).resolve()
-    value = source.split("?", 1)[0]
+    parsed = urlsplit(source)
+    if re.match(r"^[A-Za-z]:[\\/]", source):
+        value = source.split("?", 1)[0]
+    elif parsed.scheme in {"http", "https"}:
+        value = unquote(parsed.path)
+        if not value.startswith("/images/"):
+            raise ArtikelwerkError(
+                "Externe Bild-URLs müssen auf die lokale /images/-Bibliothek verweisen.",
+                status_code=400, code="INVALID_IMAGE_PATH",
+            )
+    elif parsed.scheme:
+        raise ArtikelwerkError(
+            f"Nicht unterstütztes Bild-URL-Schema: {parsed.scheme}",
+            status_code=400, code="INVALID_IMAGE_PATH",
+        )
+    else:
+        value = unquote(source.split("?", 1)[0])
     if value.startswith("/images/"):
         candidate = root / value[len("/images/"):]
     elif value.startswith("images/"):

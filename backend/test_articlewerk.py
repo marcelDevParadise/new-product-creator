@@ -1,13 +1,18 @@
 """Focused tests for the Artikelwerk contract adapter."""
 
 import json
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 
 from config import ArtikelwerkConfig
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
 from integrations.artikelwerk.mapper import build_preview
+from integrations.artikelwerk.publisher import prepare_image_payload
 from integrations.artikelwerk.schemas import ArtikelwerkSettings
 from models.attribute import AttributeDefinition
 from models.product import Product
@@ -114,6 +119,22 @@ class MapperTests(unittest.TestCase):
         self.assertTrue(preview.valid)
         self.assertIn("SKIPPED_ATTRIBUTE", {issue.code for issue in preview.issues})
         self.assertNotIn("set_attribute", {step.operation for step in preview.steps})
+
+
+class ImagePayloadTests(unittest.TestCase):
+    def test_maps_public_image_url_to_local_library(self):
+        with tempfile.TemporaryDirectory() as directory:
+            image = Path(directory) / "produkte" / "brand" / "produkt" / "bild.webp"
+            image.parent.mkdir(parents=True)
+            image.write_bytes(b"test-image")
+            with patch.dict(os.environ, {"IMAGE_LIBRARY_ROOT": directory}):
+                payload = prepare_image_payload({
+                    "source": "https://raspberrypi.example/images/produkte/brand/produkt/bild.webp?cache=1",
+                    "filename": "bild.webp", "tenantIds": [4], "order": 1,
+                })
+        self.assertEqual(payload["filename"], "bild.webp")
+        self.assertEqual(payload["tenantIds"], [4])
+        self.assertTrue(payload["imageBase64"])
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
