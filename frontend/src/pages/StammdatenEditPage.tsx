@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker, Link } from 'react-router-dom';
-import { Save, ArrowRight, ChevronRight, GitBranch, ArrowDownFromLine, X, Copy, Code, Eye, Plus } from 'lucide-react';
+import { Save, ArrowRight, ChevronRight, GitBranch, ArrowDownFromLine, X, Copy, Code, Eye, Plus, CloudUpload } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CategoryCascader } from '../components/ui/CategoryCascader';
 import { HtmlEditor } from '../components/ui/HtmlEditor';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import { VariantMatrix } from '../components/products/VariantMatrix';
 import { slugify } from '../lib/utils';
-import type { Product, CategoryTree, VariantenSettings } from '../types';
+import type { Product, CategoryTree, VariantenSettings, ArtikelwerkPreview } from '../types';
 
 const EINHEITEN_FALLBACK = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
 
@@ -112,6 +115,8 @@ export function StammdatenEditPage() {
   const [newKeyword, setNewKeyword] = useState('');
   const [showSourceKurz, setShowSourceKurz] = useState(false);
   const [showSourceBeschr, setShowSourceBeschr] = useState(false);
+  const [artikelwerkPreview, setArtikelwerkPreview] = useState<ArtikelwerkPreview | null>(null);
+  const [artikelwerkLoading, setArtikelwerkLoading] = useState(false);
 
   const markDirty = () => setDirty(true);
 
@@ -211,6 +216,32 @@ export function StammdatenEditPage() {
     }
   };
 
+  const handleArtikelwerkPreview = async () => {
+    if (!product || dirty) return;
+    setArtikelwerkLoading(true);
+    try {
+      setArtikelwerkPreview(await api.previewArtikelwerk(product.artikelnummer));
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Artikelwerk-Prüfung fehlgeschlagen', 'error');
+    } finally {
+      setArtikelwerkLoading(false);
+    }
+  };
+
+  const handleArtikelwerkPublish = async () => {
+    if (!product) return;
+    setArtikelwerkLoading(true);
+    try {
+      const result = await api.publishArtikelwerk(product.artikelnummer);
+      toast(`Artikelwerk-Job mit ${result.steps} Schritten gestartet`, 'success');
+      setArtikelwerkPreview(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Veröffentlichung fehlgeschlagen', 'error');
+    } finally {
+      setArtikelwerkLoading(false);
+    }
+  };
+
   const handleSave = useCallback(async (andContinue: boolean) => {
     if (!product || !f) return;
     setSaving(true);
@@ -293,6 +324,18 @@ export function StammdatenEditPage() {
           title={product.artikelname}
           description={`Stammdaten für ${product.artikelnummer} bearbeiten`}
           actions={
+            <div className="flex items-center gap-2">
+            {!product.parent_sku && (
+              <button
+                onClick={handleArtikelwerkPreview}
+                disabled={artikelwerkLoading || dirty}
+                title={dirty ? 'Bitte zuerst die Stammdaten speichern' : 'Über Artikelwerk an JTL-Wawi veröffentlichen'}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CloudUpload className="w-4 h-4" />
+                {artikelwerkLoading ? 'Prüft…' : 'An JTL senden'}
+              </button>
+            )}
             <button
               onClick={async () => {
                 try {
@@ -308,6 +351,7 @@ export function StammdatenEditPage() {
               <Copy className="w-4 h-4" />
               Klonen
             </button>
+            </div>
           }
         />
       </div>
@@ -715,6 +759,40 @@ export function StammdatenEditPage() {
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
+
+      <Dialog open={artikelwerkPreview !== null} onOpenChange={open => { if (!open) setArtikelwerkPreview(null); }}>
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Veröffentlichung an JTL-Wawi prüfen</DialogTitle>
+            <DialogDescription>
+              {artikelwerkPreview?.steps.length || 0} API-Schritte für {product.artikelnummer}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {artikelwerkPreview?.issues.length === 0 && (
+              <p className="text-sm text-green-700 bg-green-50 rounded-lg p-3">Keine Mapping-Probleme gefunden.</p>
+            )}
+            {artikelwerkPreview?.issues.map((issue, index) => (
+              <div key={`${issue.code}-${index}`} className={`rounded-lg border p-3 text-sm ${issue.severity === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                <span className="font-medium">{issue.code}</span>: {issue.message}
+              </div>
+            ))}
+            <div className="rounded-lg border p-3 text-sm">
+              <p className="font-medium mb-2">Geplante Schritte</p>
+              <div className="flex flex-wrap gap-1.5">
+                {artikelwerkPreview?.steps.map(step => <Badge key={step.resource_key} variant="secondary">{step.operation}</Badge>)}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArtikelwerkPreview(null)}>Abbrechen</Button>
+            <Button onClick={handleArtikelwerkPublish} disabled={!artikelwerkPreview?.valid || artikelwerkLoading}>
+              <CloudUpload className="w-4 h-4" />
+              {artikelwerkLoading ? 'Startet…' : 'Veröffentlichen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
