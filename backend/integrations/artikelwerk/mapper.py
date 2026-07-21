@@ -147,23 +147,23 @@ def build_preview(
     )):
         if not features.get("descriptionWrite", False):
             issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Beschreibungen sind nicht freigeschaltet."))
-        for tenant_id in settings.tenant_ids:
-            steps.append(PublicationStep(
-                operation="upsert_description",
-                resource_key=f"description:{tenant_id}:{settings.language_id}:{settings.platform_id}",
-                payload={
-                    "languageId": settings.language_id,
-                    "platformId": settings.platform_id,
-                    "tenantId": tenant_id,
-                    "name": product.artikelname,
-                    "description": product.beschreibung,
-                    "shortDescription": product.kurzbeschreibung,
-                    "urlPath": product.url_pfad,
-                    "metaDescription": product.meta_description,
-                    "titleTag": product.title_tag,
-                    "metaKeywords": product.seo_keywords,
-                },
-            ))
+        steps.append(PublicationStep(
+            operation="upsert_description",
+            resource_key=f"description:0:{settings.language_id}:{settings.platform_id}",
+            payload={
+                "languageId": settings.language_id,
+                "platformId": settings.platform_id,
+                # Artikelwerk/JTL uses tenant 0 for the global description and SEO context.
+                "tenantId": 0,
+                "name": product.artikelname,
+                "description": product.beschreibung,
+                "shortDescription": product.kurzbeschreibung,
+                "urlPath": product.url_pfad,
+                "metaDescription": product.meta_description,
+                "titleTag": product.title_tag,
+                "metaKeywords": product.seo_keywords,
+            },
+        ))
 
     if settings.publish_attributes and product.attributes:
         if not features.get("attributeWrite", False):

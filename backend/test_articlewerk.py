@@ -109,6 +109,29 @@ class MapperTests(unittest.TestCase):
             ["create_article", "upsert_description", "set_attribute", "update_base_price"],
         )
         self.assertEqual(preview.steps[0].payload["weight"], 0.25)
+        description_step = next(step for step in preview.steps if step.operation == "upsert_description")
+        self.assertEqual(description_step.payload["tenantId"], 0)
+        self.assertEqual(description_step.resource_key, "description:0:1:1")
+
+    def test_creates_only_one_global_description_for_multiple_tenants(self):
+        product = Product(
+            artikelnummer="CYL-SEO", artikelname="SEO Test", title_tag="Globaler Titel",
+            meta_description="Globale Beschreibung",
+        )
+        context = {
+            **CONTEXT,
+            "tenants": [
+                *CONTEXT["tenants"],
+                {"id": 5, "name": "Weiterer Shop", "articleCount": 0, "isDefault": False},
+            ],
+        }
+        preview = build_preview(
+            product, children=[], attribute_config={}, context=context, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4, 5]),
+        )
+        descriptions = [step for step in preview.steps if step.operation == "upsert_description"]
+        self.assertEqual(len(descriptions), 1)
+        self.assertEqual(descriptions[0].payload["tenantId"], 0)
 
     def test_unknown_attribute_is_skipped_without_blocking_publication(self):
         product = Product(artikelnummer="CYL-TEST", artikelname="Test", attributes={"missing": "x"})
