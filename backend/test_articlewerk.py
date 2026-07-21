@@ -12,7 +12,12 @@ import httpx
 from config import ArtikelwerkConfig
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
 from integrations.artikelwerk.mapper import build_preview
-from integrations.artikelwerk.publisher import _create_or_reuse_article, prepare_image_payload
+from integrations.artikelwerk.publisher import (
+    _create_or_reuse_article,
+    _sync_price,
+    _sync_supplier,
+    prepare_image_payload,
+)
 from integrations.artikelwerk.schemas import ArtikelwerkSettings
 from models.attribute import AttributeDefinition
 from models.product import Product
@@ -71,6 +76,7 @@ class MapperTests(unittest.TestCase):
         product = Product(
             artikelnummer="CYL-FULL", artikelname="Vollständig", preis=119, ek=40,
             hersteller="Acme", lieferant_name="Supply", lieferant_artikelnummer="SUP-1",
+            lieferant_artikelname="Name beim Lieferanten",
             lieferant_netto_ek=35, kategorie_1="Pflege", kategorie_2="Leder",
         )
         context = {
@@ -88,6 +94,10 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(payload["price"]["net"], 100)
         self.assertEqual(payload["purchase"]["supplierId"], "42")
         self.assertEqual(payload["purchase"]["purchasePriceNet"], 35)
+        price_step = next(step for step in preview.steps if step.operation == "sync_price")
+        supplier_step = next(step for step in preview.steps if step.operation == "sync_supplier")
+        self.assertEqual(price_step.payload["net"], 100)
+        self.assertEqual(supplier_step.payload["articleName"], "Name beim Lieferanten")
         self.assertEqual(payload["categories"], {"categoryIds": [600, 615], "defaultCategoryId": 615})
         self.assertEqual(preview.unsupported_fields, [])
 
@@ -145,6 +155,17 @@ class MapperTests(unittest.TestCase):
 
 
 class ImagePayloadTests(unittest.TestCase):
+    def test_image_url_query_is_mapped_to_stable_article_filename(self):
+        product = Product(
+            artikelnummer="CYL-IMG", artikelname="Bild", bild_1="https://example.test/images/a/b.webp?v=2",
+        )
+        preview = build_preview(
+            product, children=[], attribute_config={}, context=CONTEXT,
+            capabilities=CAPABILITIES, settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        step = next(step for step in preview.steps if step.operation == "upload_image")
+        self.assertEqual(step.payload["filename"], "CYL-IMG-01.webp")
+
     def test_maps_public_image_url_to_local_library(self):
         with tempfile.TemporaryDirectory() as directory:
             image = Path(directory) / "produkte" / "brand" / "produkt" / "bild.webp"
@@ -161,6 +182,42 @@ class ImagePayloadTests(unittest.TestCase):
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_syncs_existing_price_with_etag(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "GET":
+                return httpx.Response(200, headers={"ETag": '"price-rev"'}, json={
+                    "items": [{"priceId": "retail", "customerGroupId": 1, "quantityFrom": 1}],
+                })
+            return httpx.Response(200, json={"updated": True})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        payload = {"tenantId": 4, "customerGroupId": 1, "currency": "EUR", "net": 10,
+                   "taxRate": 19, "quantityFrom": 1}
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            await _sync_price(client, "12", payload)
+        self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/prices/retail")
+        self.assertEqual(requests[1].headers["If-Match"], '"price-rev"')
+
+    async def test_syncs_supplier_article_name_with_etag(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "GET":
+                return httpx.Response(200, headers={"ETag": '"supplier-rev"'}, json={"items": []})
+            return httpx.Response(200, json={"updated": True})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        payload = {"supplierId": "42", "articleNumber": "SUP-1", "articleName": "Lieferantenname",
+                   "purchasePriceNet": 5, "currency": "EUR", "isDefault": True}
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            await _sync_supplier(client, "12", payload)
+        self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/suppliers/42")
+        self.assertEqual(json.loads(requests[1].content)["articleName"], "Lieferantenname")
+
     async def test_reuses_existing_article_without_second_create(self):
         methods = []
 

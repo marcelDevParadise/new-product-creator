@@ -123,6 +123,81 @@ def _normalized_article(item: dict[str, Any]) -> dict[str, Any]:
     return article
 
 
+def _collection_items(value: Any, depth: int = 0) -> list[dict[str, Any]]:
+    """Read list responses used by the generic ETag-backed v1 routes."""
+    if depth > 4:
+        return []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, dict)]
+    if isinstance(value, dict):
+        if any(key in value for key in ("id", "priceId", "supplierId")):
+            return [value]
+        for key in ("items", "prices", "suppliers", "rows", "results"):
+            if isinstance(value.get(key), list):
+                return [item for item in value[key] if isinstance(item, dict)]
+        for key in ("data", "result", "page"):
+            if key in value:
+                nested = _collection_items(value[key], depth + 1)
+                if nested:
+                    return nested
+    return []
+
+
+def _required_etag(etag: str | None, resource: str) -> str:
+    if etag:
+        return etag
+    raise ArtikelwerkError(
+        f"Artikelwerk lieferte fÃ¼r {resource} keinen ETag.",
+        status_code=502,
+        code="MISSING_ETAG",
+    )
+
+
+async def _sync_price(
+    client: ArtikelwerkClient, article_id: str, payload: dict[str, Any],
+) -> dict[str, Any]:
+    current = await client.get_article_prices(article_id, int(payload["tenantId"]))
+    items = _collection_items(current.data)
+    wanted_group = str(payload["customerGroupId"])
+    wanted_quantity = float(payload.get("quantityFrom", 1))
+    matches = [
+        item for item in items
+        if str(item.get("customerGroupId", item.get("customerGroup", ""))) == wanted_group
+        and float(item.get("quantityFrom", item.get("fromQuantity", 1)) or 1) == wanted_quantity
+    ]
+    if not matches and len(items) == 1:
+        matches = items
+    if len(matches) != 1:
+        raise ArtikelwerkError(
+            "Der zu aktualisierende Artikelwerk-Verkaufspreis wurde nicht eindeutig gefunden.",
+            status_code=409,
+            code="PRICE_NOT_FOUND",
+            details={"tenantId": payload["tenantId"], "customerGroupId": payload["customerGroupId"],
+                     "availablePrices": items},
+        )
+    price = matches[0]
+    price_id = price.get("id") or price.get("priceId") or price.get("key")
+    if price_id in (None, ""):
+        raise ArtikelwerkError(
+            "Artikelwerk lieferte keine Preis-ID.", status_code=502, code="INVALID_PRICE_RESPONSE",
+            details={"price": price},
+        )
+    return await client.set_article_price(
+        article_id, str(price_id), payload, _required_etag(current.etag, "den Verkaufspreis"),
+    )
+
+
+async def _sync_supplier(
+    client: ArtikelwerkClient, article_id: str, payload: dict[str, Any],
+) -> dict[str, Any]:
+    supplier_id = str(payload.pop("supplierId"))
+    current = await client.get_article_suppliers(article_id)
+    # The supplier PUT is an upsert, so an existing list entry is not required.
+    return await client.upsert_article_supplier(
+        article_id, supplier_id, payload, _required_etag(current.etag, "die Lieferantenzuordnung"),
+    )
+
+
 async def _find_article_by_sku(
     client: ArtikelwerkClient, tenant_id: int, sku: str,
 ) -> dict[str, Any] | None:
@@ -266,10 +341,12 @@ async def _execute_operation(
     payload: dict[str, Any],
     idempotent: bool,
     invoke: Callable[[str | None], Awaitable[dict[str, Any]]],
+    reuse_success: bool = True,
 ) -> dict[str, Any]:
     digest = _payload_hash(payload)
     existing = get_articlewerk_operation(sku, step.operation, step.resource_key, digest)
-    if existing and existing["status"] == "succeeded" and existing.get("response") is not None:
+    if (reuse_success and existing and existing["status"] == "succeeded"
+            and existing.get("response") is not None):
         return existing["response"]
 
     operation_id = existing["operation_id"] if existing else str(uuid.uuid4())
@@ -381,11 +458,25 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                         await _execute_operation(
                             client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
                             invoke=lambda _key: client.upsert_description(remote_article_id or "", payload),
+                            reuse_success=False,
                         )
                     elif step.operation == "update_base_price":
                         await _execute_operation(
                             client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
                             invoke=lambda _key: client.update_base_price(remote_article_id or "", payload),
+                            reuse_success=False,
+                        )
+                    elif step.operation == "sync_price":
+                        await _execute_operation(
+                            client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
+                            invoke=lambda _key: _sync_price(client, remote_article_id or "", payload),
+                            reuse_success=False,
+                        )
+                    elif step.operation == "sync_supplier":
+                        await _execute_operation(
+                            client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
+                            invoke=lambda _key: _sync_supplier(client, remote_article_id or "", payload),
+                            reuse_success=False,
                         )
                     elif step.operation == "upload_image":
                         image_payload = prepare_image_payload(payload)

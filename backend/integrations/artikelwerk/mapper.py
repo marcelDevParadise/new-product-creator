@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from integrations.artikelwerk.schemas import (
     ArtikelwerkSettings,
@@ -141,6 +142,26 @@ def build_preview(
                 }
     steps.append(PublicationStep(operation="create_article", resource_key="article", payload=article_payload))
 
+    # CreateArticle writes these values for a new article. Keep explicit state
+    # steps as well: an existing SKU is deliberately reused and POST /articles
+    # never updates it.
+    if "price" in article_payload:
+        steps.append(PublicationStep(
+            operation="sync_price",
+            resource_key=(f"price:{article_payload['price']['tenantId']}:"
+                          f"{article_payload['price']['customerGroupId']}:1"),
+            payload=dict(article_payload["price"]),
+        ))
+    if "purchase" in article_payload:
+        purchase_payload = dict(article_payload["purchase"])
+        if _present(product.lieferant_artikelname):
+            purchase_payload["articleName"] = product.lieferant_artikelname
+        steps.append(PublicationStep(
+            operation="sync_supplier",
+            resource_key=f"supplier:{purchase_payload['supplierId']}",
+            payload=purchase_payload,
+        ))
+
     if settings.publish_descriptions and any(_present(v) for v in (
         product.beschreibung, product.kurzbeschreibung, product.url_pfad,
         product.title_tag, product.meta_description, product.seo_keywords,
@@ -229,7 +250,10 @@ def build_preview(
         for order, source in enumerate(image_values, start=1):
             if not _present(source):
                 continue
-            suffix = Path(str(source)).suffix.lower()
+            source_text = str(source)
+            parsed = urlsplit(source_text)
+            source_path = unquote(parsed.path) if parsed.scheme in {"http", "https"} else source_text.split("?", 1)[0]
+            suffix = Path(source_path).suffix.lower()
             if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
                 issues.append(PreviewIssue(
                     severity="error", code="UNSUPPORTED_IMAGE",
@@ -238,7 +262,12 @@ def build_preview(
                 continue
             steps.append(PublicationStep(
                 operation="upload_image", resource_key=f"image:{order}",
-                payload={"source": str(source), "filename": Path(str(source)).name, "tenantIds": settings.tenant_ids, "order": order},
+                payload={
+                    "source": source_text,
+                    "filename": f"{product.artikelnummer}-{order:02d}{suffix}",
+                    "tenantIds": settings.tenant_ids,
+                    "order": order,
+                },
             ))
 
     if product.is_parent and children and settings.publish_variants:
