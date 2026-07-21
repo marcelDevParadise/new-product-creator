@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication } from '../types';
 
 const BASE = '/api';
 
@@ -462,18 +462,22 @@ export const api = {
 
   // Lieferanten
   getSuppliers: () => request<Supplier[]>('/suppliers'),
-  createSupplier: (name: string) =>
+  createSupplier: (data: SupplierPayload) =>
     request<Supplier>('/suppliers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(data),
     }),
-  updateSupplier: (id: number, name: string) =>
+  updateSupplier: (id: number, data: SupplierPayload) =>
     request<Supplier>(`/suppliers/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(data),
     }),
+  publishSupplierToArtikelwerk: (id: number) =>
+    request<Supplier>(`/suppliers/${id}/articlewerk`, { method: 'POST' }),
+  importSuppliersFromArtikelwerk: () =>
+    request<{ imported: number; created: number; updated: number }>('/suppliers/articlewerk/import', { method: 'POST' }),
   deleteSupplier: (id: number) =>
     request<{ deleted: boolean }>(`/suppliers/${id}`, { method: 'DELETE' }),
 

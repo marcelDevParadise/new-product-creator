@@ -256,6 +256,28 @@ class ArtikelwerkClient:
             "POST", f"articles/{_segment(article_id)}/activate", json=payload, idempotency_key=key,
         )  # type: ignore[return-value]
 
+    async def create_supplier(self, payload: dict[str, Any], key: str) -> dict[str, Any]:
+        return await self.request(
+            "POST", "suppliers", json=payload, idempotency_key=key,
+        )  # type: ignore[return-value]
+
+    async def search_suppliers(
+        self,
+        *,
+        supplier_number: str | None = None,
+        name: str | None = None,
+        active: bool | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> dict[str, Any]:
+        return await self.request("GET", "suppliers", params={
+            "supplierNumber": supplier_number,
+            "name": name,
+            "active": active,
+            "page": page,
+            "pageSize": page_size,
+        })  # type: ignore[return-value]
+
     async def get_article_suppliers(self, article_id: str) -> ETaggedResponse:
         return await self.request_etagged("GET", f"articles/{_segment(article_id)}/suppliers")
 

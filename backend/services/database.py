@@ -246,6 +246,7 @@ def init_db() -> None:
         _migrate_product_columns(cur)
         _migrate_template_columns(cur)
         _migrate_articlewerk_columns(cur)
+        _migrate_supplier_columns(cur)
         cur.execute(
             "INSERT INTO suppliers (name) "
             "SELECT DISTINCT TRIM(lieferant_name) FROM products "
@@ -259,30 +260,44 @@ def init_db() -> None:
 def load_all_suppliers() -> list[dict]:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT s.id, s.name, COUNT(p.artikelnummer), s.created_at, s.updated_at "
+            "SELECT s.id, s.name, s.supplier_number, s.currency, s.email, s.phone, s.website, s.active, "
+            "s.default_company_id, s.default_warehouse_id, s.articlewerk_supplier_id, "
+            "s.articlewerk_revision, s.articlewerk_synced_at, s.articlewerk_sync_error, COUNT(p.artikelnummer), s.created_at, s.updated_at "
             "FROM suppliers s LEFT JOIN products p ON LOWER(p.lieferant_name) = LOWER(s.name) "
-            "GROUP BY s.id, s.name, s.created_at, s.updated_at "
+            "GROUP BY s.id, s.name, s.supplier_number, s.currency, s.email, s.phone, s.website, s.active, "
+            "s.default_company_id, s.default_warehouse_id, s.articlewerk_supplier_id, "
+            "s.articlewerk_revision, s.articlewerk_synced_at, s.articlewerk_sync_error, s.created_at, s.updated_at "
             "ORDER BY LOWER(s.name)"
         )
         rows = cur.fetchall()
     return [
-        {"id": row[0], "name": row[1], "product_count": row[2], "created_at": row[3], "updated_at": row[4]}
+        {
+            "id": row[0], "name": row[1], "supplier_number": row[2], "currency": row[3],
+            "email": row[4], "phone": row[5], "website": row[6], "active": bool(row[7]),
+            "default_company_id": row[8], "default_warehouse_id": row[9],
+            "articlewerk_supplier_id": row[10], "articlewerk_revision": row[11],
+            "articlewerk_synced_at": row[12], "articlewerk_sync_error": row[13],
+            "product_count": row[14], "created_at": row[15], "updated_at": row[16],
+        }
         for row in rows
     ]
 
 
-def create_supplier(name: str) -> dict:
+def create_supplier(data: dict) -> dict:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
-            f"INSERT INTO suppliers (name, created_at, updated_at) "
-            f"VALUES (%s, {_NOW_SQL}, {_NOW_SQL}) RETURNING id, name, created_at, updated_at",
-            (name,),
+            f"INSERT INTO suppliers "
+            f"(name, supplier_number, currency, email, phone, website, active, default_company_id, default_warehouse_id, created_at, updated_at) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, {_NOW_SQL}, {_NOW_SQL}) RETURNING id",
+            (data["name"], data.get("supplier_number"), data.get("currency", "EUR"), data.get("email"),
+             data.get("phone"), data.get("website"), int(data.get("active", True)),
+             data.get("default_company_id"), data.get("default_warehouse_id")),
         )
-        row = cur.fetchone()
-    return {"id": row[0], "name": row[1], "product_count": 0, "created_at": row[2], "updated_at": row[3]}
+        supplier_id = cur.fetchone()[0]
+    return next(item for item in load_all_suppliers() if item["id"] == supplier_id)
 
 
-def rename_supplier(supplier_id: int, name: str) -> tuple[dict | None, str | None]:
+def update_supplier(supplier_id: int, data: dict) -> tuple[dict | None, str | None]:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute("SELECT name FROM suppliers WHERE id = %s", (supplier_id,))
         row = cur.fetchone()
@@ -290,15 +305,81 @@ def rename_supplier(supplier_id: int, name: str) -> tuple[dict | None, str | Non
             return None, None
         old_name = row[0]
         cur.execute(
-            f"UPDATE suppliers SET name = %s, updated_at = {_NOW_SQL} WHERE id = %s",
-            (name, supplier_id),
+            f"UPDATE suppliers SET name=%s, supplier_number=%s, currency=%s, email=%s, phone=%s, website=%s, "
+            f"active=%s, default_company_id=%s, default_warehouse_id=%s, updated_at={_NOW_SQL} WHERE id=%s",
+            (data["name"], data.get("supplier_number"), data.get("currency", "EUR"), data.get("email"),
+             data.get("phone"), data.get("website"), int(data.get("active", True)),
+             data.get("default_company_id"), data.get("default_warehouse_id"), supplier_id),
         )
         cur.execute(
             "UPDATE products SET lieferant_name = %s WHERE LOWER(lieferant_name) = LOWER(%s)",
-            (name, old_name),
+            (data["name"], old_name),
         )
     supplier = next((item for item in load_all_suppliers() if item["id"] == supplier_id), None)
     return supplier, old_name
+
+
+def save_supplier_articlewerk_result(
+    supplier_id: int, *, remote_id: str | None = None, revision: str | None = None,
+    error: str | None = None,
+) -> dict | None:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE suppliers SET articlewerk_supplier_id=COALESCE(%s, articlewerk_supplier_id), "
+            f"articlewerk_revision=COALESCE(%s, articlewerk_revision), "
+            f"articlewerk_synced_at=CASE WHEN %s IS NOT NULL THEN {_NOW_SQL} ELSE articlewerk_synced_at END, "
+            f"articlewerk_sync_error=%s, updated_at={_NOW_SQL} WHERE id=%s",
+            (remote_id, revision, remote_id, error, supplier_id),
+        )
+    return next((item for item in load_all_suppliers() if item["id"] == supplier_id), None)
+
+
+def upsert_articlewerk_supplier(remote: dict) -> tuple[dict, bool]:
+    remote_id = str(remote["id"])
+    number = str(remote["supplierNumber"]).strip()
+    name = str(remote["name"]).strip()
+    suppliers = load_all_suppliers()
+    match = next((item for item in suppliers if item.get("articlewerk_supplier_id") == remote_id), None)
+    if match is None:
+        match = next(
+            (item for item in suppliers if (item.get("supplier_number") or "").casefold() == number.casefold()),
+            None,
+        )
+    if match is None:
+        match = next(
+            (item for item in suppliers
+             if not item.get("supplier_number") and item["name"].casefold() == name.casefold()),
+            None,
+        )
+    with _conn() as conn, conn.cursor() as cur:
+        if match:
+            cur.execute(
+                f"UPDATE suppliers SET name=%s, supplier_number=%s, currency=%s, email=%s, phone=%s, website=%s, "
+                f"active=%s, articlewerk_supplier_id=%s, articlewerk_revision=%s, articlewerk_synced_at={_NOW_SQL}, "
+                f"articlewerk_sync_error=NULL, updated_at={_NOW_SQL} WHERE id=%s",
+                (name, number, remote.get("currency", "EUR"), remote.get("email"), remote.get("phone"),
+                 remote.get("website"), int(remote.get("active", True)), remote_id, remote.get("revision"), match["id"]),
+            )
+            if match["name"] != name:
+                cur.execute(
+                    "UPDATE products SET lieferant_name=%s WHERE LOWER(lieferant_name)=LOWER(%s)",
+                    (name, match["name"]),
+                )
+            supplier_id = match["id"]
+            created = False
+        else:
+            cur.execute(
+                f"INSERT INTO suppliers "
+                f"(name, supplier_number, currency, email, phone, website, active, articlewerk_supplier_id, "
+                f"articlewerk_revision, articlewerk_synced_at, created_at, updated_at) "
+                f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,{_NOW_SQL},{_NOW_SQL},{_NOW_SQL}) RETURNING id",
+                (name, number, remote.get("currency", "EUR"), remote.get("email"), remote.get("phone"),
+                 remote.get("website"), int(remote.get("active", True)), remote_id, remote.get("revision")),
+            )
+            supplier_id = cur.fetchone()[0]
+            created = True
+    supplier = next(item for item in load_all_suppliers() if item["id"] == supplier_id)
+    return supplier, created
 
 
 def delete_supplier(supplier_id: int) -> tuple[bool, str | None, int]:
@@ -385,6 +466,29 @@ def _migrate_template_columns(cur: psycopg.Cursor) -> None:
 
 def _migrate_articlewerk_columns(cur: psycopg.Cursor) -> None:
     cur.execute("ALTER TABLE articlewerk_jobs ADD COLUMN IF NOT EXISTS preview_json TEXT NOT NULL DEFAULT '{}'")
+
+
+def _migrate_supplier_columns(cur: psycopg.Cursor) -> None:
+    migrations = [
+        ("supplier_number", "TEXT"),
+        ("currency", "TEXT NOT NULL DEFAULT 'EUR'"),
+        ("email", "TEXT"),
+        ("phone", "TEXT"),
+        ("website", "TEXT"),
+        ("active", "INTEGER NOT NULL DEFAULT 1"),
+        ("default_company_id", "INTEGER"),
+        ("default_warehouse_id", "INTEGER"),
+        ("articlewerk_supplier_id", "TEXT"),
+        ("articlewerk_revision", "TEXT"),
+        ("articlewerk_synced_at", "TEXT"),
+        ("articlewerk_sync_error", "TEXT"),
+    ]
+    for col_name, col_type in migrations:
+        cur.execute(f"ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_suppliers_number_ci "
+        "ON suppliers (LOWER(supplier_number)) WHERE supplier_number IS NOT NULL AND supplier_number <> ''"
+    )
 
 
 # --- Artikelwerk publication state ---

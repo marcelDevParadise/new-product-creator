@@ -146,6 +146,13 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             await client.set_article_categories("12", {"categoryIds": [1]}, '"0xA1"')
             await client.deactivate_article("12", {}, "lifecycle:off")
             await client.activate_article("12", {}, "lifecycle:on")
+            await client.create_supplier({
+                "name": "Lieferant GmbH",
+                "supplierNumber": "L-10042",
+                "defaultCompanyId": 1,
+                "defaultWarehouseId": 1,
+            }, "supplier-master:10042")
+            await client.search_suppliers(supplier_number="L-10042", active=True, page=2, page_size=50)
             await client.get_article_suppliers("12")
             await client.upsert_article_supplier("12", "7", {"net": 5}, '"0xA1"')
             await client.delete_article_supplier("12", "7", '"0xA1"')
@@ -168,10 +175,66 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             ("PATCH", "/api/integrations/v1/articles/12/variations/9"),
             ("PUT", "/api/integrations/v1/articles/12/suppliers/7"),
             ("POST", "/api/integrations/v1/articles/12/inventory-adjustments"),
+            ("POST", "/api/integrations/v1/suppliers"),
             ("POST", "/api/integrations/v1/jobs/article-updates"),
             ("GET", "/api/integrations/v1/changes"),
         }
         self.assertTrue(expected.issubset(seen))
+
+    async def test_searches_global_suppliers_with_filters(self):
+        seen = {}
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            seen["path"] = request.url.path
+            seen["params"] = dict(request.url.params)
+            return httpx.Response(200, json={
+                "items": [{
+                    "id": "42", "name": "Lieferant GmbH", "supplierNumber": "L-10042",
+                    "currency": "EUR", "email": None, "phone": None, "website": None,
+                    "active": True, "revision": "0xA1",
+                }],
+                "page": 2, "pageSize": 50, "total": 1, "totalPages": 1,
+            })
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await client.search_suppliers(
+                supplier_number="L-10042", name="GmbH", active=True, page=2, page_size=50,
+            )
+
+        self.assertEqual(seen["path"], "/api/integrations/v1/suppliers")
+        self.assertEqual(seen["params"], {
+            "supplierNumber": "L-10042", "name": "GmbH", "active": "true", "page": "2", "pageSize": "50",
+        })
+        self.assertEqual(result["items"][0]["revision"], "0xA1")
+
+    async def test_creates_supplier_with_idempotency_key(self):
+        seen = {}
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            seen["path"] = request.url.path
+            seen["key"] = request.headers.get("Idempotency-Key")
+            seen["body"] = json.loads(request.content)
+            return httpx.Response(201, json={
+                "operationId": "f9be70ad-24b9-45b6-9301-32173972f457",
+                "supplier": {"id": "42", "name": "Lieferant GmbH", "supplierNumber": "L-10042"},
+            })
+
+        payload = {
+            "name": "Lieferant GmbH",
+            "supplierNumber": "L-10042",
+            "currency": "EUR",
+            "defaultCompanyId": 1,
+            "defaultWarehouseId": 1,
+        }
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await client.create_supplier(payload, "supplier-master:10042")
+
+        self.assertEqual(seen["path"], "/api/integrations/v1/suppliers")
+        self.assertEqual(seen["key"], "supplier-master:10042")
+        self.assertEqual(seen["body"], payload)
+        self.assertEqual(result["supplier"]["id"], "42")
 
 
 if __name__ == "__main__":

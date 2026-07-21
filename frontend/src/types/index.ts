@@ -413,9 +413,33 @@ export interface CategoryTree {
 export interface Supplier {
   id: number;
   name: string;
+  supplier_number: string | null;
+  currency: string;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  active: boolean;
+  default_company_id: number | null;
+  default_warehouse_id: number | null;
+  articlewerk_supplier_id: string | null;
+  articlewerk_revision: string | null;
+  articlewerk_synced_at: string | null;
+  articlewerk_sync_error: string | null;
   product_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface SupplierPayload {
+  name: string;
+  supplier_number?: string | null;
+  currency?: string;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  active?: boolean;
+  default_company_id?: number | null;
+  default_warehouse_id?: number | null;
 }
 
 // Global Search

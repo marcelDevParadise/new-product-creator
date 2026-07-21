@@ -13,7 +13,9 @@ from services.database import (
     delete_attribute_definition as db_delete_attribute_definition,
     count_attribute_definitions,
     load_all_suppliers, create_supplier as db_create_supplier,
-    rename_supplier as db_rename_supplier, delete_supplier as db_delete_supplier,
+    update_supplier as db_update_supplier, delete_supplier as db_delete_supplier,
+    save_supplier_articlewerk_result as db_save_supplier_articlewerk_result,
+    upsert_articlewerk_supplier as db_upsert_articlewerk_supplier,
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -156,16 +158,41 @@ class AppState:
     def get_suppliers(self) -> list[dict]:
         return load_all_suppliers()
 
-    def create_supplier(self, name: str) -> dict:
-        return db_create_supplier(name)
+    def get_supplier(self, supplier_id: int) -> dict | None:
+        return next((supplier for supplier in load_all_suppliers() if supplier["id"] == supplier_id), None)
 
-    def rename_supplier(self, supplier_id: int, name: str) -> tuple[dict | None, str | None]:
-        supplier, old_name = db_rename_supplier(supplier_id, name)
+    def create_supplier(self, data: dict) -> dict:
+        return db_create_supplier(data)
+
+    def update_supplier(self, supplier_id: int, data: dict) -> tuple[dict | None, str | None]:
+        supplier, old_name = db_update_supplier(supplier_id, data)
         if supplier and old_name:
             for product in self.products.values():
                 if (product.lieferant_name or "").lower() == old_name.lower():
-                    product.lieferant_name = name
+                    product.lieferant_name = data["name"]
         return supplier, old_name
+
+    def save_supplier_articlewerk_result(
+        self, supplier_id: int, *, remote_id: str | None = None, revision: str | None = None,
+        error: str | None = None,
+    ) -> dict | None:
+        return db_save_supplier_articlewerk_result(
+            supplier_id, remote_id=remote_id, revision=revision, error=error,
+        )
+
+    def upsert_articlewerk_supplier(self, remote: dict) -> tuple[dict, bool]:
+        before = self.get_supplier(next(
+            (item["id"] for item in self.get_suppliers()
+             if item.get("articlewerk_supplier_id") == str(remote["id"])
+             or (item.get("supplier_number") or "").casefold() == str(remote["supplierNumber"]).casefold()),
+            -1,
+        ))
+        supplier, created = db_upsert_articlewerk_supplier(remote)
+        if before and before["name"] != supplier["name"]:
+            for product in self.products.values():
+                if (product.lieferant_name or "").casefold() == before["name"].casefold():
+                    product.lieferant_name = supplier["name"]
+        return supplier, created
 
     def delete_supplier(self, supplier_id: int) -> tuple[bool, str | None, int]:
         return db_delete_supplier(supplier_id)
