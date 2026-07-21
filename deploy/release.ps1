@@ -19,6 +19,14 @@ if ($status) {
 	exit 1
 }
 
+$trackedDatabases = git ls-files | Where-Object {
+	$_ -match '(?i)\.(db|sqlite|sqlite3|db3|sdb|s3db)(-wal|-shm)?$'
+}
+if ($trackedDatabases) {
+	Write-Error "Release abgebrochen: Datenbankdateien duerfen nicht von Git verwaltet werden.`n$($trackedDatabases -join "`n")"
+	exit 1
+}
+
 git pull --ff-only
 
 # Tag-Name bestimmen

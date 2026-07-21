@@ -29,9 +29,19 @@ vorlagen/
 backend/.env
 backend/data/settings.local.json
 
-backend/backend/*.db
-backend/backend/*.db-shm
-backend/backend/*.db-wal
+# Datenbanken sind ausschliesslich Laufzeitdaten und duerfen niemals deployed werden.
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.db3
+*.sdb
+*.s3db
 backend/backend/services/
 
 Umsetzung/

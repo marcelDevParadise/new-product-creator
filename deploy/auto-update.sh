@@ -52,6 +52,14 @@ echo "[$(date '+%F %T')] Neuer Tag erkannt: ${LATEST_TAG}"
 echo "Vorheriger Deploy:                    ${LAST_DEPLOYED:-<keiner>}"
 echo "============================================================"
 
+# Datenbanken sind Laufzeitdaten. Ein Tag, der eine DB enthaelt, darf niemals
+# ausgecheckt werden, weil git checkout sonst produktive Daten ersetzen kann.
+if git ls-tree -r --name-only "${LATEST_TAG}" \
+	| grep -Eqi '\.(db|sqlite|sqlite3|db3|sdb|s3db)(-wal|-shm)?$'; then
+	echo "!! Tag enthaelt eine Datenbankdatei - Deploy aus Sicherheitsgruenden abgebrochen."
+	exit 1
+fi
+
 # --- Auf den Tag wechseln (detached HEAD), dabei working tree clean halten ---
 if ! git diff --quiet || ! git diff --cached --quiet; then
 	echo "!! Working tree ist dirty \u2014 abbrechen."
