@@ -410,6 +410,14 @@ export interface CategoryTree {
   [name: string]: CategoryTree;
 }
 
+export interface Supplier {
+  id: number;
+  name: string;
+  product_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Global Search
 
 export interface GlobalSearchResult {

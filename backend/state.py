@@ -12,6 +12,8 @@ from services.database import (
     load_all_attribute_definitions, save_attribute_definition,
     delete_attribute_definition as db_delete_attribute_definition,
     count_attribute_definitions,
+    load_all_suppliers, create_supplier as db_create_supplier,
+    rename_supplier as db_rename_supplier, delete_supplier as db_delete_supplier,
 )
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -148,6 +150,25 @@ class AppState:
     def save_product_changes(self, product: Product) -> None:
         """Persist current product state to DB (call after attribute changes)."""
         save_product(product)
+
+    # --- Suppliers ---
+
+    def get_suppliers(self) -> list[dict]:
+        return load_all_suppliers()
+
+    def create_supplier(self, name: str) -> dict:
+        return db_create_supplier(name)
+
+    def rename_supplier(self, supplier_id: int, name: str) -> tuple[dict | None, str | None]:
+        supplier, old_name = db_rename_supplier(supplier_id, name)
+        if supplier and old_name:
+            for product in self.products.values():
+                if (product.lieferant_name or "").lower() == old_name.lower():
+                    product.lieferant_name = name
+        return supplier, old_name
+
+    def delete_supplier(self, supplier_id: int) -> tuple[bool, str | None, int]:
+        return db_delete_supplier(supplier_id)
 
     # --- Variants ---
 

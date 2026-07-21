@@ -219,7 +219,7 @@ def build_preview(
     if unsupported:
         issues.append(PreviewIssue(
             severity="warning", code="UNSUPPORTED_FIELDS",
-            message="Diese Felder werden von Artikelwerk API v1 nicht geschrieben: " + ", ".join(unsupported),
+            message="Diese Felder werden vom aktuellen Veröffentlichungsworkflow noch nicht geschrieben: " + ", ".join(unsupported),
         ))
 
     return PublicationPreview(

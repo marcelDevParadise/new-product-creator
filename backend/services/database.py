@@ -170,6 +170,18 @@ def init_db() -> None:
             )
         """)
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id BIGSERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+                updated_at TEXT NOT NULL DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+            )
+        """)
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_suppliers_name_ci
+            ON suppliers (LOWER(name))
+        """)
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS product_ingredients (
                 artikelnummer TEXT NOT NULL,
                 ingredient_id BIGINT NOT NULL,
@@ -234,6 +246,77 @@ def init_db() -> None:
         _migrate_product_columns(cur)
         _migrate_template_columns(cur)
         _migrate_articlewerk_columns(cur)
+        cur.execute(
+            "INSERT INTO suppliers (name) "
+            "SELECT DISTINCT TRIM(lieferant_name) FROM products "
+            "WHERE lieferant_name IS NOT NULL AND TRIM(lieferant_name) <> '' "
+            "ON CONFLICT DO NOTHING"
+        )
+
+
+# --- Suppliers ---
+
+def load_all_suppliers() -> list[dict]:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT s.id, s.name, COUNT(p.artikelnummer), s.created_at, s.updated_at "
+            "FROM suppliers s LEFT JOIN products p ON LOWER(p.lieferant_name) = LOWER(s.name) "
+            "GROUP BY s.id, s.name, s.created_at, s.updated_at "
+            "ORDER BY LOWER(s.name)"
+        )
+        rows = cur.fetchall()
+    return [
+        {"id": row[0], "name": row[1], "product_count": row[2], "created_at": row[3], "updated_at": row[4]}
+        for row in rows
+    ]
+
+
+def create_supplier(name: str) -> dict:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO suppliers (name, created_at, updated_at) "
+            f"VALUES (%s, {_NOW_SQL}, {_NOW_SQL}) RETURNING id, name, created_at, updated_at",
+            (name,),
+        )
+        row = cur.fetchone()
+    return {"id": row[0], "name": row[1], "product_count": 0, "created_at": row[2], "updated_at": row[3]}
+
+
+def rename_supplier(supplier_id: int, name: str) -> tuple[dict | None, str | None]:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT name FROM suppliers WHERE id = %s", (supplier_id,))
+        row = cur.fetchone()
+        if not row:
+            return None, None
+        old_name = row[0]
+        cur.execute(
+            f"UPDATE suppliers SET name = %s, updated_at = {_NOW_SQL} WHERE id = %s",
+            (name, supplier_id),
+        )
+        cur.execute(
+            "UPDATE products SET lieferant_name = %s WHERE LOWER(lieferant_name) = LOWER(%s)",
+            (name, old_name),
+        )
+    supplier = next((item for item in load_all_suppliers() if item["id"] == supplier_id), None)
+    return supplier, old_name
+
+
+def delete_supplier(supplier_id: int) -> tuple[bool, str | None, int]:
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT s.name, COUNT(p.artikelnummer) FROM suppliers s "
+            "LEFT JOIN products p ON LOWER(p.lieferant_name) = LOWER(s.name) "
+            "WHERE s.id = %s GROUP BY s.id, s.name",
+            (supplier_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return False, None, 0
+        name, product_count = row
+        if product_count:
+            return False, name, product_count
+        cur.execute("DELETE FROM suppliers WHERE id = %s", (supplier_id,))
+    return True, name, 0
 
 
 def _migrate_product_columns(cur: psycopg.Cursor) -> None:

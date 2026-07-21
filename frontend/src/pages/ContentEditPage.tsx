@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker } from 'react-router-dom';
-import { Save, ChevronRight, Code, Eye, FileText, Plus, X } from 'lucide-react';
+import { Save, ChevronRight, FileText, Plus, X } from 'lucide-react';
 import { api } from '@/api/client';
 import { useToast } from '@/components/ui/Toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -22,9 +22,6 @@ export function ContentEditPage() {
   const [beschreibung, setBeschreibung] = useState('');
   const [seoKeywords, setSeoKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
-
-  const [showSourceKurz, setShowSourceKurz] = useState(false);
-  const [showSourceBeschr, setShowSourceBeschr] = useState(false);
 
   // Block navigation when dirty
   const blocker = useBlocker(dirty && !saving);
@@ -165,64 +162,24 @@ export function ContentEditPage() {
         <div className="max-w-4xl space-y-8">
           {/* Kurzbeschreibung */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Kurzbeschreibung</label>
-              <button
-                type="button"
-                onClick={() => setShowSourceKurz((v) => !v)}
-                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                {showSourceKurz ? <Eye className="w-3.5 h-3.5" /> : <Code className="w-3.5 h-3.5" />}
-                {showSourceKurz ? 'Editor' : 'HTML-Quelltext'}
-              </button>
-            </div>
-            {showSourceKurz ? (
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
-                rows={6}
-                value={kurzbeschreibung}
-                onChange={(e) => { setKurzbeschreibung(e.target.value); setDirty(true); }}
-                placeholder="<p>HTML-Quelltext eingeben…</p>"
-              />
-            ) : (
-              <HtmlEditor
-                content={kurzbeschreibung}
-                onChange={(html) => { setKurzbeschreibung(html); setDirty(true); }}
-                placeholder="Kurze Produktbeschreibung eingeben…"
-                minHeight="120px"
-              />
-            )}
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Kurzbeschreibung</label>
+            <HtmlEditor
+              content={kurzbeschreibung}
+              onChange={(html) => { setKurzbeschreibung(html); setDirty(true); }}
+              placeholder="Kurzbeschreibung verfassen …"
+              minHeight="120px"
+            />
           </div>
 
           {/* Beschreibung */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Beschreibung</label>
-              <button
-                type="button"
-                onClick={() => setShowSourceBeschr((v) => !v)}
-                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                {showSourceBeschr ? <Eye className="w-3.5 h-3.5" /> : <Code className="w-3.5 h-3.5" />}
-                {showSourceBeschr ? 'Editor' : 'HTML-Quelltext'}
-              </button>
-            </div>
-            {showSourceBeschr ? (
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
-                rows={14}
-                value={beschreibung}
-                onChange={(e) => { setBeschreibung(e.target.value); setDirty(true); }}
-                placeholder="<p>HTML-Quelltext eingeben…</p>"
-              />
-            ) : (
-              <HtmlEditor
-                content={beschreibung}
-                onChange={(html) => { setBeschreibung(html); setDirty(true); }}
-                placeholder="Ausführliche Produktbeschreibung eingeben…"
-                minHeight="300px"
-              />
-            )}
+            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Beschreibung</label>
+            <HtmlEditor
+              content={beschreibung}
+              onChange={(html) => { setBeschreibung(html); setDirty(true); }}
+              placeholder="Ausführliche Produktbeschreibung eingeben …"
+              minHeight="300px"
+            />
           </div>
 
           {/* SEO Keywords */}

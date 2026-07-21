@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication } from '../types';
 
 const BASE = '/api';
 
@@ -459,6 +459,23 @@ export const api = {
     }),
   deleteBundle: (id: number) =>
     request<{ deleted: boolean }>(`/bundles/${id}`, { method: 'DELETE' }),
+
+  // Lieferanten
+  getSuppliers: () => request<Supplier[]>('/suppliers'),
+  createSupplier: (name: string) =>
+    request<Supplier>('/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  updateSupplier: (id: number, name: string) =>
+    request<Supplier>(`/suppliers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  deleteSupplier: (id: number) =>
+    request<{ deleted: boolean }>(`/suppliers/${id}`, { method: 'DELETE' }),
 
   // Warnings
   getWarnings: () => request<Warning[]>('/warnings'),

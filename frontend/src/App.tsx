@@ -23,6 +23,7 @@ import { BundlesPage } from './pages/BundlesPage';
 import { WarningsPage } from './pages/WarningsPage';
 import { IngredientsPage } from './pages/IngredientsPage';
 import { ArtikelwerkPage } from './pages/ArtikelwerkPage';
+import { SuppliersPage } from './pages/SuppliersPage';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -91,6 +92,7 @@ const router = createBrowserRouter([
       { path: '/attributes', element: <AttributesPage /> },
       { path: '/templates', element: <TemplatesPage /> },
       { path: '/categories', element: <CategoriesPage /> },
+      { path: '/suppliers', element: <SuppliersPage /> },
       { path: '/export', element: <ExportPage /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '/activity', element: <ActivityLogPage /> },
