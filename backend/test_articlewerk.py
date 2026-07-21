@@ -124,7 +124,10 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             seen["path"] = request.url.path
             seen["key"] = request.headers.get("Idempotency-Key")
             seen["body"] = json.loads(request.content)
-            return httpx.Response(201, json={"manufacturer": {"id": 12, "name": "Acme"}})
+            return httpx.Response(201, headers={"X-Idempotent-Replay": "false"}, json={
+                "operationId": "f9be70ad-24b9-45b6-9301-32173972f457",
+                "manufacturer": {"id": 12, "name": "Acme"},
+            })
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
@@ -133,6 +136,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             "path": "/api/integrations/v1/manufacturers",
             "key": "manufacturer:acme", "body": {"name": "Acme"},
         })
+        self.assertEqual(result["operationId"], "f9be70ad-24b9-45b6-9301-32173972f457")
         self.assertEqual(result["manufacturer"]["id"], 12)
 
     async def test_searches_manufacturers_and_categories(self):
