@@ -713,6 +713,25 @@ def get_articlewerk_operation(
     return result
 
 
+def get_articlewerk_managed_attribute_ids(artikelnummer: str) -> set[str]:
+    """Return attributes whose latest successful generator action assigned them."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT ON (resource_key) resource_key, operation_type "
+            "FROM articlewerk_operations "
+            "WHERE artikelnummer=%s AND operation_type IN ('set_attribute', 'delete_attribute') "
+            "AND status='succeeded' "
+            "ORDER BY resource_key, updated_at DESC, operation_id DESC",
+            (artikelnummer,),
+        )
+        rows = cur.fetchall()
+    return {
+        str(resource_key).split(":", 1)[1]
+        for resource_key, operation_type in rows
+        if operation_type == "set_attribute" and str(resource_key).startswith("attribute:")
+    }
+
+
 def save_articlewerk_operation(
     operation_id: str,
     job_id: str,

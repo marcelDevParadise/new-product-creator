@@ -31,6 +31,7 @@ def build_preview(
     context: dict[str, Any],
     capabilities: dict[str, Any],
     settings: ArtikelwerkSettings,
+    managed_attribute_ids: set[str] | None = None,
 ) -> PublicationPreview:
     issues: list[PreviewIssue] = []
     steps: list[PublicationStep] = []
@@ -143,9 +144,38 @@ def build_preview(
                 }
     steps.append(PublicationStep(operation="create_article", resource_key="article", payload=article_payload))
 
+    # POST /articles never updates an existing SKU. Keep the mutable article
+    # state as explicit steps; the publisher skips them only when this run
+    # actually created the article.
+    article_update_payload = {
+        "name": product.artikelname,
+        "inventoryTracking": settings.inventory_tracking,
+        "gtin": product.ean,
+        "dimensions": dict(article_payload["dimensions"]),
+        "weight": article_payload["weight"],
+        "shippingWeight": article_payload["shippingWeight"],
+    }
+    if "manufacturerId" in article_payload:
+        article_update_payload["manufacturerId"] = article_payload["manufacturerId"]
+    state_sync_steps.extend([
+        PublicationStep(
+            operation="sync_article", resource_key="article-master",
+            payload={"tenantId": settings.tenant_ids[0] if settings.tenant_ids else None,
+                     "article": article_update_payload},
+        ),
+        PublicationStep(
+            operation="sync_tenants", resource_key="article-tenants",
+            payload={"tenantIds": list(settings.tenant_ids)},
+        ),
+    ])
+    if "categories" in article_payload:
+        state_sync_steps.append(PublicationStep(
+            operation="sync_categories", resource_key="article-categories",
+            payload=dict(article_payload["categories"]),
+        ))
+
     # CreateArticle writes these values for a new article. Keep explicit state
-    # steps as well: an existing SKU is deliberately reused and POST /articles
-    # never updates it.
+    # steps as well so an existing SKU converges to the local target state.
     if "price" in article_payload:
         state_sync_steps.append(PublicationStep(
             operation="sync_price",
@@ -193,9 +223,10 @@ def build_preview(
             },
         ))
 
-    if settings.publish_attributes and product.attributes:
+    if settings.publish_attributes and (product.attributes or managed_attribute_ids):
         if not features.get("attributeWrite", False):
             issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Attribute sind nicht freigeschaltet."))
+        desired_attribute_ids: set[str] = set()
         for key, value in product.attributes.items():
             definition = attribute_config.get(key)
             stable_id = key.casefold()
@@ -227,6 +258,15 @@ def build_preview(
             steps.append(PublicationStep(
                 operation="set_attribute", resource_key=f"attribute:{remote_id}",
                 payload={"attributeId": remote_id, "value": text_value},
+            ))
+            desired_attribute_ids.add(remote_id)
+        for remote_id in sorted((managed_attribute_ids or set()) - desired_attribute_ids):
+            if remote_id not in remote_attributes:
+                continue
+            steps.append(PublicationStep(
+                operation="delete_attribute", resource_key=f"attribute:{remote_id}",
+                payload={"attributeId": remote_id,
+                         "tenantId": settings.tenant_ids[0] if settings.tenant_ids else None},
             ))
 
     if settings.publish_base_price and product.grundpreis_ausweisen:

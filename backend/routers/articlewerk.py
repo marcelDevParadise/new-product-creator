@@ -12,6 +12,7 @@ from integrations.artikelwerk.schemas import ArtikelwerkSettings, ConnectionStat
 from routers.settings import get_artikelwerk_settings, save_artikelwerk_settings
 from services.database import (
     create_articlewerk_job,
+    get_articlewerk_managed_attribute_ids,
     get_articlewerk_job,
     get_articlewerk_publication,
     list_articlewerk_logs,
@@ -143,6 +144,7 @@ async def _preview(sku: str) -> PublicationPreview:
     return build_preview(
         product, children=children, attribute_config=state.attribute_config,
         context=context, capabilities=capabilities, settings=settings,
+        managed_attribute_ids=get_articlewerk_managed_attribute_ids(product.artikelnummer),
     )
 
 

@@ -14,8 +14,12 @@ from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
 from integrations.artikelwerk.mapper import build_preview
 from integrations.artikelwerk.publisher import (
     _create_or_reuse_article,
+    _delete_attribute,
+    _sync_article,
+    _sync_categories,
     _sync_price,
     _sync_supplier,
+    _sync_tenants,
     prepare_image_payload,
 )
 from integrations.artikelwerk.schemas import ArtikelwerkSettings
@@ -102,6 +106,8 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(preview.steps[-2].operation, "sync_price")
         self.assertEqual(preview.steps[-1].operation, "sync_supplier")
         self.assertEqual(payload["categories"], {"categoryIds": [600, 615], "defaultCategoryId": 615})
+        category_step = next(step for step in preview.steps if step.operation == "sync_categories")
+        self.assertEqual(category_step.payload, payload["categories"])
         self.assertEqual(preview.unsupported_fields, [])
 
     def test_maps_article_attribute_description_and_base_price(self):
@@ -119,9 +125,13 @@ class MapperTests(unittest.TestCase):
         self.assertTrue(preview.valid, preview.issues)
         self.assertEqual(
             [s.operation for s in preview.steps],
-            ["create_article", "upsert_description", "set_attribute", "update_base_price"],
+            ["create_article", "upsert_description", "set_attribute", "update_base_price",
+             "sync_article", "sync_tenants"],
         )
         self.assertEqual(preview.steps[0].payload["weight"], 0.25)
+        article_step = next(step for step in preview.steps if step.operation == "sync_article")
+        self.assertEqual(article_step.payload["article"]["weight"], 0.25)
+        self.assertEqual(article_step.payload["tenantId"], 4)
         description_step = next(step for step in preview.steps if step.operation == "upsert_description")
         self.assertEqual(description_step.payload["tenantId"], 0)
         self.assertEqual(description_step.resource_key, "description:0:1:1")
@@ -156,6 +166,31 @@ class MapperTests(unittest.TestCase):
         self.assertIn("SKIPPED_ATTRIBUTE", {issue.code for issue in preview.issues})
         self.assertNotIn("set_attribute", {step.operation for step in preview.steps})
 
+    def test_deletes_only_previously_managed_missing_attributes(self):
+        product = Product(
+            artikelnummer="CYL-ATTR-SYNC", artikelname="Test", attributes={"material": "Leder"},
+        )
+        context = {
+            **CONTEXT,
+            "attributes": [
+                *CONTEXT["attributes"],
+                {"id": "color", "name": "Farbe", "allowsCustomValue": True},
+                {"id": "external", "name": "Extern", "allowsCustomValue": True},
+            ],
+        }
+        preview = build_preview(
+            product, children=[],
+            attribute_config={
+                "material": AttributeDefinition(id="material", category="Produkt", name="Material"),
+            },
+            context=context, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4]),
+            managed_attribute_ids={"material", "color"},
+        )
+        deletes = [step for step in preview.steps if step.operation == "delete_attribute"]
+        self.assertEqual([step.payload["attributeId"] for step in deletes], ["color"])
+        self.assertNotIn("external", {step.payload["attributeId"] for step in deletes})
+
 
 class ImagePayloadTests(unittest.TestCase):
     def test_image_url_query_is_mapped_to_stable_article_filename(self):
@@ -185,6 +220,76 @@ class ImagePayloadTests(unittest.TestCase):
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_deletes_managed_attribute_with_fresh_article_etag(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "GET":
+                return httpx.Response(200, headers={"ETag": '"attribute-rev"'}, json={})
+            return httpx.Response(200, json={"deleted": True})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            await _delete_attribute(client, "12", {"attributeId": "color", "tenantId": 4})
+
+        self.assertEqual(requests[0].url.path, "/api/integrations/v1/articles/12")
+        self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/attributes/color")
+        self.assertEqual(requests[1].headers["If-Match"], '"attribute-rev"')
+
+    async def test_syncs_existing_article_state_with_fresh_etags(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "GET":
+                return httpx.Response(200, headers={"ETag": '"fresh-rev"'}, json={})
+            return httpx.Response(200, json={"updated": True})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            await _sync_article(client, "12", {
+                "tenantId": 4,
+                "article": {"name": "Neu", "gtin": "123", "weight": 0.25},
+            })
+            await _sync_tenants(client, "12", {"tenantIds": [4, 5]})
+            await _sync_categories(client, "12", {
+                "categoryIds": [600, 615], "defaultCategoryId": 615,
+            })
+
+        self.assertEqual(
+            [(request.method, request.url.path) for request in requests],
+            [
+                ("GET", "/api/integrations/v1/articles/12"),
+                ("PATCH", "/api/integrations/v1/articles/12"),
+                ("GET", "/api/integrations/v1/articles/12/tenants"),
+                ("PUT", "/api/integrations/v1/articles/12/tenants"),
+                ("GET", "/api/integrations/v1/articles/12/categories"),
+                ("PUT", "/api/integrations/v1/articles/12/categories"),
+            ],
+        )
+        for request in requests[1::2]:
+            self.assertEqual(request.headers["If-Match"], '"fresh-rev"')
+        self.assertEqual(json.loads(requests[1].content), {
+            "name": "Neu", "gtin": "123", "weight": 0.25,
+        })
+        self.assertEqual(json.loads(requests[3].content), {"tenantIds": [4, 5]})
+        self.assertEqual(json.loads(requests[5].content), {
+            "categoryIds": [600, 615], "defaultCategoryId": 615,
+        })
+
+    async def test_rejects_update_without_etag(self):
+        async def handler(_request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _sync_article(client, "12", {
+                    "tenantId": 4, "article": {"name": "Neu"},
+                })
+        self.assertEqual(caught.exception.code, "MISSING_ETAG")
+
     async def test_syncs_existing_price_with_etag(self):
         requests = []
 

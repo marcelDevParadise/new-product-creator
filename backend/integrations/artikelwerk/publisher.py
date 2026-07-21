@@ -200,6 +200,55 @@ async def _sync_supplier(
     )
 
 
+async def _sync_article(
+    client: ArtikelwerkClient, article_id: str, payload: dict[str, Any],
+) -> dict[str, Any]:
+    tenant_id = payload.get("tenantId")
+    article_payload = payload.get("article")
+    if tenant_id is None or not isinstance(article_payload, dict):
+        raise ArtikelwerkError(
+            "Der Artikel-Zielzustand ist unvollstaendig.", status_code=400, code="INVALID_UPDATE_STATE",
+        )
+    current = await client.get_article(article_id, int(tenant_id))
+    return await client.patch_article(
+        article_id, article_payload, _required_etag(current.etag, "den Artikelstamm"),
+    )
+
+
+async def _sync_tenants(
+    client: ArtikelwerkClient, article_id: str, payload: dict[str, Any],
+) -> dict[str, Any]:
+    current = await client.get_article_tenants(article_id)
+    return await client.set_article_tenants(
+        article_id, payload, _required_etag(current.etag, "die Mandantenzuordnungen"),
+    )
+
+
+async def _sync_categories(
+    client: ArtikelwerkClient, article_id: str, payload: dict[str, Any],
+) -> dict[str, Any]:
+    current = await client.get_article_categories(article_id)
+    return await client.set_article_categories(
+        article_id, payload, _required_etag(current.etag, "die Kategorien"),
+    )
+
+
+async def _delete_attribute(
+    client: ArtikelwerkClient, article_id: str, payload: dict[str, Any],
+) -> dict[str, Any]:
+    tenant_id = payload.get("tenantId")
+    attribute_id = payload.get("attributeId")
+    if tenant_id is None or attribute_id in (None, ""):
+        raise ArtikelwerkError(
+            "Der Attribut-Loeschauftrag ist unvollstaendig.", status_code=400,
+            code="INVALID_UPDATE_STATE",
+        )
+    current = await client.get_article(article_id, int(tenant_id))
+    return await client.delete_attribute(
+        article_id, str(attribute_id), _required_etag(current.etag, "das Artikelattribut"),
+    )
+
+
 async def _find_article_by_sku(
     client: ArtikelwerkClient, tenant_id: int, sku: str,
 ) -> dict[str, Any] | None:
@@ -391,12 +440,14 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
     manufacturer_id: str | None = None
     variation_ids: dict[str, dict[str, str]] = {}
     article_created_with_price = False
+    article_preexisting = False
 
     try:
         publication = get_articlewerk_publication(preview.sku)
         remote_article_id = publication.get("remote_article_id") if publication else None
         async with ArtikelwerkClient(get_artikelwerk_config()) as client:
             if remote_article_id:
+                article_preexisting = True
                 create_step = next(
                     (step for step in preview.steps if step.operation == "create_article"), None,
                 )
@@ -416,6 +467,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                         raise
                     reset_deleted_articlewerk_publication(preview.sku)
                     remote_article_id = None
+                    article_preexisting = False
             for step in preview.steps:
                 active_operation = step.operation
                 update_articlewerk_job(job_id, status="publishing", phase=step.operation, progress=completed)
@@ -445,6 +497,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                     article_created_with_price = (
                         "price" in payload and not bool(response.get("reusedExisting"))
                     )
+                    article_preexisting = bool(response.get("reusedExisting"))
                     remote_article_id = str(article.get("id", ""))
                     if not remote_article_id:
                         raise ArtikelwerkError("Artikelwerk-Antwort enthält keine Artikel-ID.", code="INVALID_RESPONSE")
@@ -459,6 +512,42 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                         await _execute_operation(
                             client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
                             invoke=lambda _key: client.set_attribute(remote_article_id or "", payload),
+                            reuse_success=False,
+                        )
+                    elif step.operation == "delete_attribute":
+                        await _execute_operation(
+                            client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
+                            invoke=lambda _key: _delete_attribute(client, remote_article_id or "", payload),
+                            reuse_success=False,
+                        )
+                    elif step.operation == "sync_article":
+                        if not article_preexisting:
+                            completed += 1
+                            continue
+                        if manufacturer_id:
+                            payload.setdefault("article", {})["manufacturerId"] = int(manufacturer_id)
+                        await _execute_operation(
+                            client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
+                            invoke=lambda _key: _sync_article(client, remote_article_id or "", payload),
+                            reuse_success=False,
+                        )
+                    elif step.operation == "sync_tenants":
+                        if not article_preexisting:
+                            completed += 1
+                            continue
+                        await _execute_operation(
+                            client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
+                            invoke=lambda _key: _sync_tenants(client, remote_article_id or "", payload),
+                            reuse_success=False,
+                        )
+                    elif step.operation == "sync_categories":
+                        if not article_preexisting:
+                            completed += 1
+                            continue
+                        await _execute_operation(
+                            client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,
+                            invoke=lambda _key: _sync_categories(client, remote_article_id or "", payload),
+                            reuse_success=False,
                         )
                     elif step.operation == "upsert_description":
                         await _execute_operation(
