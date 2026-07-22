@@ -438,6 +438,47 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["createErrorReconciled"])
         self.assertEqual(result["article"]["id"], "13")
 
+    async def test_reconciles_existing_sku_hidden_in_another_tenant(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "POST":
+                return httpx.Response(409, json={
+                    "code": "CONFLICT",
+                    "error": "Artikelnummer 'CYL-00030' ist bereits vorhanden.",
+                    "requestId": "req-5x",
+                })
+            if request.url.path.endswith("/context"):
+                return httpx.Response(200, json={
+                    "tenants": [{"id": 4}, {"id": 5}], "units": [], "attributes": [],
+                })
+            tenant_id = request.url.params.get("tenantId")
+            items = ([{"id": "30", "sku": "CYL-00030", "name": "Vorhanden"}]
+                     if tenant_id == "5" else [])
+            return httpx.Response(200, json={"items": items})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await _create_or_reuse_article(
+                client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
+                "article:create:00030",
+            )
+
+        self.assertTrue(result["createErrorReconciled"])
+        self.assertEqual(result["article"]["id"], "30")
+        self.assertEqual(result["originalRequestId"], "req-5x")
+        self.assertEqual(
+            [(request.method, request.url.path, request.url.params.get("tenantId")) for request in requests],
+            [
+                ("GET", "/api/integrations/v1/articles", "4"),
+                ("POST", "/api/integrations/v1/articles", None),
+                ("GET", "/api/integrations/v1/articles", "4"),
+                ("GET", "/api/integrations/v1/context", None),
+                ("GET", "/api/integrations/v1/articles", "5"),
+            ],
+        )
+
     async def test_creates_manufacturer_idempotently(self):
         seen = {}
 

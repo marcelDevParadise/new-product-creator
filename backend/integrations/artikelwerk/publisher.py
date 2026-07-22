@@ -280,6 +280,33 @@ async def _find_article_by_sku(
     return matches[0] if matches else None
 
 
+async def _find_article_across_tenants(
+    client: ArtikelwerkClient, tenant_ids: list[int], sku: str,
+) -> dict[str, Any] | None:
+    """Resolve a globally unique SKU that may be hidden by tenant filtering."""
+    matches: dict[str, dict[str, Any]] = {}
+    for tenant_id in dict.fromkeys(tenant_ids):
+        item = await _find_article_by_sku(client, tenant_id, sku)
+        if not item:
+            continue
+        article = _normalized_article(item)
+        article_id = article.get("id")
+        if article_id in (None, ""):
+            raise ArtikelwerkError(
+                "Artikelwerk lieferte für die vorhandene SKU keine Artikel-ID.",
+                status_code=502, code="INVALID_ARTICLE_SEARCH_RESPONSE",
+                details={"tenantId": tenant_id, "sku": sku},
+            )
+        matches[str(article_id)] = item
+    if len(matches) > 1:
+        raise ArtikelwerkError(
+            f"Artikelnummer '{sku}' ist mandantenübergreifend mehrfach vorhanden.",
+            status_code=409, code="DUPLICATE_REMOTE_SKU",
+            details={"sku": sku, "articleIds": sorted(matches)},
+        )
+    return next(iter(matches.values()), None)
+
+
 async def _create_or_reuse_article(
     client: ArtikelwerkClient, payload: dict[str, Any], key: str,
 ) -> dict[str, Any]:
@@ -296,6 +323,15 @@ async def _create_or_reuse_article(
         if exc.status_code != 409 and exc.status_code < 500:
             raise
         existing = await _find_article_by_sku(client, int(tenant_ids[0]), sku)
+        if not existing and exc.status_code == 409:
+            context = await client.context()
+            visible_tenant_ids = [
+                int(item["id"])
+                for item in context.get("tenants", [])
+                if isinstance(item, dict) and item.get("id") is not None
+                and int(item["id"]) not in {int(value) for value in tenant_ids}
+            ]
+            existing = await _find_article_across_tenants(client, visible_tenant_ids, sku)
         if not existing:
             raise
         return {
