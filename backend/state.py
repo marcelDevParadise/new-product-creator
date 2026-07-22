@@ -11,7 +11,9 @@ from services.database import (
     load_all_templates, save_template as db_save_template, delete_template as db_delete_template,
     load_all_attribute_definitions, save_attribute_definition,
     delete_attribute_definition as db_delete_attribute_definition,
+    delete_all_attribute_definitions as db_delete_all_attribute_definitions,
     count_attribute_definitions,
+    get_app_metadata, set_app_metadata,
     load_all_suppliers, create_supplier as db_create_supplier,
     update_supplier as db_update_supplier, delete_supplier as db_delete_supplier,
     save_supplier_articlewerk_result as db_save_supplier_articlewerk_result,
@@ -19,6 +21,7 @@ from services.database import (
 )
 
 DATA_DIR = Path(__file__).parent / "data"
+ATTRIBUTE_SEED_MARKER = "attribute_definitions_seeded"
 
 
 class AppState:
@@ -42,11 +45,11 @@ class AppState:
         self._load_category_tree()
 
     def _load_attribute_config(self) -> None:
-        """Load attributes from DB, seeding from JSON on first run."""
-        if count_attribute_definitions() == 0:
-            self._seed_attributes_from_json()
-        else:
-            self._sync_attributes_from_json()
+        """Load definitions, using the bundled JSON only on the first-ever start."""
+        if get_app_metadata(ATTRIBUTE_SEED_MARKER) != "1":
+            if count_attribute_definitions() == 0:
+                self._seed_attributes_from_json()
+            set_app_metadata(ATTRIBUTE_SEED_MARKER, "1")
         self.attribute_config = load_all_attribute_definitions()
 
     def _seed_attributes_from_json(self) -> None:
@@ -58,33 +61,6 @@ class AppState:
         for idx, (key, entry) in enumerate(raw.items()):
             attr = AttributeDefinition(**entry)
             save_attribute_definition(key, attr, sort_order=idx)
-
-    def _sync_attributes_from_json(self) -> None:
-        """Sync sort order, categories, names, IDs, suggested_values, and descriptions from JSON into DB."""
-        config_path = DATA_DIR / "attribute_config.json"
-        if not config_path.exists():
-            return
-        raw = json.loads(config_path.read_text(encoding="utf-8-sig"))
-        db_attrs = load_all_attribute_definitions()
-        for idx, (key, entry) in enumerate(raw.items()):
-            json_attr = AttributeDefinition(**entry)
-            if key not in db_attrs:
-                # New attribute from JSON — add it
-                save_attribute_definition(key, json_attr, sort_order=idx)
-                continue
-            db_attr = db_attrs[key]
-            # Always sync category, name, and id from JSON (structural data)
-            db_attr.category = json_attr.category
-            db_attr.name = json_attr.name
-            db_attr.id = json_attr.id
-            # Sync suggested_values if JSON has values but DB is empty
-            if json_attr.suggested_values and not db_attr.suggested_values:
-                db_attr.suggested_values = json_attr.suggested_values
-            # Sync description if JSON has one but DB is empty
-            if json_attr.description and not db_attr.description:
-                db_attr.description = json_attr.description
-            # Always update sort_order to match JSON position
-            save_attribute_definition(key, db_attr, sort_order=idx)
 
     # --- Attribute config CRUD ---
 
@@ -103,6 +79,13 @@ class AppState:
             db_delete_attribute_definition(key)
             return True
         return False
+
+    def clear_attribute_definitions(self) -> int:
+        """Delete all definitions without touching product or template values."""
+        deleted = db_delete_all_attribute_definitions()
+        self.attribute_config.clear()
+        set_app_metadata(ATTRIBUTE_SEED_MARKER, "1")
+        return deleted
 
     def delete_product(self, artikelnummer: str) -> bool:
         if artikelnummer in self.products:

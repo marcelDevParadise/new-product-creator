@@ -154,6 +154,17 @@ export const api = {
     request<{ deleted: boolean }>(`/attributes/definitions/${encodeURIComponent(key)}`, {
       method: 'DELETE',
     }),
+  resetAttributeDefinitions: () =>
+    request<{
+      deleted: number;
+      total: number;
+      product_values_preserved: boolean;
+      template_values_preserved: boolean;
+    }>('/attributes/definitions/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true }),
+    }),
   reorderAttributeDefinitions: (orderedKeys: string[]) =>
     request<{ reordered: number }>('/attributes/definitions/reorder', {
       method: 'PUT',

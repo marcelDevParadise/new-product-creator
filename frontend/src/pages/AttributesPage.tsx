@@ -32,6 +32,8 @@ export function AttributesPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const { toast } = useToast();
 
   const reload = async () => {
@@ -127,6 +129,21 @@ export function AttributesPage() {
     }
   };
 
+  const handleDeleteAll = async () => {
+    setDeletingAll(true);
+    try {
+      const result = await api.resetAttributeDefinitions();
+      toast(`${result.deleted} Attributdefinitionen gelöscht`, 'success');
+      setShowDeleteAllConfirm(false);
+      setActiveCategory(null);
+      await reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Zurücksetzen fehlgeschlagen', 'error');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const handleMove = async (key: string, direction: 'up' | 'down') => {
     if (!activeCategory || search) return;
     const items = categories.get(activeCategory);
@@ -203,6 +220,15 @@ export function AttributesPage() {
               >
                 <Download className="w-4 h-4 mr-2" />
                 JSON exportieren
+              </Button>
+              <Button
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                disabled={totalCount === 0}
+                onClick={() => setShowDeleteAllConfirm(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Alle löschen
               </Button>
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="w-4 h-4 mr-2" />
@@ -522,6 +548,39 @@ export function AttributesPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete all definitions confirm */}
+      {showDeleteAllConfirm && (
+        <Dialog open onOpenChange={(open) => !deletingAll && setShowDeleteAllConfirm(open)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Alle Attributdefinitionen löschen?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Es werden <strong className="text-foreground">{totalCount} Attributdefinitionen</strong> gelöscht.
+                Nach einem Neustart werden sie nicht erneut aus der alten JSON-Datei angelegt.
+              </p>
+              <p>
+                Bereits gespeicherte Attributwerte in Produkten und Vorlagen bleiben erhalten. Werden beim Neuimport
+                dieselben Keys verwendet, sind diese Werte wieder mit den neuen Definitionen verknüpft.
+              </p>
+              <p className="font-medium text-destructive">
+                Exportiere die aktuelle Konfiguration vorab als JSON und veröffentliche während des Neuaufbaus keine
+                Produkte an Artikelwerk.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" disabled={deletingAll} onClick={() => setShowDeleteAllConfirm(false)}>
+                Abbrechen
+              </Button>
+              <Button variant="destructive" disabled={deletingAll} onClick={handleDeleteAll}>
+                {deletingAll ? 'Wird gelöscht…' : 'Alle Definitionen löschen'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -603,7 +662,7 @@ function ImportAttributesDialog({
               ))}
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Optional: <code>description</code>, <code>required</code>, <code>default_value</code>, <code>suggested_values</code>. Mehrere vorgeschlagene Werte mit <code>|</code> trennen.
+              Optional: <code>description</code>, <code>required</code>, <code>required_for_types</code>, <code>default_value</code>, <code>suggested_values</code> und <code>smart_defaults</code>. Listenwerte mit <code>|</code> trennen, Titelregeln als <code>Titel=&gt;Wert</code> angeben.
             </p>
           </section>
 

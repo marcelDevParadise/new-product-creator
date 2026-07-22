@@ -58,3 +58,6 @@ vorlagen/ausgabe/
 *.md
 !deploy/ARTIKELWERK-UPDATE-DIAGNOSE.md
 *.html
+
+attribute/*.json
+attribute/*.csv
