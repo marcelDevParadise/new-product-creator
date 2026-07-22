@@ -12,7 +12,9 @@ import httpx
 from config import ArtikelwerkConfig
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
 from integrations.artikelwerk.mapper import build_preview
+from integrations.artikelwerk.normalization import normalized_reference_name, searchable_reference_name
 from integrations.artikelwerk.publisher import (
+    _create_or_find_manufacturer,
     _create_or_reuse_article,
     _delete_attribute,
     _sync_article,
@@ -53,6 +55,13 @@ CONTEXT = {
 
 
 class MapperTests(unittest.TestCase):
+    def test_normalizes_typographic_apostrophes_for_reference_matching(self):
+        self.assertEqual(searchable_reference_name("24B\u2019MOONS CO., LTD."), "24B'MOONS CO., LTD.")
+        self.assertEqual(
+            normalized_reference_name("24B\u2019MOONS CO., LTD."),
+            normalized_reference_name("24b'moons co., ltd."),
+        )
+
     def test_creates_missing_manufacturer_before_article(self):
         product = Product(artikelnummer="CYL-MAN", artikelname="Test", hersteller="Neue Marke")
         preview = build_preview(
@@ -269,6 +278,27 @@ class DatabaseCompatibilityTests(unittest.TestCase):
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reconciles_manufacturer_with_typographic_apostrophe(self):
+        searches = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                return httpx.Response(500, json={"code": "INTERNAL_ERROR", "requestId": "req-contact"})
+            searches.append(request.url.params.get("search"))
+            return httpx.Response(200, json={
+                "items": [{"id": 1232, "name": "24B'MOONS CO., LTD."}],
+            })
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await _create_or_find_manufacturer(
+                client, {"name": "24B\u2019MOONS CO., LTD."}, "manufacturer:create:24b",
+            )
+
+        self.assertEqual(searches, ["24B'MOONS CO., LTD."])
+        self.assertTrue(result["createErrorReconciled"])
+        self.assertEqual(result["manufacturer"]["id"], 1232)
+
     async def test_deletes_managed_attribute_with_fresh_article_etag(self):
         requests = []
 
@@ -411,7 +441,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/suppliers/42")
         self.assertNotIn("articleName", json.loads(requests[1].content))
 
-    async def test_reuses_existing_article_without_second_create(self):
+    async def test_blocks_unmapped_existing_article_without_second_create(self):
         methods = []
 
         async def handler(request: httpx.Request) -> httpx.Response:
@@ -422,12 +452,13 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
-            result = await _create_or_reuse_article(
-                client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
-            )
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _create_or_reuse_article(
+                    client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
+                )
         self.assertEqual(methods, ["GET"])
-        self.assertTrue(result["reusedExisting"])
-        self.assertEqual(result["article"]["id"], "12")
+        self.assertEqual(caught.exception.code, "REMOTE_SKU_ALREADY_EXISTS")
+        self.assertEqual(caught.exception.details["articleId"], "12")
 
     async def test_understands_nested_article_number_search_response(self):
         methods = []
@@ -440,12 +471,13 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
-            result = await _create_or_reuse_article(
-                client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
-            )
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _create_or_reuse_article(
+                    client, {"sku": "CYL-1", "name": "Test", "tenantIds": [4]}, "article:create:1",
+                )
         self.assertEqual(methods, ["GET"])
-        self.assertEqual(result["article"]["id"], "14")
-        self.assertEqual(result["article"]["sku"], "CYL-1")
+        self.assertEqual(caught.exception.code, "REMOTE_SKU_ALREADY_EXISTS")
+        self.assertEqual(caught.exception.details["articleId"], "14")
 
     async def test_blocks_create_for_unknown_search_response_shape(self):
         methods = []
@@ -485,7 +517,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["createErrorReconciled"])
         self.assertEqual(result["article"]["id"], "13")
 
-    async def test_reuses_article_id_returned_with_create_conflict(self):
+    async def test_blocks_article_id_returned_with_create_conflict(self):
         methods = []
 
         async def handler(request: httpx.Request) -> httpx.Response:
@@ -501,18 +533,18 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
-            result = await _create_or_reuse_article(
-                client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
-                "article:create:00030",
-            )
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _create_or_reuse_article(
+                    client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
+                    "article:create:00030",
+                )
 
         self.assertEqual(methods, ["GET", "POST"])
-        self.assertTrue(result["reusedExisting"])
-        self.assertTrue(result["createErrorReconciled"])
-        self.assertEqual(result["article"], {"id": "30", "sku": "CYL-00030"})
-        self.assertEqual(result["originalRequestId"], "req-direct-id")
+        self.assertEqual(caught.exception.code, "REMOTE_SKU_ALREADY_EXISTS")
+        self.assertEqual(caught.exception.details["articleId"], "30")
+        self.assertEqual(caught.exception.request_id, "req-direct-id")
 
-    async def test_reconciles_existing_sku_hidden_in_another_tenant(self):
+    async def test_blocks_existing_sku_hidden_in_another_tenant(self):
         requests = []
 
         async def handler(request: httpx.Request) -> httpx.Response:
@@ -535,27 +567,21 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
-            result = await _create_or_reuse_article(
-                client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
-                "article:create:00030",
-            )
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _create_or_reuse_article(
+                    client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
+                    "article:create:00030",
+                )
 
-        self.assertTrue(result["createErrorReconciled"])
-        self.assertTrue(result["reusedExisting"])
-        self.assertEqual(result["article"]["id"], "30")
-        self.assertEqual(result["originalRequestId"], "req-5x")
+        self.assertEqual(caught.exception.code, "REMOTE_SKU_ALREADY_EXISTS")
+        self.assertIsNone(caught.exception.details["articleId"])
+        self.assertEqual(caught.exception.request_id, "req-5x")
         self.assertEqual(
             [(request.method, request.url.path, request.url.params.get("tenantId"),
               request.url.params.get("status")) for request in requests],
             [
                 ("GET", "/api/integrations/v1/articles", "4", None),
                 ("POST", "/api/integrations/v1/articles", None, None),
-                ("GET", "/api/integrations/v1/articles", "4", None),
-                ("GET", "/api/integrations/v1/context", None, None),
-                ("GET", "/api/integrations/v1/articles", "4", "active"),
-                ("GET", "/api/integrations/v1/articles", "4", "inactive"),
-                ("GET", "/api/integrations/v1/articles", "5", "active"),
-                ("GET", "/api/integrations/v1/articles", "5", "inactive"),
             ],
         )
 
@@ -578,8 +604,8 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
                     client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
                     "article:create:00030",
                 )
-        self.assertEqual(caught.exception.code, "EXISTING_SKU_NOT_RESOLVABLE")
-        self.assertEqual(caught.exception.details["searchedStatuses"], ["active", "inactive"])
+        self.assertEqual(caught.exception.code, "REMOTE_SKU_ALREADY_EXISTS")
+        self.assertIsNone(caught.exception.details["articleId"])
 
     async def test_creates_manufacturer_idempotently(self):
         seen = {}

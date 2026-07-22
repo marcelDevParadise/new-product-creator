@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from config import get_artikelwerk_config
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
 from integrations.artikelwerk.mapper import build_preview
+from integrations.artikelwerk.normalization import normalized_reference_name, searchable_reference_name
 from integrations.artikelwerk.publisher import run_publication
 from integrations.artikelwerk.schemas import ArtikelwerkSettings, ConnectionStatus, PublicationPreview
 from routers.settings import get_artikelwerk_settings, save_artikelwerk_settings
@@ -36,10 +37,10 @@ def _items(result: object) -> list[dict]:
 
 
 def _exact_named(items: list[dict], name: str) -> list[dict]:
-    target = name.strip().casefold()
+    target = normalized_reference_name(name)
     return [
         item for item in items
-        if str(item.get("name") or item.get("label") or "").strip().casefold() == target
+        if normalized_reference_name(item.get("name") or item.get("label") or "") == target
     ]
 
 
@@ -52,7 +53,10 @@ async def _resolve_create_references(
 ) -> None:
     """Resolve human-readable local master data to global Artikelwerk IDs."""
     if settings.publish_manufacturer and product.hersteller:
-        matches = _exact_named(_items(await client.search_manufacturers(product.hersteller)), product.hersteller)
+        matches = _exact_named(
+            _items(await client.search_manufacturers(searchable_reference_name(product.hersteller))),
+            product.hersteller,
+        )
         if len(matches) == 1 and _reference_id(matches[0], "manufacturer") is not None:
             context["resolvedManufacturerId"] = _reference_id(matches[0], "manufacturer")
         elif not matches:

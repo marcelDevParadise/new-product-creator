@@ -13,6 +13,7 @@ from urllib.parse import unquote, urlsplit
 
 from config import get_artikelwerk_config
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
+from integrations.artikelwerk.normalization import normalized_reference_name, searchable_reference_name
 from integrations.artikelwerk.schemas import PublicationPreview, PublicationStep
 from services.database import (
     get_articlewerk_operation,
@@ -280,34 +281,6 @@ async def _find_article_by_sku(
     return matches[0] if matches else None
 
 
-async def _find_article_across_tenants(
-    client: ArtikelwerkClient, tenant_ids: list[int], sku: str,
-) -> dict[str, Any] | None:
-    """Resolve a globally unique SKU that may be hidden by tenant filtering."""
-    matches: dict[str, dict[str, Any]] = {}
-    for tenant_id in dict.fromkeys(tenant_ids):
-        for status in ("active", "inactive"):
-            item = await _find_article_by_sku(client, tenant_id, sku, status=status)
-            if not item:
-                continue
-            article = _normalized_article(item)
-            article_id = article.get("id")
-            if article_id in (None, ""):
-                raise ArtikelwerkError(
-                    "Artikelwerk lieferte für die vorhandene SKU keine Artikel-ID.",
-                    status_code=502, code="INVALID_ARTICLE_SEARCH_RESPONSE",
-                    details={"tenantId": tenant_id, "status": status, "sku": sku},
-                )
-            matches[str(article_id)] = item
-    if len(matches) > 1:
-        raise ArtikelwerkError(
-            f"Artikelnummer '{sku}' ist mandantenübergreifend mehrfach vorhanden.",
-            status_code=409, code="DUPLICATE_REMOTE_SKU",
-            details={"sku": sku, "articleIds": sorted(matches)},
-        )
-    return next(iter(matches.values()), None)
-
-
 def _article_from_conflict_details(details: Any, sku: str) -> dict[str, Any] | None:
     """Read the globally resolved article ID returned with a create conflict."""
     if not isinstance(details, dict):
@@ -335,46 +308,32 @@ async def _create_or_reuse_article(
     sku = str(payload["sku"])
     existing = await _find_article_by_sku(client, int(tenant_ids[0]), sku)
     if existing:
-        return {"article": _normalized_article(existing), "reusedExisting": True}
+        article = _normalized_article(existing)
+        raise ArtikelwerkError(
+            f"Artikelnummer '{sku}' ist bereits vorhanden und diesem lokalen Artikel nicht zugeordnet. "
+            "Die Übertragung wurde zum Schutz des bestehenden Artikels abgebrochen.",
+            status_code=409, code="REMOTE_SKU_ALREADY_EXISTS",
+            details={"sku": sku, "articleId": article.get("id")},
+        )
     try:
         return await client.create_article(payload, key)
     except ArtikelwerkError as exc:
-        if exc.status_code != 409 and exc.status_code < 500:
-            raise
         if exc.status_code == 409:
             conflict_article = _article_from_conflict_details(exc.details, sku)
-            if conflict_article:
-                return {
-                    "article": conflict_article,
-                    "reusedExisting": True,
-                    "createErrorReconciled": True,
-                    "originalRequestId": exc.request_id,
-                }
+            raise ArtikelwerkError(
+                f"Artikelnummer '{sku}' ist bereits vorhanden und diesem lokalen Artikel nicht zugeordnet. "
+                "Die Übertragung wurde zum Schutz des bestehenden Artikels abgebrochen.",
+                status_code=409, code="REMOTE_SKU_ALREADY_EXISTS", request_id=exc.request_id,
+                details={"sku": sku, "articleId": conflict_article.get("id") if conflict_article else None},
+            ) from exc
+        if exc.status_code < 500:
+            raise
         existing = await _find_article_by_sku(client, int(tenant_ids[0]), sku)
-        if not existing and exc.status_code == 409:
-            context = await client.context()
-            visible_tenant_ids = [
-                int(item["id"])
-                for item in context.get("tenants", [])
-                if isinstance(item, dict) and item.get("id") is not None
-            ]
-            existing = await _find_article_across_tenants(client, visible_tenant_ids, sku)
         if not existing:
-            if exc.status_code == 409:
-                raise ArtikelwerkError(
-                    f"Artikelnummer '{sku}' ist laut Artikelwerk vorhanden, kann aber über die "
-                    "mandantenbezogene Artikelsuche weder aktiv noch inaktiv aufgelöst werden. "
-                    "Die Konfliktantwort enthält keine bestehende Artikel-ID.",
-                    status_code=409,
-                    code="EXISTING_SKU_NOT_RESOLVABLE",
-                    request_id=exc.request_id,
-                    details={"sku": sku, "searchedTenantIds": visible_tenant_ids,
-                             "searchedStatuses": ["active", "inactive"]},
-                ) from exc
             raise
         return {
             "article": _normalized_article(existing), "createErrorReconciled": True,
-            "reusedExisting": exc.status_code == 409,
+            "reusedExisting": False,
             "originalRequestId": exc.request_id,
         }
 
@@ -390,11 +349,14 @@ async def _create_or_find_manufacturer(
         # failed; the same strategy also handles a concurrent 409 create.
         if exc.status_code != 409 and exc.status_code < 500:
             raise
-        result = await client.search_manufacturers(str(payload["name"]), page_size=100)
+        result = await client.search_manufacturers(
+            searchable_reference_name(payload["name"]), page_size=100,
+        )
         items = result.get("items", []) if isinstance(result, dict) else result
         matches = [
             item for item in items if isinstance(item, dict)
-            and str(item.get("name", "")).strip().casefold() == str(payload["name"]).strip().casefold()
+            and normalized_reference_name(item.get("name", ""))
+            == normalized_reference_name(payload["name"])
         ] if isinstance(items, list) else []
         if len(matches) != 1:
             raise
