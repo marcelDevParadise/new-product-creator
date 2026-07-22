@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Package, Plus, Trash2, Edit, X, Search } from 'lucide-react';
+import { Package, Plus, Trash2, Edit, X, Search, Boxes, Layers3 } from 'lucide-react';
 import { api } from '../api/client';
 import { useToast } from '../components/ui/Toast';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
+import { Button } from '../components/ui/button';
 import type { Bundle, Product } from '../types';
 
 export function BundlesPage() {
@@ -96,20 +97,26 @@ export function BundlesPage() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>;
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <PageHeader
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Produktkombinationen"
         title="Bundles & Sets"
-        subtitle={`${bundles.length} Bundle${bundles.length !== 1 ? 's' : ''}`}
+        description="Mehrere Produkte zu wiederverwendbaren Sets zusammenstellen."
+        icon={Boxes}
+        stats={[
+          { label: 'Bundles', value: bundles.length, icon: Boxes, tone: 'indigo' },
+          { label: 'Positionen', value: bundles.reduce((sum, bundle) => sum + bundle.items.length, 0), icon: Layers3, tone: 'sky' },
+          { label: 'Produkte verfügbar', value: products.length, icon: Package, tone: 'emerald' },
+        ]}
         actions={
-          <button onClick={() => { resetForm(); setShowCreate(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-            <Plus className="w-4 h-4" /> Neues Bundle
-          </button>
+          <Button onClick={() => { resetForm(); setShowCreate(true); }}><Plus className="mr-2 h-4 w-4" />Neues Bundle</Button>
         }
       />
 
       {/* Create/Edit Form */}
       {showCreate && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
+        <div className="space-y-4 rounded-3xl border bg-card/90 p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">{editId ? 'Bundle bearbeiten' : 'Neues Bundle'}</h3>
             <button onClick={resetForm}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
@@ -261,6 +268,7 @@ export function BundlesPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

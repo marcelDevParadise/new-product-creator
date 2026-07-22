@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle2, RefreshCw, Search, Filter, Grid3X3 } from 'lucide-react';
 import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
+import { Button } from '../components/ui/button';
 import { api } from '../api/client';
 import type { ValidationResult, ProductValidation, HeatmapData } from '../types';
 import { Badge } from '../components/ui/badge';
@@ -86,83 +88,21 @@ export function DataQualityPage() {
   const { stats } = data;
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <PageHeader title="Datenqualität" description="Prüfe deine Produktdaten auf Fehler und Warnungen" />
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors self-start sm:self-auto"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Aktualisieren
-        </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Gesamt</CardTitle>
-            <ShieldCheck className="w-4 h-4 text-gray-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-gray-900">{stats.total_products}</div>
-            <p className="text-xs text-gray-500 mt-1">{stats.ok_percent}% fehlerfrei</p>
-            <div className="h-2 w-full rounded-full bg-gray-100 mt-3">
-              <div className="h-2 rounded-full bg-emerald-600 transition-all duration-500" style={{ width: `${stats.ok_percent}%` }} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm cursor-pointer hover:bg-emerald-50/50 transition-colors" onClick={() => setFilterSeverity(filterSeverity === 'ok' ? 'all' : 'ok')}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Fehlerfrei</CardTitle>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-emerald-600">{stats.ok_count}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm cursor-pointer hover:bg-amber-50/50 transition-colors" onClick={() => setFilterSeverity(filterSeverity === 'warning' ? 'all' : 'warning')}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Warnungen</CardTitle>
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-amber-600">{stats.warning_count}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm cursor-pointer hover:bg-red-50/50 transition-colors" onClick={() => setFilterSeverity(filterSeverity === 'error' ? 'all' : 'error')}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Fehler</CardTitle>
-            <ShieldAlert className="w-4 h-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">{stats.error_count}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top Issues */}
-      {stats.top_issues.length > 0 && (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Häufigste Probleme</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {stats.top_issues.map((issue) => (
-                <Badge key={issue.field} variant="secondary" className="bg-gray-100 text-gray-700 hover:bg-gray-100">
-                  {issue.field}: {issue.count}×
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Qualitätssicherung"
+        title="Datenqualität"
+        description="Produktdaten auf Fehler, Warnungen und Vollständigkeit prüfen."
+        icon={ShieldCheck}
+        stats={[
+          { label: 'Produkte', value: stats.total_products, icon: ShieldCheck, tone: 'indigo' },
+          { label: 'Fehlerfrei', value: stats.ok_count, icon: CheckCircle2, tone: 'emerald' },
+          { label: 'Warnungen', value: stats.warning_count, icon: AlertTriangle, tone: 'amber' },
+          { label: 'Fehler', value: stats.error_count, icon: ShieldAlert, tone: 'amber' },
+        ]}
+        actions={<Button variant="outline" className="bg-background/70" onClick={load} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Aktualisieren</Button>}
+      />
 
       {/* Heatmap Toggle + Section */}
       <div className="flex items-center gap-3">
@@ -314,6 +254,7 @@ export function DataQualityPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

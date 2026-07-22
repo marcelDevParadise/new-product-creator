@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { ActivityLog } from '../types';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import {
@@ -60,10 +60,15 @@ export function ActivityLogPage() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <PageHeader
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Systemhistorie"
         title="Aktivitätsprotokoll"
-        description="Alle Aktivitäten im Überblick"
+        description="Importe, Exporte und Produktänderungen chronologisch nachvollziehen."
+        icon={Activity}
+        stats={[{ label: 'Geladene Einträge', value: activities.length, icon: Activity, tone: 'indigo' }]}
+        actions={<Button variant="outline" className="bg-background/70" onClick={load} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Aktualisieren</Button>}
       />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -86,7 +91,7 @@ export function ActivityLogPage() {
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
         <div className="overflow-x-auto">
           <Table>
           <TableHeader>
@@ -133,6 +138,7 @@ export function ActivityLogPage() {
           </TableBody>
         </Table>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Download, Eye, Package, FileText, Archive, Globe, CheckCircle2, History } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { useToast } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { api } from '../api/client';
@@ -159,14 +159,23 @@ export function ExportPage() {
   const allExported = exportCount >= TOTAL_EXPORTS;
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <PageHeader
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Datenausgabe"
         title="Export"
         description="Exportiere Produkt- und Attributdaten als CSV."
+        icon={Download}
+        stats={[
+          { label: 'Exportarten', value: TOTAL_EXPORTS, icon: FileText, tone: 'indigo' },
+          { label: 'Diese Sitzung', value: exportCount, icon: CheckCircle2, tone: 'emerald' },
+          { label: 'Historie', value: exportHistory.length, icon: History, tone: 'sky' },
+          { label: 'Archivierung', value: archiveAfterExport ? 'Aktiv' : 'Aus', icon: Archive, tone: 'amber' },
+        ]}
       />
 
       {/* --- Stammdaten Export --- */}
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <section className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
@@ -205,7 +214,7 @@ export function ExportPage() {
               </span>
             </div>
             {stammdatenPreview.rows.length > 0 ? (
-              <div className="overflow-x-auto max-h-[20rem]">
+              <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
@@ -266,7 +275,7 @@ export function ExportPage() {
       </section>
 
       {/* --- Ameise Attribut-Export --- */}
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <section className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center">
@@ -308,7 +317,7 @@ export function ExportPage() {
               </span>
             </div>
             {ameisePreview.rows.length > 0 ? (
-              <div className="overflow-x-auto max-h-[20rem]">
+              <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
@@ -356,7 +365,7 @@ export function ExportPage() {
       )}
 
       {/* --- SEO & Content Export --- */}
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <section className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center">
@@ -395,7 +404,7 @@ export function ExportPage() {
               </span>
             </div>
             {seoPreview.rows.length > 0 ? (
-              <div className="overflow-x-auto max-h-[20rem]">
+              <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
@@ -435,7 +444,7 @@ export function ExportPage() {
       </section>
 
       {/* --- Archivierung --- */}
-      <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <section className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
@@ -479,7 +488,7 @@ export function ExportPage() {
 
       {/* Export History */}
       {exportHistory.length > 0 && (
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <section className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
           <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
             <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center">
               <History className="w-5 h-5 text-gray-600" />
@@ -489,7 +498,7 @@ export function ExportPage() {
               <p className="text-xs text-gray-500">Letzte {exportHistory.length} Exporte</p>
             </div>
           </div>
-          <div className="overflow-x-auto max-h-[16rem]">
+          <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="bg-gray-50 sticky top-0">
                 <tr>
@@ -523,6 +532,7 @@ export function ExportPage() {
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import type { PricingSettings, ExportSettings, DefaultValues, VariantenSettings, SystemHealth } from '../types';
-import { Save, Plus, X, FileSpreadsheet, Calculator, Ruler, Building2, GitBranch, HardDrive } from 'lucide-react';
+import { Save, Plus, X, FileSpreadsheet, Calculator, Ruler, Building2, GitBranch, HardDrive, Settings2 } from 'lucide-react';
 
-const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
-const selectCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
+const inputCls = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40';
+const selectCls = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40';
 
 function SectionCard({ icon: Icon, title, description, children, onSave, saving }: {
   icon: React.ElementType;
@@ -17,8 +17,8 @@ function SectionCard({ icon: Icon, title, description, children, onSave, saving 
   saving: boolean;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex items-center gap-3">
+    <div className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
+      <div className="flex items-center gap-3 border-b bg-muted/25 px-4 py-4 sm:px-6">
         <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
           <Icon className="w-4 h-4 text-indigo-600" />
         </div>
@@ -238,12 +238,22 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="p-4 md:p-8 space-y-6 max-w-2xl">
-        <PageHeader
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+        <WorkspaceHeader
+          eyebrow="Systemkonfiguration"
           title="Einstellungen"
           description="Preisberechnung, Export-Format, Einheiten und Standard-Werte konfigurieren."
+          icon={Settings2}
+          stats={[
+            { label: 'Einheiten', value: einheiten.length, icon: Ruler, tone: 'indigo' },
+            { label: 'MwSt.', value: `${mwst}%`, icon: Calculator, tone: 'sky' },
+            { label: 'Variantenfelder', value: variantenSettings.inherit_fields.length, icon: GitBranch, tone: 'violet' },
+            { label: 'Datenbank', value: health?.db_size_display ?? '–', icon: HardDrive, tone: health?.integrity_ok ? 'emerald' : 'amber' },
+          ]}
         />
+
+        <div className="grid gap-5 xl:grid-cols-2">
 
         {/* VK-Berechnung */}
         <SectionCard
@@ -563,6 +573,7 @@ export function SettingsPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
