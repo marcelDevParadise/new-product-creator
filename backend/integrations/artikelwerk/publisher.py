@@ -250,9 +250,9 @@ async def _delete_attribute(
 
 
 async def _find_article_by_sku(
-    client: ArtikelwerkClient, tenant_id: int, sku: str,
+    client: ArtikelwerkClient, tenant_id: int, sku: str, *, status: str | None = None,
 ) -> dict[str, Any] | None:
-    result = await client.search_articles(tenant_id, sku=sku)
+    result = await client.search_articles(tenant_id, sku=sku, status=status)
     items = _article_search_items(result)
     if items is None:
         raise ArtikelwerkError(
@@ -286,18 +286,19 @@ async def _find_article_across_tenants(
     """Resolve a globally unique SKU that may be hidden by tenant filtering."""
     matches: dict[str, dict[str, Any]] = {}
     for tenant_id in dict.fromkeys(tenant_ids):
-        item = await _find_article_by_sku(client, tenant_id, sku)
-        if not item:
-            continue
-        article = _normalized_article(item)
-        article_id = article.get("id")
-        if article_id in (None, ""):
-            raise ArtikelwerkError(
-                "Artikelwerk lieferte für die vorhandene SKU keine Artikel-ID.",
-                status_code=502, code="INVALID_ARTICLE_SEARCH_RESPONSE",
-                details={"tenantId": tenant_id, "sku": sku},
-            )
-        matches[str(article_id)] = item
+        for status in ("active", "inactive"):
+            item = await _find_article_by_sku(client, tenant_id, sku, status=status)
+            if not item:
+                continue
+            article = _normalized_article(item)
+            article_id = article.get("id")
+            if article_id in (None, ""):
+                raise ArtikelwerkError(
+                    "Artikelwerk lieferte für die vorhandene SKU keine Artikel-ID.",
+                    status_code=502, code="INVALID_ARTICLE_SEARCH_RESPONSE",
+                    details={"tenantId": tenant_id, "status": status, "sku": sku},
+                )
+            matches[str(article_id)] = item
     if len(matches) > 1:
         raise ArtikelwerkError(
             f"Artikelnummer '{sku}' ist mandantenübergreifend mehrfach vorhanden.",
@@ -329,10 +330,20 @@ async def _create_or_reuse_article(
                 int(item["id"])
                 for item in context.get("tenants", [])
                 if isinstance(item, dict) and item.get("id") is not None
-                and int(item["id"]) not in {int(value) for value in tenant_ids}
             ]
             existing = await _find_article_across_tenants(client, visible_tenant_ids, sku)
         if not existing:
+            if exc.status_code == 409:
+                raise ArtikelwerkError(
+                    f"Artikelnummer '{sku}' ist laut Artikelwerk vorhanden, kann aber über die "
+                    "mandantenbezogene Artikelsuche weder aktiv noch inaktiv aufgelöst werden. "
+                    "Die Konfliktantwort enthält keine bestehende Artikel-ID.",
+                    status_code=409,
+                    code="EXISTING_SKU_NOT_RESOLVABLE",
+                    request_id=exc.request_id,
+                    details={"sku": sku, "searchedTenantIds": visible_tenant_ids,
+                             "searchedStatuses": ["active", "inactive"]},
+                ) from exc
             raise
         return {
             "article": _normalized_article(existing), "createErrorReconciled": True,

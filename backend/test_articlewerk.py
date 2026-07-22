@@ -454,8 +454,9 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
                     "tenants": [{"id": 4}, {"id": 5}], "units": [], "attributes": [],
                 })
             tenant_id = request.url.params.get("tenantId")
+            status = request.url.params.get("status")
             items = ([{"id": "30", "sku": "CYL-00030", "name": "Vorhanden"}]
-                     if tenant_id == "5" else [])
+                     if tenant_id == "5" and status == "inactive" else [])
             return httpx.Response(200, json={"items": items})
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
@@ -469,15 +470,41 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["article"]["id"], "30")
         self.assertEqual(result["originalRequestId"], "req-5x")
         self.assertEqual(
-            [(request.method, request.url.path, request.url.params.get("tenantId")) for request in requests],
+            [(request.method, request.url.path, request.url.params.get("tenantId"),
+              request.url.params.get("status")) for request in requests],
             [
-                ("GET", "/api/integrations/v1/articles", "4"),
-                ("POST", "/api/integrations/v1/articles", None),
-                ("GET", "/api/integrations/v1/articles", "4"),
-                ("GET", "/api/integrations/v1/context", None),
-                ("GET", "/api/integrations/v1/articles", "5"),
+                ("GET", "/api/integrations/v1/articles", "4", None),
+                ("POST", "/api/integrations/v1/articles", None, None),
+                ("GET", "/api/integrations/v1/articles", "4", None),
+                ("GET", "/api/integrations/v1/context", None, None),
+                ("GET", "/api/integrations/v1/articles", "4", "active"),
+                ("GET", "/api/integrations/v1/articles", "4", "inactive"),
+                ("GET", "/api/integrations/v1/articles", "5", "active"),
+                ("GET", "/api/integrations/v1/articles", "5", "inactive"),
             ],
         )
+
+    async def test_explains_unresolvable_existing_sku(self):
+        async def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                return httpx.Response(409, json={
+                    "code": "CONFLICT", "error": "SKU vorhanden", "requestId": "req-hidden",
+                })
+            if request.url.path.endswith("/context"):
+                return httpx.Response(200, json={
+                    "tenants": [{"id": 4}], "units": [], "attributes": [],
+                })
+            return httpx.Response(200, json={"items": []})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _create_or_reuse_article(
+                    client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
+                    "article:create:00030",
+                )
+        self.assertEqual(caught.exception.code, "EXISTING_SKU_NOT_RESOLVABLE")
+        self.assertEqual(caught.exception.details["searchedStatuses"], ["active", "inactive"])
 
     async def test_creates_manufacturer_idempotently(self):
         seen = {}
