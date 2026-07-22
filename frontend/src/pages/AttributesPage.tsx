@@ -3,8 +3,8 @@ import type { DragEvent } from 'react';
 import {
   Search, Plus, Pencil, Trash2, X, Check, Filter, ArrowUp, ArrowDown,
   Hash, Tag, FileText, List, Settings2, AlertCircle, Download, Upload,
+  ChevronLeft, ChevronRight, Layers3, Asterisk, FolderTree, RotateCcw,
 } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,6 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import type { AttributeConfig, AttributeDefinition, AttributeImportResult } from '../types';
@@ -34,6 +33,7 @@ export function AttributesPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   const reload = async () => {
@@ -62,29 +62,31 @@ export function AttributesPage() {
 
   const allCategoryNames = useMemo(() => Array.from(categories.keys()), [categories]);
 
-  // Auto-select first category
+  // Keep a selected category valid after imports and deletions.
   useEffect(() => {
-    if (allCategoryNames.length > 0 && (activeCategory === null || !categories.has(activeCategory))) {
-      setActiveCategory(allCategoryNames[0]);
+    if (activeCategory !== null && !categories.has(activeCategory)) {
+      setActiveCategory(null);
     }
-  }, [allCategoryNames]);
+  }, [activeCategory, categories]);
 
   // Filtered list for current view
   const filteredEntries = useMemo(() => {
     const q = search.toLowerCase();
     let entries: { key: string; def: AttributeDefinition }[] = [];
 
-    if (q) {
-      // Search across all categories
+    if (q || activeCategory === null) {
       for (const items of categories.values()) {
         entries.push(...items);
       }
-      entries = entries.filter(({ key, def }) =>
-        def.name.toLowerCase().includes(q) ||
-        key.toLowerCase().includes(q) ||
-        def.description.toLowerCase().includes(q) ||
-        def.id.toLowerCase().includes(q)
-      );
+      if (q) {
+        entries = entries.filter(({ key, def }) =>
+          def.name.toLowerCase().includes(q) ||
+          key.toLowerCase().includes(q) ||
+          def.description.toLowerCase().includes(q) ||
+          def.id.toLowerCase().includes(q) ||
+          def.category.toLowerCase().includes(q)
+        );
+      }
     } else if (activeCategory) {
       entries = categories.get(activeCategory) ?? [];
     }
@@ -95,28 +97,6 @@ export function AttributesPage() {
 
     return entries;
   }, [categories, activeCategory, search, requiredFilter]);
-
-  // Category counts (respecting search + required filter)
-  const categoryCounts = useMemo(() => {
-    const q = search.toLowerCase();
-    const counts = new Map<string, number>();
-    for (const [cat, items] of categories) {
-      let filtered = items;
-      if (q) {
-        filtered = filtered.filter(({ key, def }) =>
-          def.name.toLowerCase().includes(q) ||
-          key.toLowerCase().includes(q) ||
-          def.description.toLowerCase().includes(q) ||
-          def.id.toLowerCase().includes(q)
-        );
-      }
-      if (requiredFilter) {
-        filtered = filtered.filter(({ def }) => def.required);
-      }
-      counts.set(cat, filtered.length);
-    }
-    return counts;
-  }, [categories, search, requiredFilter]);
 
   const handleDelete = async (key: string) => {
     try {
@@ -193,19 +173,44 @@ export function AttributesPage() {
   };
 
   const totalCount = Object.keys(config).length;
+  const requiredCount = Object.values(config).filter((def) => def.required).length;
+  const pageSize = 8;
+  const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+  const visibleEntries = filteredEntries.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, activeCategory, requiredFilter]);
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setActiveCategory(null);
+    setRequiredFilter(false);
+  };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 md:p-8 space-y-6">
-        <PageHeader
-          title="Attribute verwalten"
-          description={`${totalCount} Attribute in ${allCategoryNames.length} Kategorien`}
-          className='mb-4'
-          actions={
+    <div className="min-h-full">
+      <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.08),transparent_28rem)]">
+        <div className="mx-auto w-full max-w-[1680px] space-y-5 p-4 md:p-6 xl:p-8">
+          <header className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
+                <Settings2 className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">Konfiguration</p>
+                <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Attribute</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Produktdaten zentral strukturieren und pflegen.</p>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" onClick={() => setShowImportDialog(true)}>
-                <Upload className="w-4 h-4 mr-2" />
-                CSV importieren
+                <Upload className="mr-2 h-4 w-4" />CSV importieren
               </Button>
               <Button
                 variant="outline"
@@ -218,8 +223,7 @@ export function AttributesPage() {
                   }
                 }}
               >
-                <Download className="w-4 h-4 mr-2" />
-                JSON exportieren
+                <Download className="mr-2 h-4 w-4" />Exportieren
               </Button>
               <Button
                 variant="outline"
@@ -227,264 +231,144 @@ export function AttributesPage() {
                 disabled={totalCount === 0}
                 onClick={() => setShowDeleteAllConfirm(true)}
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Alle löschen
+                <Trash2 className="mr-2 h-4 w-4" />Alle löschen
               </Button>
-              <Button onClick={() => setShowCreateDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Neues Attribut
+              <Button className="shadow-md shadow-primary/15" onClick={() => setShowCreateDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />Neues Attribut
               </Button>
             </div>
-          }
-        />
-      </div>
+          </header>
 
-      <div className="flex flex-col md:flex-row flex-1 min-h-0 px-4 md:px-8 pb-4 md:pb-8 gap-4 md:gap-6">
-        {/* Mobile-only controls: search + category select + filter */}
-        <div className="md:hidden flex flex-col gap-2 shrink-0">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Attribute suchen…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-11 text-sm"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Select
-              value={activeCategory ?? ''}
-              onValueChange={cat => { setActiveCategory(cat); setSearch(''); }}
-            >
-              <SelectTrigger className="flex-1 h-11">
-                <SelectValue placeholder="Kategorie wählen…" />
-              </SelectTrigger>
-              <SelectContent>
-                {allCategoryNames.map(cat => {
-                  const count = categoryCounts.get(cat) ?? 0;
-                  return (
-                    <SelectItem key={cat} value={cat}>
-                      <span className="flex items-center justify-between gap-3 w-full">
-                        <span>{cat}</span>
-                        <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
-                      </span>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <button
-              onClick={() => setRequiredFilter(v => !v)}
-              className={`shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-md text-xs font-medium border transition-colors ${
-                requiredFilter
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'border-input text-muted-foreground hover:bg-accent hover:text-foreground'
-              }`}
-              title="Nur Pflichtfelder"
-            >
-              <Filter className="w-4 h-4" />
-              Pflicht
-            </button>
-          </div>
-        </div>
+          <section className="grid gap-3 sm:grid-cols-3">
+            <MetricCard icon={Layers3} value={totalCount} label="Attribute insgesamt" tone="indigo" />
+            <MetricCard icon={FolderTree} value={allCategoryNames.length} label="Kategorien" tone="sky" />
+            <MetricCard icon={Asterisk} value={requiredCount} label="Pflichtattribute" tone="amber" />
+          </section>
 
-        {/* Sidebar — Category navigation (desktop only) */}
-        <div className="hidden md:flex w-56 shrink-0 flex-col gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Suchen..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
-          </div>
-
-          <button
-            onClick={() => setRequiredFilter(v => !v)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              requiredFilter
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-            }`}
-          >
-            <Filter className="w-3.5 h-3.5" />
-            Nur Pflichtfelder
-          </button>
-
-          <ScrollArea className="flex-1">
-            <nav className="space-y-0.5">
-              {allCategoryNames.map((cat, catIdx) => {
-                const count = categoryCounts.get(cat) ?? 0;
-                const isActive = !search && activeCategory === cat;
-                if (search && count === 0) return null;
-                const canMoveUp = catIdx > 0;
-                const canMoveDown = catIdx < allCategoryNames.length - 1;
-                return (
-                  <div
-                    key={cat}
-                    className={`group/cat flex items-center gap-0.5 rounded-md transition-colors ${
-                      isActive
-                        ? 'bg-accent'
-                        : 'hover:bg-accent/50'
-                    }`}
-                  >
-                    <button
-                      onClick={() => { setActiveCategory(cat); setSearch(''); }}
-                      className={`flex-1 min-w-0 flex items-center justify-between px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? 'text-foreground font-medium'
-                          : 'text-muted-foreground group-hover/cat:text-foreground'
-                      }`}
-                    >
-                      <span className="truncate">{cat}</span>
-                      <span className={`text-xs tabular-nums ${isActive ? 'text-foreground/70' : 'text-muted-foreground/60'}`}>
-                        {count}
-                      </span>
-                    </button>
-                    {!search && (
-                      <div className="flex shrink-0 opacity-0 group-hover/cat:opacity-100 transition-opacity pr-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          disabled={!canMoveUp}
-                          onClick={(e) => { e.stopPropagation(); handleMoveCategory(cat, 'up'); }}
-                          title="Kategorie nach oben"
-                        >
-                          <ArrowUp className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          disabled={!canMoveDown}
-                          onClick={(e) => { e.stopPropagation(); handleMoveCategory(cat, 'down'); }}
-                          title="Kategorie nach unten"
-                        >
-                          <ArrowDown className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </nav>
-          </ScrollArea>
-        </div>
-
-        {/* Main content — Attribute list */}
-        <div className="flex-1 min-w-0 flex flex-col rounded-lg border bg-card shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-            </div>
-          ) : (
-            <>
-              {/* List header */}
-              <div className="flex items-center px-4 sm:px-5 py-3 border-b text-xs font-medium text-muted-foreground shrink-0">
-                <span className="flex-1 truncate">
-                  {search ? `Ergebnisse für „${search}"` : activeCategory}
-                </span>
-                <span className="hidden sm:block w-44 shrink-0 text-right">
-                  {filteredEntries.length} {filteredEntries.length === 1 ? 'Attribut' : 'Attribute'}
-                </span>
-                <span className="sm:hidden text-right">
-                  {filteredEntries.length}
-                </span>
+          <section className="rounded-2xl border bg-card/90 p-3 shadow-sm backdrop-blur md:p-4">
+            <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_minmax(250px,360px)_auto]">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Name, Key, Beschreibung oder Kategorie suchen …"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="h-11 rounded-xl bg-background pl-10 pr-10"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Suche leeren">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
-              {/* Attribute rows */}
-              <ScrollArea className="flex-1 min-h-0">
-                {filteredEntries.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                    <Search className="w-8 h-8 mb-2 opacity-20" />
-                    <p className="text-sm">Keine Attribute gefunden</p>
-                  </div>
-                ) : (
-                  <div className="divide-y">
-                    {filteredEntries.map(({ key, def }) => (
-                      <div
-                        key={key}
-                        className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 sm:px-5 py-3 sm:py-3.5 group hover:bg-accent/40 transition-colors"
-                      >
-                        {/* Left: Name + Description */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-sm font-medium truncate">{def.name}</span>
-                            {def.required && (
-                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 shrink-0">
-                                Pflicht
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground line-clamp-1">
-                            {def.description || '—'}
-                          </p>
-                        </div>
-
-                        {/* Middle: Key + meta */}
-                        <div className="sm:w-44 shrink-0 sm:text-right space-y-0.5">
-                          <code className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-mono">
-                            {key}
-                          </code>
-                          {def.default_value && (
-                            <p className="text-[11px] text-muted-foreground/70 truncate">
-                              Standard: {def.default_value}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Right: Actions */}
-                        <div className="flex items-center gap-0.5 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0 self-end sm:self-auto">
-                          {!search && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 md:h-7 md:w-7"
-                                onClick={() => handleMove(key, 'up')}
-                                title="Nach oben"
-                              >
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 md:h-7 md:w-7"
-                                onClick={() => handleMove(key, 'down')}
-                                title="Nach unten"
-                              >
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 md:h-7 md:w-7"
-                            onClick={() => setEditingKey(key)}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 md:h-7 md:w-7 text-destructive hover:text-destructive"
-                            onClick={() => setShowDeleteConfirm(key)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </div>
+              <div className="flex gap-2">
+                <Select
+                  value={activeCategory ?? '__all__'}
+                  onValueChange={(value) => {
+                    setActiveCategory(value === '__all__' ? null : value);
+                    setSearch('');
+                  }}
+                >
+                  <SelectTrigger className="h-11 flex-1 rounded-xl bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Alle Kategorien ({totalCount})</SelectItem>
+                    {allCategoryNames.map((category) => (
+                      <SelectItem key={category} value={category}>{category} ({categories.get(category)?.length ?? 0})</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                {activeCategory && !search && (
+                  <div className="flex rounded-xl border bg-background p-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={allCategoryNames.indexOf(activeCategory) === 0} onClick={() => handleMoveCategory(activeCategory, 'up')} title="Kategorie nach oben"><ArrowUp className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={allCategoryNames.indexOf(activeCategory) === allCategoryNames.length - 1} onClick={() => handleMoveCategory(activeCategory, 'down')} title="Kategorie nach unten"><ArrowDown className="h-4 w-4" /></Button>
                   </div>
                 )}
-              </ScrollArea>
-            </>
-          )}
+              </div>
+
+              <Button variant={requiredFilter ? 'default' : 'outline'} className="h-11 rounded-xl" onClick={() => setRequiredFilter((value) => !value)}>
+                <Filter className="mr-2 h-4 w-4" />Nur Pflichtfelder
+              </Button>
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold">{search ? `Suchergebnisse für „${search}“` : activeCategory ?? 'Alle Attribute'}</h2>
+                <p className="text-xs text-muted-foreground">{filteredEntries.length} {filteredEntries.length === 1 ? 'Eintrag' : 'Einträge'} gefunden</p>
+              </div>
+              {(search || activeCategory || requiredFilter) && (
+                <Button variant="ghost" size="sm" onClick={clearFilters}><RotateCcw className="mr-2 h-3.5 w-3.5" />Filter zurücksetzen</Button>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="flex min-h-80 items-center justify-center rounded-2xl border bg-card/80">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+              </div>
+            ) : filteredEntries.length === 0 ? (
+              <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed bg-card/60 px-6 text-center">
+                <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted"><Search className="h-6 w-6 text-muted-foreground" /></span>
+                <h3 className="font-semibold">Keine Attribute gefunden</h3>
+                <p className="mt-1 max-w-md text-sm text-muted-foreground">Passe deine Suche oder Filter an – oder lege direkt ein neues Attribut an.</p>
+                <div className="mt-4 flex gap-2"><Button variant="outline" onClick={clearFilters}>Filter zurücksetzen</Button><Button onClick={() => setShowCreateDialog(true)}><Plus className="mr-2 h-4 w-4" />Attribut anlegen</Button></div>
+              </div>
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {visibleEntries.map(({ key, def }) => {
+                  const categoryEntries = categories.get(def.category) ?? [];
+                  const categoryIndex = categoryEntries.findIndex((entry) => entry.key === key);
+                  const canReorder = !search && activeCategory === def.category;
+                  return (
+                    <article key={key} className="group rounded-2xl border bg-card/90 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-500/30 hover:shadow-md">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-sm font-semibold text-indigo-600 dark:text-indigo-400">{def.name.trim().charAt(0).toUpperCase() || '#'}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate font-semibold">{def.name}</h3>
+                            {def.required && <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">Pflicht</Badge>}
+                          </div>
+                          <p className="mt-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-400">{def.category}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center rounded-lg border bg-background/80 p-0.5">
+                          {canReorder && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" disabled={categoryIndex <= 0} onClick={() => handleMove(key, 'up')} title="Nach oben"><ArrowUp className="h-3.5 w-3.5" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" disabled={categoryIndex === categoryEntries.length - 1} onClick={() => handleMove(key, 'down')} title="Nach unten"><ArrowDown className="h-3.5 w-3.5" /></Button>
+                            </>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingKey(key)} title="Bearbeiten"><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setShowDeleteConfirm(key)} title="Löschen"><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      </div>
+                      <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">{def.description || 'Keine Beschreibung hinterlegt.'}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3 text-[11px] text-muted-foreground">
+                        <code className="max-w-full truncate rounded-md bg-muted px-2 py-1 font-mono text-foreground/80">{key}</code>
+                        {def.default_value && <span className="rounded-md border px-2 py-1">Standard: {def.default_value}</span>}
+                        {!!def.suggested_values?.length && <span className="rounded-md border px-2 py-1">{def.suggested_values.length} Vorschläge</span>}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {!loading && filteredEntries.length > 0 && (
+              <div className="mt-4 flex flex-col items-center justify-between gap-3 rounded-2xl border bg-card/80 px-4 py-3 sm:flex-row">
+                <p className="text-xs text-muted-foreground">Einträge {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredEntries.length)} von {filteredEntries.length}</p>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft className="mr-1 h-4 w-4" />Zurück</Button>
+                  <span className="min-w-20 text-center text-xs font-medium">Seite {page} / {pageCount}</span>
+                  <Button variant="outline" size="sm" disabled={page === pageCount} onClick={() => setPage((value) => value + 1)}>Weiter<ChevronRight className="ml-1 h-4 w-4" /></Button>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       </div>
+
 
       {/* Edit Dialog */}
       {editingKey && config[editingKey] && (
@@ -581,6 +465,38 @@ export function AttributesPage() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+type MetricTone = 'indigo' | 'sky' | 'amber';
+
+function MetricCard({
+  icon: Icon,
+  value,
+  label,
+  tone,
+}: {
+  icon: typeof Layers3;
+  value: number;
+  label: string;
+  tone: MetricTone;
+}) {
+  const tones: Record<MetricTone, string> = {
+    indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+    sky: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+    amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border bg-card/90 p-4 shadow-sm">
+      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone]}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-2xl font-semibold leading-none">{value}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      </div>
     </div>
   );
 }
