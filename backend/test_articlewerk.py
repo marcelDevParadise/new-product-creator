@@ -11,6 +11,7 @@ import httpx
 
 from config import ArtikelwerkConfig
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
+from integrations.artikelwerk.article_numbers import get_next_article_sku
 from integrations.artikelwerk.mapper import build_preview
 from integrations.artikelwerk.normalization import normalized_reference_name, searchable_reference_name
 from integrations.artikelwerk.publisher import (
@@ -278,6 +279,33 @@ class DatabaseCompatibilityTests(unittest.TestCase):
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):
+    async def test_skips_locally_reserved_remote_gap(self):
+        class NumberClient:
+            calls = []
+
+            def __init__(self, _config):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return None
+
+            async def next_article_number(self, _tenant_id, *, after_sequence=None):
+                self.calls.append(after_sequence)
+                sequence = 231 if after_sequence is None else 332
+                return {"number": f"CYL-{sequence:05d}", "sequence": sequence}
+
+        with patch("integrations.artikelwerk.article_numbers.ArtikelwerkClient", NumberClient), patch(
+            "integrations.artikelwerk.article_numbers.get_artikelwerk_settings",
+            return_value=ArtikelwerkSettings(tenant_ids=[4]),
+        ):
+            result = await get_next_article_sku(["CYL-00231"])
+
+        self.assertEqual(result, "CYL-00332")
+        self.assertEqual(NumberClient.calls, [None, 231])
+
     async def test_reconciles_manufacturer_with_typographic_apostrophe(self):
         searches = []
 
@@ -696,6 +724,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
         async def handler(request: httpx.Request) -> httpx.Response:
             seen["path"] = request.url.path
+            seen["after"] = request.url.params.get("afterSequence")
             return httpx.Response(200, json={
                 "tenantId": 4, "tenantName": "CleanYourLeather", "prefix": "CYL-",
                 "number": "CYL-00999", "sequence": 999,
@@ -703,8 +732,9 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
 
         config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
         async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
-            result = await client.next_article_number(4)
+            result = await client.next_article_number(4, after_sequence=998)
         self.assertEqual(seen["path"], "/api/integrations/v1/tenants/4/next-article-number")
+        self.assertEqual(seen["after"], "998")
         self.assertEqual(result["number"], "CYL-00999")
 
     async def test_reads_etag_and_sends_if_match_for_article_updates(self):

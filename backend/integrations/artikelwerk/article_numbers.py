@@ -34,20 +34,35 @@ async def get_next_article_sku(local_skus: Iterable[str]) -> str:
                 )
             tenant_id = defaults[0]
 
-        result = await client.next_article_number(tenant_id)
+        local_sequences = {
+            int(match.group(1))
+            for sku in local_skus
+            if (match := _CYL_SKU.fullmatch(sku))
+        }
+        after_sequence: int | None = None
+        for _ in range(len(local_sequences) + 1):
+            result = await client.next_article_number(
+                tenant_id, after_sequence=after_sequence,
+            )
+            remote_number = str(result.get("number", ""))
+            remote_match = _CYL_SKU.fullmatch(remote_number)
+            if not remote_match:
+                raise ArtikelwerkError(
+                    "Artikelwerk lieferte keine gültige nächste Artikelnummer.",
+                    code="INVALID_RESPONSE",
+                    details=result,
+                )
+            sequence = int(remote_match.group(1))
+            if after_sequence is not None and sequence <= after_sequence:
+                raise ArtikelwerkError(
+                    "Artikelwerk lieferte keine fortschreitende Artikelnummer.",
+                    code="INVALID_RESPONSE", details=result,
+                )
+            if sequence not in local_sequences:
+                return remote_number
+            after_sequence = sequence
 
-    remote_number = str(result.get("number", ""))
-    remote_match = _CYL_SKU.fullmatch(remote_number)
-    if not remote_match:
-        raise ArtikelwerkError(
-            "Artikelwerk lieferte keine gültige nächste Artikelnummer.",
-            code="INVALID_RESPONSE",
-            details=result,
-        )
-
-    highest = int(remote_match.group(1)) - 1
-    for sku in local_skus:
-        match = _CYL_SKU.fullmatch(sku)
-        if match:
-            highest = max(highest, int(match.group(1)))
-    return f"CYL-{highest + 1:05d}"
+    raise ArtikelwerkError(
+        "Artikelwerk konnte keine freie Artikelnummer ermitteln.",
+        code="ARTICLE_NUMBER_EXHAUSTED",
+    )

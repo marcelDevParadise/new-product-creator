@@ -184,8 +184,13 @@ class ArtikelwerkClient:
         result = await self.request("GET", f"context/attributes/{_segment(attribute_id)}/values")
         return result if isinstance(result, list) else []
 
-    async def next_article_number(self, tenant_id: int) -> dict[str, Any]:
-        return await self.request("GET", f"tenants/{tenant_id}/next-article-number")  # type: ignore[return-value]
+    async def next_article_number(
+        self, tenant_id: int, *, after_sequence: int | None = None,
+    ) -> dict[str, Any]:
+        return await self.request(
+            "GET", f"tenants/{tenant_id}/next-article-number",
+            params={"afterSequence": after_sequence},
+        )  # type: ignore[return-value]
 
     async def create_article(self, payload: dict[str, Any], key: str) -> dict[str, Any]:
         # A timed-out create is ambiguous. The publisher reconciles by exact
