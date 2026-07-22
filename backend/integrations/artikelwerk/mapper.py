@@ -292,11 +292,15 @@ def build_preview(
 
     if settings.publish_images:
         image_values = [getattr(product, f"bild_{idx}") for idx in range(1, 10)]
-        if any(_present(v) for v in image_values) and not features.get("imageWrite", False):
+        new_images = [
+            (order, source) for order, source in enumerate(image_values, start=1)
+            if _present(source) and str(source).strip()
+        ]
+        if new_images and not features.get("imageWrite", False):
             issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Bilder sind nicht freigeschaltet."))
-        for order, source in enumerate(image_values, start=1):
-            if not _present(source):
-                continue
+        # Only explicitly supplied images are synchronized. Empty slots never
+        # remove or replace images that already exist in JTL.
+        for order, source in new_images:
             source_text = str(source)
             parsed = urlsplit(source_text)
             source_path = unquote(parsed.path) if parsed.scheme in {"http", "https"} else source_text.split("?", 1)[0]

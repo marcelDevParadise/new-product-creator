@@ -195,6 +195,17 @@ class MapperTests(unittest.TestCase):
 
 
 class ImagePayloadTests(unittest.TestCase):
+    def test_does_not_schedule_image_transfer_without_new_images(self):
+        product = Product(
+            artikelnummer="CYL-NO-IMAGE", artikelname="Ohne neues Bild",
+            bild_1=None, bild_2="", bild_3="   ",
+        )
+        preview = build_preview(
+            product, children=[], attribute_config={}, context=CONTEXT,
+            capabilities=CAPABILITIES, settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertNotIn("upload_image", {step.operation for step in preview.steps})
+
     def test_image_url_query_is_mapped_to_stable_article_filename(self):
         product = Product(
             artikelnummer="CYL-IMG", artikelname="Bild", bild_1="https://example.test/images/a/b.webp?v=2",
