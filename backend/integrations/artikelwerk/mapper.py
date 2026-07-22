@@ -5,6 +5,8 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from integrations.artikelwerk.schemas import (
+    ARTIKELWERK_STANDARD_TAX_CLASS_ID,
+    ARTIKELWERK_TAX_RATE,
     ArtikelwerkSettings,
     PreviewIssue,
     PublicationPreview,
@@ -62,6 +64,11 @@ def build_preview(
         "tenantIds": settings.tenant_ids,
         "active": True,
         "inventoryTracking": settings.inventory_tracking,
+        # JTL derives the effective VAT from the article's tax class. The
+        # Artikelwerk API otherwise defaults this field to 0, which creates an
+        # article without the standard 19 % tax class even when price.taxRate
+        # is correct.
+        "taxClassId": ARTIKELWERK_STANDARD_TAX_CLASS_ID,
         "description": product.beschreibung,
         "shortDescription": product.kurzbeschreibung,
         "gtin": product.ean,
@@ -100,11 +107,14 @@ def build_preview(
             issues.append(PreviewIssue(severity="error", code="NO_TENANT", message="Für den Verkaufspreis fehlt ein Mandant.", field="preis"))
         else:
             # Local `preis` is Brutto-VK; Artikelwerk's create contract expects net.
-            net_price = product.preis / (1 + settings.tax_rate / 100)
+            # The integration's article contract is fixed to 19 % VAT. Use the
+            # invariant here as a final safeguard, independent of persisted
+            # settings from installations predating this rule.
+            net_price = product.preis / (1 + ARTIKELWERK_TAX_RATE / 100)
             article_payload["price"] = {
                 "tenantId": settings.tenant_ids[0], "customerGroupId": settings.customer_group_id,
                 "currency": settings.currency.upper(), "net": round(net_price, 4),
-                "taxRate": settings.tax_rate, "quantityFrom": 1,
+                "taxRate": ARTIKELWERK_TAX_RATE, "quantityFrom": 1,
             }
 
     purchase_price = product.lieferant_netto_ek if product.lieferant_netto_ek is not None else product.ek
@@ -150,6 +160,7 @@ def build_preview(
     article_update_payload = {
         "name": product.artikelname,
         "inventoryTracking": settings.inventory_tracking,
+        "taxClassId": ARTIKELWERK_STANDARD_TAX_CLASS_ID,
         "gtin": product.ean,
         "dimensions": dict(article_payload["dimensions"]),
         "weight": article_payload["weight"],

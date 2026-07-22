@@ -5,6 +5,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+ARTIKELWERK_TAX_RATE = 19.0
+ARTIKELWERK_STANDARD_TAX_CLASS_ID = 1
+
+
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -16,7 +20,14 @@ class ArtikelwerkSettings(StrictModel):
     inventory_tracking: bool = True
     customer_group_id: int = Field(default=1, ge=1)
     currency: str = Field(default="EUR", min_length=3, max_length=3)
-    tax_rate: float = Field(default=19.0, ge=0, le=100)
+    # Artikelwerk/JTL articles created by this application always use the
+    # German standard VAT rate. Keeping this fixed also prevents stale clients
+    # from accidentally persisting 0 % again.
+    tax_rate: float = Field(
+        default=ARTIKELWERK_TAX_RATE,
+        ge=ARTIKELWERK_TAX_RATE,
+        le=ARTIKELWERK_TAX_RATE,
+    )
     publish_price: bool = True
     publish_purchase: bool = True
     publish_manufacturer: bool = True

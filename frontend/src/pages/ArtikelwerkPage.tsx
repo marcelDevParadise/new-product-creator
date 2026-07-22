@@ -107,7 +107,10 @@ export function ArtikelwerkPage() {
             <label className="text-sm">Plattform-ID<input type="number" min={0} className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.platform_id} onChange={e => setSettings({ ...settings, platform_id: Number(e.target.value) })} /></label>
             <label className="text-sm">Kundengruppen-ID<input type="number" min={1} className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.customer_group_id} onChange={e => setSettings({ ...settings, customer_group_id: Number(e.target.value) })} /></label>
             <label className="text-sm">Währung<input maxLength={3} className="mt-1 w-full rounded-lg border px-3 py-2 uppercase" value={settings.currency} onChange={e => setSettings({ ...settings, currency: e.target.value.toUpperCase() })} /></label>
-            <label className="text-sm">Steuersatz (%)<input type="number" min={0} max={100} step="0.01" className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.tax_rate} onChange={e => setSettings({ ...settings, tax_rate: Number(e.target.value) })} /></label>
+            <label className="text-sm">Steuersatz (%)
+              <input type="number" className="mt-1 w-full cursor-not-allowed rounded-lg border bg-muted/60 px-3 py-2 text-muted-foreground" value={19} readOnly aria-describedby="artikelwerk-tax-note" />
+              <span id="artikelwerk-tax-note" className="mt-1 block text-xs text-muted-foreground">Fest auf den deutschen Regelsteuersatz von 19 % eingestellt.</span>
+            </label>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {([
