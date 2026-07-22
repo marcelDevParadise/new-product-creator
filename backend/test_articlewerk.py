@@ -25,6 +25,8 @@ from integrations.artikelwerk.publisher import (
 from integrations.artikelwerk.schemas import ArtikelwerkSettings
 from models.attribute import AttributeDefinition
 from models.product import Product
+from services import database as database_service
+from services.sqlite_backend import make_pool as make_sqlite_pool
 
 
 CAPABILITIES = {
@@ -217,6 +219,42 @@ class ImagePayloadTests(unittest.TestCase):
         self.assertEqual(payload["filename"], "bild.webp")
         self.assertEqual(payload["tenantIds"], [4])
         self.assertTrue(payload["imageBase64"])
+
+
+class DatabaseCompatibilityTests(unittest.TestCase):
+    def test_managed_attribute_lookup_works_with_sqlite(self):
+        previous_pool = database_service._pool
+        with tempfile.TemporaryDirectory() as directory:
+            db_path = (Path(directory) / "attributes.db").as_posix()
+            pool = make_sqlite_pool(f"sqlite:///{db_path}")
+            database_service._pool = pool
+            try:
+                with database_service.get_conn() as conn, conn.cursor() as cur:
+                    cur.execute("""
+                        CREATE TABLE articlewerk_operations (
+                            operation_id TEXT PRIMARY KEY,
+                            artikelnummer TEXT NOT NULL,
+                            operation_type TEXT NOT NULL,
+                            resource_key TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            updated_at TEXT NOT NULL
+                        )
+                    """)
+                    cur.executemany(
+                        "INSERT INTO articlewerk_operations VALUES (%s,%s,%s,%s,%s,%s)",
+                        [
+                            ("1", "CYL-1", "set_attribute", "attribute:material", "succeeded", "2026-01-01 10:00:00"),
+                            ("2", "CYL-1", "set_attribute", "attribute:color", "succeeded", "2026-01-01 10:01:00"),
+                            ("3", "CYL-1", "delete_attribute", "attribute:color", "succeeded", "2026-01-01 10:02:00"),
+                        ],
+                    )
+                self.assertEqual(
+                    database_service.get_articlewerk_managed_attribute_ids("CYL-1"),
+                    {"material"},
+                )
+            finally:
+                pool.close()
+                database_service._pool = previous_pool
 
 
 class ClientTests(unittest.IsolatedAsyncioTestCase):

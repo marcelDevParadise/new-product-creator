@@ -206,8 +206,8 @@ async def publish_product(sku: str, background_tasks: BackgroundTasks):
                     raise _http_error(exc) from exc
                 reset_deleted_articlewerk_publication(sku)
                 publication = None
-    if publication and publication.get("status") in {"queued", "publishing", "published"}:
-        raise HTTPException(409, "Produkt ist bereits eingeplant oder an Artikelwerk veröffentlicht.")
+    if publication and publication.get("status") in {"queued", "publishing"}:
+        raise HTTPException(409, "Produkt ist bereits eingeplant oder wird gerade veröffentlicht.")
     job_id = str(uuid.uuid4())
     create_articlewerk_job(job_id, sku, len(preview.steps), preview.model_dump())
     upsert_articlewerk_publication(sku, status="queued")
