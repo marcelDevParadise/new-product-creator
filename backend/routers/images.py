@@ -98,6 +98,40 @@ def _target_path(root: Path, brand: str, product: str, filename: str) -> Path:
     return resolved
 
 
+def _add_public_read_access(path: Path) -> None:
+    """Apply the equivalent of ``chmod a+rX`` without removing existing bits."""
+    mode = path.stat().st_mode
+    add_mode = 0o555 if path.is_dir() or mode & 0o111 else 0o444
+    path.chmod(mode | add_mode)
+
+
+def _make_uploaded_path_readable(root: Path, target: Path) -> None:
+    """Make an uploaded image and every library directory leading to it readable."""
+    paths = [target]
+    current = target.parent
+    while True:
+        paths.append(current)
+        if current == root:
+            break
+        if root not in current.parents:
+            raise ValueError("Upload-Ziel liegt ausserhalb der Bildbibliothek.")
+        current = current.parent
+
+    for path in reversed(paths):
+        if not path.is_symlink():
+            _add_public_read_access(path)
+
+
+def _make_library_readable(root: Path) -> None:
+    """Repair permissions after an index rebuild, including the generated index."""
+    if not root.exists():
+        return
+    _add_public_read_access(root)
+    for path in root.rglob("*"):
+        if not path.is_symlink():
+            _add_public_read_access(path)
+
+
 def _rebuild_index() -> dict:
     script = os.environ.get("IMAGE_REBUILD_COMMAND", "").strip()
     if script:
@@ -127,6 +161,11 @@ def _rebuild_index() -> dict:
         return {"ok": False, "error": exc.stderr.strip() or exc.stdout.strip()}
     except subprocess.TimeoutExpired:
         return {"ok": False, "error": "Indexer hat zu lange gebraucht."}
+
+    try:
+        _make_library_readable(_image_root())
+    except OSError as exc:
+        return {"ok": False, "error": f"Bildrechte konnten nicht gesetzt werden: {exc}"}
 
     return {"ok": True, "output": result.stdout.strip()}
 
@@ -166,6 +205,7 @@ async def upload_image(
                     raise HTTPException(413, f"Datei ist groesser als {max_bytes // 1024 // 1024} MB.")
                 handle.write(chunk)
         shutil.move(str(tmp), str(target))
+        _make_uploaded_path_readable(root, target)
     finally:
         if tmp.exists():
             tmp.unlink()
