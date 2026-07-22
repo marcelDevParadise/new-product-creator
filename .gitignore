@@ -56,4 +56,5 @@ vorlagen/*.md
 vorlagen/ausgabe/
 
 *.md
+!deploy/ARTIKELWERK-UPDATE-DIAGNOSE.md
 *.html

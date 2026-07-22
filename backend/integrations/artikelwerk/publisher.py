@@ -308,6 +308,24 @@ async def _find_article_across_tenants(
     return next(iter(matches.values()), None)
 
 
+def _article_from_conflict_details(details: Any, sku: str) -> dict[str, Any] | None:
+    """Read the globally resolved article ID returned with a create conflict."""
+    if not isinstance(details, dict):
+        return None
+    article_id = details.get("articleId") or details.get("id")
+    if article_id in (None, ""):
+        return None
+    returned_sku = str(details.get("sku") or sku).strip()
+    if returned_sku.casefold() != sku.strip().casefold():
+        raise ArtikelwerkError(
+            "Die Artikelwerk-Konfliktantwort verweist auf eine abweichende SKU.",
+            status_code=502,
+            code="INVALID_CONFLICT_RESPONSE",
+            details={"requestedSku": sku, "returnedSku": returned_sku},
+        )
+    return {"id": str(article_id), "sku": returned_sku}
+
+
 async def _create_or_reuse_article(
     client: ArtikelwerkClient, payload: dict[str, Any], key: str,
 ) -> dict[str, Any]:
@@ -323,6 +341,15 @@ async def _create_or_reuse_article(
     except ArtikelwerkError as exc:
         if exc.status_code != 409 and exc.status_code < 500:
             raise
+        if exc.status_code == 409:
+            conflict_article = _article_from_conflict_details(exc.details, sku)
+            if conflict_article:
+                return {
+                    "article": conflict_article,
+                    "reusedExisting": True,
+                    "createErrorReconciled": True,
+                    "originalRequestId": exc.request_id,
+                }
         existing = await _find_article_by_sku(client, int(tenant_ids[0]), sku)
         if not existing and exc.status_code == 409:
             context = await client.context()
@@ -347,6 +374,7 @@ async def _create_or_reuse_article(
             raise
         return {
             "article": _normalized_article(existing), "createErrorReconciled": True,
+            "reusedExisting": exc.status_code == 409,
             "originalRequestId": exc.request_id,
         }
 

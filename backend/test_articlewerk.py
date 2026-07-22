@@ -438,6 +438,33 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["createErrorReconciled"])
         self.assertEqual(result["article"]["id"], "13")
 
+    async def test_reuses_article_id_returned_with_create_conflict(self):
+        methods = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            methods.append(request.method)
+            if request.method == "POST":
+                return httpx.Response(409, json={
+                    "code": "CONFLICT",
+                    "error": "Artikelnummer 'CYL-00030' ist bereits vorhanden.",
+                    "requestId": "req-direct-id",
+                    "details": {"articleId": "30", "sku": "CYL-00030"},
+                })
+            return httpx.Response(200, json={"items": []})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await _create_or_reuse_article(
+                client, {"sku": "CYL-00030", "name": "Test", "tenantIds": [4]},
+                "article:create:00030",
+            )
+
+        self.assertEqual(methods, ["GET", "POST"])
+        self.assertTrue(result["reusedExisting"])
+        self.assertTrue(result["createErrorReconciled"])
+        self.assertEqual(result["article"], {"id": "30", "sku": "CYL-00030"})
+        self.assertEqual(result["originalRequestId"], "req-direct-id")
+
     async def test_reconciles_existing_sku_hidden_in_another_tenant(self):
         requests = []
 
@@ -467,6 +494,7 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertTrue(result["createErrorReconciled"])
+        self.assertTrue(result["reusedExisting"])
         self.assertEqual(result["article"]["id"], "30")
         self.assertEqual(result["originalRequestId"], "req-5x")
         self.assertEqual(
