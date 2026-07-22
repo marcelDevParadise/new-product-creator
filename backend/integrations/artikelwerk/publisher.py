@@ -132,7 +132,7 @@ def _collection_items(value: Any, depth: int = 0) -> list[dict[str, Any]]:
     if isinstance(value, dict):
         if any(key in value for key in ("id", "priceId", "supplierId")):
             return [value]
-        for key in ("items", "prices", "suppliers", "rows", "results"):
+        for key in ("items", "prices", "tierPrices", "suppliers", "rows", "results"):
             if isinstance(value.get(key), list):
                 return [item for item in value[key] if isinstance(item, dict)]
         for key in ("data", "result", "page"):
@@ -165,15 +165,15 @@ async def _sync_price(
         if str(item.get("customerGroupId", item.get("customerGroup", ""))) == wanted_group
         and float(item.get("quantityFrom", item.get("fromQuantity", 1)) or 1) == wanted_quantity
     ]
-    if not matches and len(items) == 1:
-        matches = items
+    if not matches:
+        return await client.upsert_article_price(
+            article_id, payload, _required_etag(current.etag, "den Verkaufspreis"),
+        )
     if len(matches) != 1:
         raise ArtikelwerkError(
-            "Am vorhandenen Artikel existiert kein eindeutig aktualisierbarer Verkaufspreis. "
-            "Die Artikelwerk-v1-Route kann nur einen vorhandenen Preis per priceId aktualisieren; "
-            "ein fehlender Preis kann laut aktuellem API-Vertrag nur bei der Artikelanlage erzeugt werden.",
+            "Am vorhandenen Artikel existieren mehrere passende Verkaufspreise.",
             status_code=409,
-            code="MISSING_REMOTE_PRICE",
+            code="AMBIGUOUS_REMOTE_PRICE",
             details={"tenantId": payload["tenantId"], "customerGroupId": payload["customerGroupId"],
                      "availablePrices": items},
         )

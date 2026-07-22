@@ -260,6 +260,13 @@ class ArtikelwerkClient:
             json=payload, if_match=etag,
         )  # type: ignore[return-value]
 
+    async def upsert_article_price(
+        self, article_id: str, payload: dict[str, Any], etag: str,
+    ) -> dict[str, Any]:
+        return await self.request(
+            "PUT", f"articles/{_segment(article_id)}/prices", json=payload, if_match=etag,
+        )  # type: ignore[return-value]
+
     async def get_article_inventory(self, article_id: str) -> ETaggedResponse:
         return await self.request_etagged("GET", f"articles/{_segment(article_id)}/inventory")
 

@@ -358,6 +358,42 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/prices/retail")
         self.assertEqual(requests[1].headers["If-Match"], '"price-rev"')
 
+    async def test_creates_missing_price_with_etag(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "GET":
+                return httpx.Response(200, headers={"ETag": '"price-rev"'}, json={"tierPrices": []})
+            return httpx.Response(200, json={"updated": True})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        payload = {"tenantId": 4, "customerGroupId": 1, "currency": "EUR", "net": 10,
+                   "taxRate": 19, "quantityFrom": 1}
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            await _sync_price(client, "12", payload)
+        self.assertEqual(requests[1].method, "PUT")
+        self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/prices")
+        self.assertEqual(requests[1].headers["If-Match"], '"price-rev"')
+
+    async def test_reads_existing_tier_prices_from_real_api_shape(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            if request.method == "GET":
+                return httpx.Response(200, headers={"ETag": '"price-rev"'}, json={
+                    "tierPrices": [{"priceId": "real-price", "customerGroupId": 1, "quantityFrom": 1}],
+                })
+            return httpx.Response(200, json={"updated": True})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        payload = {"tenantId": 4, "customerGroupId": 1, "currency": "EUR", "net": 10,
+                   "taxRate": 19, "quantityFrom": 1}
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            await _sync_price(client, "12", payload)
+        self.assertEqual(requests[1].url.path, "/api/integrations/v1/articles/12/prices/real-price")
+
     async def test_syncs_supplier_with_etag(self):
         requests = []
 
