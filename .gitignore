@@ -61,3 +61,4 @@ vorlagen/ausgabe/
 
 attribute/*.json
 attribute/*.csv
+deploy/jtl-workflows/disable-inventory-tracking/*.ps1
