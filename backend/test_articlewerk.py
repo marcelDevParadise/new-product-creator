@@ -128,7 +128,7 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(
             [s.operation for s in preview.steps],
             ["create_article", "upsert_description", "set_attribute", "update_base_price",
-             "sync_article", "sync_tenants"],
+             "sync_tenants", "sync_article"],
         )
         self.assertEqual(preview.steps[0].payload["weight"], 0.25)
         article_step = next(step for step in preview.steps if step.operation == "sync_article")

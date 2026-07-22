@@ -158,14 +158,17 @@ def build_preview(
     if "manufacturerId" in article_payload:
         article_update_payload["manufacturerId"] = article_payload["manufacturerId"]
     state_sync_steps.extend([
+        # A globally resolved legacy article may not yet belong to the target
+        # tenant. Assign it first so the tenant-scoped detail read used for the
+        # article ETag can succeed.
+        PublicationStep(
+            operation="sync_tenants", resource_key="article-tenants",
+            payload={"tenantIds": list(settings.tenant_ids)},
+        ),
         PublicationStep(
             operation="sync_article", resource_key="article-master",
             payload={"tenantId": settings.tenant_ids[0] if settings.tenant_ids else None,
                      "article": article_update_payload},
-        ),
-        PublicationStep(
-            operation="sync_tenants", resource_key="article-tenants",
-            payload={"tenantIds": list(settings.tenant_ids)},
         ),
     ])
     if "categories" in article_payload:
