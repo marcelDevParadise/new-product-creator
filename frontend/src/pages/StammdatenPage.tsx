@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
@@ -8,7 +8,7 @@ import { api } from '../api/client';
 import type { Product } from '../types';
 import { BulkStammdatenModal } from '../components/products/BulkStammdatenModal';
 import { VariantGroupModal } from '../components/products/VariantGroupModal';
-import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUp, Plus, Trash2, Archive, ArchiveRestore, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy } from 'lucide-react';
+import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUp, Plus, Trash2, Archive, ArchiveRestore, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy, Package } from 'lucide-react';
 
 type EditingCell = { sku: string; field: string } | null;
 
@@ -282,12 +282,21 @@ export function StammdatenPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <PageHeader
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Produktverwaltung"
         title="Stammdaten"
-        description={`${products.length} aktiv · ${archivedProducts.length} archiviert`}
+        description="Grunddaten, Variantenbeziehungen und Produktstatus zentral verwalten."
+        icon={ClipboardEdit}
+        stats={[
+          { label: 'Aktive Produkte', value: products.length, icon: Package, tone: 'indigo' },
+          { label: 'Vollständig', value: products.filter((product) => product.stammdaten_complete).length, icon: CheckCircle2, tone: 'emerald' },
+          { label: 'Variantengruppen', value: products.filter((product) => product.is_parent).length, icon: GitBranch, tone: 'violet' },
+          { label: 'Archiviert', value: archivedProducts.length, icon: Archive, tone: 'amber' },
+        ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={async () => {
                 const opening = !showAddForm;
@@ -299,7 +308,7 @@ export function StammdatenPage() {
                   } catch { /* leave empty */ }
                 }
               }}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
             >
               <Plus className="w-4 h-4" />
               Artikel hinzufügen
@@ -359,18 +368,18 @@ export function StammdatenPage() {
       />
 
       {/* Search + Archive toggle */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <div className="relative flex-1 sm:max-w-sm">
+      <section className="flex flex-col gap-3 rounded-3xl border bg-card/90 p-4 shadow-sm sm:flex-row sm:items-center md:p-5">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="SKU, Name, Hersteller oder GTIN suchen…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-white/5 dark:text-gray-200 dark:placeholder-gray-500"
+            className="h-11 w-full rounded-xl border bg-background pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
           />
         </div>
-        <div className="flex gap-1 bg-gray-100 dark:bg-white/5 rounded-lg p-1 self-start">
+        <div className="flex self-start rounded-xl bg-muted p-1">
           <button
             onClick={() => { setShowArchive(false); setSelectedSkus(new Set()); }}
             className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
@@ -393,11 +402,11 @@ export function StammdatenPage() {
             Archiv ({archivedProducts.length})
           </button>
         </div>
-      </div>
+      </section>
 
       {/* Inline Add Product Form */}
       {showAddForm && (
-        <div className="bg-white dark:bg-white/5 rounded-xl border border-indigo-200 dark:border-indigo-500/30 shadow-sm p-4 space-y-3">
+        <div className="space-y-3 rounded-3xl border border-indigo-500/25 bg-indigo-500/5 p-5 shadow-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Artikelnummer *</label>
@@ -493,7 +502,7 @@ export function StammdatenPage() {
                 <div
                   key={p.artikelnummer}
                   onClick={() => navigate(`/stammdaten/${encodeURIComponent(p.artikelnummer)}`)}
-                  className={`bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm p-3 active:bg-gray-50 dark:active:bg-white/10 transition-colors ${selected ? 'ring-2 ring-indigo-500/40' : ''} ${isChild ? 'ml-6 border-l-4 border-l-purple-300 dark:border-l-purple-600' : ''}`}
+                  className={`rounded-2xl border bg-card/90 p-3 shadow-sm transition-colors active:bg-accent ${selected ? 'ring-2 ring-indigo-500/40' : ''} ${isChild ? 'ml-6 border-l-4 border-l-purple-300 dark:border-l-purple-600' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     <input
@@ -566,8 +575,8 @@ export function StammdatenPage() {
           </div>
 
           {/* Desktop: Tabelle (≥ md) */}
-          <div className="hidden md:block bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
+          <div className="hidden overflow-hidden rounded-3xl border bg-card/90 shadow-sm md:block">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10">
                 <tr>
@@ -776,7 +785,7 @@ export function StammdatenPage() {
             {filteredArchived.map((p) => {
               const selected = selectedSkus.has(p.artikelnummer);
               return (
-              <div key={p.artikelnummer} className={`bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm p-3 ${selected ? 'ring-2 ring-indigo-500/40' : ''}`}>
+              <div key={p.artikelnummer} className={`rounded-2xl border bg-card/90 p-3 shadow-sm ${selected ? 'ring-2 ring-indigo-500/40' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <input
                     type="checkbox"
@@ -806,8 +815,8 @@ export function StammdatenPage() {
           </div>
 
           {/* Desktop: Tabelle */}
-          <div className="hidden md:block bg-white dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto max-h-[calc(100vh-280px)]">
+          <div className="hidden overflow-hidden rounded-3xl border bg-card/90 shadow-sm md:block">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10">
                 <tr>
@@ -901,6 +910,7 @@ export function StammdatenPage() {
           onSaved={() => { setSelectedSkus(new Set()); reload(); }}
         />
       )}
+      </div>
     </div>
   );
 }

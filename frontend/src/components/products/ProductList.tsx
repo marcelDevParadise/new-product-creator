@@ -42,7 +42,7 @@ export function ProductList({ products, selectedSkus, onSelectionChange, archive
 
   if (products.length === 0) {
     return (
-      <div className="text-center py-16 text-gray-500">
+      <div className="rounded-3xl border border-dashed bg-card/70 py-16 text-center text-muted-foreground">
         {archived ? (
           <>
             <Archive className="w-10 h-10 mx-auto mb-3 text-gray-300" />
@@ -86,7 +86,7 @@ export function ProductList({ products, selectedSkus, onSelectionChange, archive
             <div
               key={p.artikelnummer}
               onClick={() => navigate(p.stammdaten_complete ? `/products/${encodeURIComponent(p.artikelnummer)}` : `/stammdaten/${encodeURIComponent(p.artikelnummer)}`)}
-              className={`bg-white rounded-lg border ${isSelected ? 'border-indigo-300 bg-indigo-50/40' : 'border-gray-200'} shadow-sm p-3 flex gap-3 cursor-pointer active:bg-gray-50`}
+              className={`flex cursor-pointer gap-3 rounded-2xl border bg-card/90 p-3 shadow-sm transition active:bg-accent ${isSelected ? 'border-indigo-300 bg-indigo-50/40' : ''}`}
             >
               {selectable && (
                 <div onClick={(e) => e.stopPropagation()} className="pt-1">
@@ -140,8 +140,8 @@ export function ProductList({ products, selectedSkus, onSelectionChange, archive
       </div>
 
       {/* Desktop Table (>= md) */}
-      <div className="hidden md:block bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
+      <div className="hidden overflow-hidden rounded-3xl border bg-card/90 shadow-sm md:block">
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>

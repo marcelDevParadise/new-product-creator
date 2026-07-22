@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker, Link } from 'react-router-dom';
-import { Save, ArrowRight, ChevronRight, GitBranch, ArrowDownFromLine, X, Copy, CloudUpload } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
+import { Save, ArrowRight, ChevronLeft, GitBranch, ArrowDownFromLine, X, Copy, CloudUpload, Package, CircleCheckBig, Banknote } from 'lucide-react';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CategoryCascader } from '../components/ui/CategoryCascader';
@@ -18,14 +18,14 @@ import type { Product, CategoryTree, Supplier, VariantenSettings, ArtikelwerkPre
 
 const EINHEITEN_FALLBACK = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
 
-const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
-const selectCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
+const inputCls = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40';
+const selectCls = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+    <div className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
+      <div className="border-b bg-muted/30 px-5 py-4">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       </div>
       <div className="p-5 space-y-4">{children}</div>
     </div>
@@ -300,7 +300,7 @@ export function StammdatenEditPage() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
       {/* Blocker dialog for unsaved changes */}
       {blocker.state === 'blocked' && (
         <ConfirmDialog
@@ -313,32 +313,35 @@ export function StammdatenEditPage() {
         />
       )}
 
-      {/* Header with breadcrumb */}
-      <div className="shrink-0 px-4 md:px-8 pt-4 md:pt-6 pb-4">
-        <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
-          <button onClick={() => navigate('/stammdaten')} className="hover:text-gray-900 transition-colors">
-            Stammdaten
-          </button>
-          <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-gray-900 font-medium truncate max-w-[300px]">{product.artikelnummer}</span>
-        </nav>
-        <PageHeader
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 pb-24 md:p-6 md:pb-24 xl:px-8 xl:py-7 xl:pb-24 2xl:px-10">
+        <WorkspaceHeader
+          eyebrow={`Stammdaten · ${product.artikelnummer}`}
           title={product.artikelname}
-          description={`Stammdaten für ${product.artikelnummer} bearbeiten`}
+          description="Produktinformationen, Verkaufstexte, Bilder und Kategorisierung bearbeiten."
+          icon={Package}
+          stats={[
+            { label: 'Status', value: dirty ? 'Geändert' : 'Gespeichert', icon: CircleCheckBig, tone: dirty ? 'amber' : 'emerald' },
+            { label: 'EK-Preis', value: f.ek ? `${f.ek} €` : '–', icon: Banknote, tone: 'sky' },
+            { label: 'VK-Preis', value: f.preis ? `${f.preis} €` : '–', icon: Banknote, tone: 'violet' },
+            { label: 'Produktart', value: product.is_parent ? 'Parent' : product.parent_sku ? 'Variante' : 'Einzelartikel', icon: GitBranch, tone: 'indigo' },
+          ]}
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="bg-background/70" onClick={() => navigate('/stammdaten')}><ChevronLeft className="mr-2 h-4 w-4" />Stammdaten</Button>
             {!product.parent_sku && (
-              <button
+              <Button
+                variant="outline"
                 onClick={handleArtikelwerkPreview}
                 disabled={artikelwerkLoading || dirty}
                 title={dirty ? 'Bitte zuerst die Stammdaten speichern' : 'Über Artikelwerk an JTL-Wawi veröffentlichen'}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-background/70 text-indigo-600"
               >
-                <CloudUpload className="w-4 h-4" />
+                <CloudUpload className="mr-2 h-4 w-4" />
                 {artikelwerkLoading ? 'Prüft…' : 'An JTL senden'}
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="outline"
               onClick={async () => {
                 try {
                   const cloned = await api.cloneProduct(product.artikelnummer);
@@ -348,18 +351,16 @@ export function StammdatenEditPage() {
                   toast(err instanceof Error ? err.message : 'Klonen fehlgeschlagen', 'error');
                 }
               }}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+              className="bg-background/70"
             >
-              <Copy className="w-4 h-4" />
+              <Copy className="mr-2 h-4 w-4" />
               Klonen
-            </button>
+            </Button>
             </div>
           }
         />
-      </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-auto px-4 md:px-8 pb-8">
+      <div>
         {/* Variant info banner */}
         {product.parent_sku && parentProduct && (
           <div className="mb-4 flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-xl">
@@ -679,7 +680,8 @@ export function StammdatenEditPage() {
           </div>
         </div>
       </div>
-      <div className="shrink-0 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between px-4 md:px-8 py-3 md:py-4 bg-white border-t border-gray-200">
+      </div>
+      <div className="sticky bottom-0 z-20 flex shrink-0 flex-col-reverse gap-3 border-t bg-background/90 px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur sm:flex-row sm:items-center sm:justify-between md:px-8 md:py-4">
         <button
           onClick={() => handleSave(false)}
           disabled={saving}

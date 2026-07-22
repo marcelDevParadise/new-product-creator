@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { ProductList } from '../components/products/ProductList';
 import { BulkAttributeModal } from '../components/products/BulkAttributeModal';
 import { TemplateModal } from '../components/products/TemplateModal';
@@ -7,7 +7,9 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import type { Product, AttributeConfig } from '../types';
-import { Edit, FileText, Search, Filter, Bookmark, BookmarkPlus, X, Trash2 } from 'lucide-react';
+import { Edit, FileText, Search, Filter, Bookmark, BookmarkPlus, X, Trash2, Package, CircleCheckBig, Tags } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 
 interface SavedFilter {
   name: string;
@@ -119,44 +121,44 @@ export function ProductsPage() {
     reload();
   };
 
+  const completeCount = products.filter((product) => product.stammdaten_complete).length;
+  const attributedCount = products.filter((product) => Object.keys(product.attributes).length > 0).length;
+
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <PageHeader
-        title="Attribute"
-        description={`${products.length} aktive Produkte`}
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Produktdaten"
+        title="Produktattribute"
+        description="Attribute einzelner Produkte prüfen, filtern und gesammelt bearbeiten."
+        icon={Tags}
+        stats={[
+          { label: 'Aktive Produkte', value: products.length, icon: Package, tone: 'indigo' },
+          { label: 'Aktuelle Auswahl', value: filteredProducts.length, icon: Filter, tone: 'sky' },
+          { label: 'Stammdaten komplett', value: completeCount, icon: CircleCheckBig, tone: 'emerald' },
+          { label: 'Mit Attributen', value: attributedCount, icon: Tags, tone: 'violet' },
+        ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setShowTemplateModal(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              Vorlagen
-            </button>
+            <Button variant="outline" className="bg-background/70" onClick={() => setShowTemplateModal(true)}><FileText className="mr-2 h-4 w-4" />Vorlagen</Button>
             {selectedSkus.size > 0 && (
-              <button
-                onClick={() => setShowBulkModal(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
-              >
-                <Edit className="w-4 h-4" />
-                {selectedSkus.size} bearbeiten
-              </button>
+              <Button onClick={() => setShowBulkModal(true)}><Edit className="mr-2 h-4 w-4" />{selectedSkus.size} bearbeiten</Button>
             )}
           </div>
         }
       />
 
       {/* Search bar + Filters */}
-      <div className="space-y-3">
+      <section className="space-y-3 rounded-3xl border bg-card/90 p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-          <div className="relative w-full sm:flex-1 sm:max-w-sm">
+          <div className="relative w-full sm:flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
+            <Input
+              type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="SKU oder Name suchen…"
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              className="h-11 rounded-xl bg-background pl-10"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -164,7 +166,7 @@ export function ProductsPage() {
             <select
               value={filterStammdaten}
               onChange={(e) => setFilterStammdaten(e.target.value as 'all' | 'complete' | 'incomplete')}
-              className="text-xs border border-gray-200 rounded-lg px-2 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="h-11 rounded-xl border bg-background px-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">Stammdaten: Alle</option>
               <option value="complete">Stammdaten: Vollständig</option>
@@ -173,7 +175,7 @@ export function ProductsPage() {
             <select
               value={filterAttributes}
               onChange={(e) => setFilterAttributes(e.target.value as 'all' | 'has' | 'none')}
-              className="text-xs border border-gray-200 rounded-lg px-2 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="h-11 rounded-xl border bg-background px-3 text-xs outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">Attribute: Alle</option>
               <option value="has">Attribute: Vorhanden</option>
@@ -232,7 +234,7 @@ export function ProductsPage() {
             ))}
           </div>
         )}
-      </div>
+      </section>
 
       {loading ? (
         <LoadingSpinner className="py-16" />
@@ -261,6 +263,7 @@ export function ProductsPage() {
           onApplied={() => { setSelectedSkus(new Set()); reload(); }}
         />
       )}
+      </div>
     </div>
   );
 }

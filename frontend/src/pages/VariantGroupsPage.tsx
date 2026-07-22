@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GitBranch, ChevronRight, ChevronDown, RefreshCw, Trash2 } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
+import { GitBranch, ChevronRight, ChevronDown, RefreshCw, Trash2, Boxes, Package } from 'lucide-react';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { api } from '../api/client';
 import { useToast } from '../components/ui/Toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Badge } from '../components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 import type { VariantGroup } from '../types';
 
 export function VariantGroupsPage() {
@@ -45,65 +45,35 @@ export function VariantGroupsPage() {
   const totalChildren = groups.reduce((sum, g) => sum + g.children.length, 0);
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader title="Variantengruppen" description="Übersicht aller Parent/Child-Beziehungen" />
-        <div className="flex items-center gap-2">
-          <button
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Aktualisieren
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Gruppen</CardTitle>
-            <GitBranch className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{groups.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Parent-Produkte</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{groups.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Varianten</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-violet-600">{totalChildren}</div>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Produktbeziehungen"
+        title="Variantengruppen"
+        description="Parent-Produkte, Variantenachsen und zugehörige Kindartikel zentral verwalten."
+        icon={GitBranch}
+        stats={[
+          { label: 'Gruppen', value: groups.length, icon: Boxes, tone: 'indigo' },
+          { label: 'Parent-Produkte', value: groups.length, icon: Package, tone: 'violet' },
+          { label: 'Varianten', value: totalChildren, icon: GitBranch, tone: 'sky' },
+        ]}
+        actions={<Button variant="outline" className="bg-background/70" onClick={load} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Aktualisieren</Button>}
+      />
 
       {/* Group list */}
       {groups.length === 0 && !loading ? (
-        <div className="text-center py-16 text-gray-500">
-          <GitBranch className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-          <p className="text-sm mb-2">Keine Variantengruppen vorhanden.</p>
-          <p className="text-xs text-gray-400">Erstelle Gruppen über die Stammdaten-Seite.</p>
+        <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed bg-card/70 px-6 text-center">
+          <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted"><GitBranch className="h-6 w-6 text-muted-foreground" /></span>
+          <h3 className="font-semibold">Keine Variantengruppen vorhanden</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Erstelle Gruppen über die Stammdaten-Seite.</p>
+          <Button className="mt-4" onClick={() => navigate('/stammdaten')}>Stammdaten öffnen</Button>
         </div>
       ) : (
         <div className="space-y-3">
           {groups.map((g) => {
             const isExpanded = expandedParent === g.parent.artikelnummer;
             return (
-              <div key={g.parent.artikelnummer} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div key={g.parent.artikelnummer} className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm transition hover:border-indigo-500/25 hover:shadow-md">
                 <div
                   className="flex flex-wrap items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => setExpandedParent(isExpanded ? null : g.parent.artikelnummer)}
@@ -200,6 +170,7 @@ export function VariantGroupsPage() {
           onCancel={() => setDissolveTarget(null)}
         />
       )}
+      </div>
     </div>
   );
 }
