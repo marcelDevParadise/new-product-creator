@@ -4,6 +4,7 @@ import {
   Search, Plus, Pencil, Trash2, X, Check, Filter, ArrowUp, ArrowDown,
   Hash, Tag, FileText, List, Settings2, AlertCircle, Download, Upload,
   ChevronLeft, ChevronRight, Layers3, Asterisk, FolderTree, RotateCcw,
+  ListChecks, Sparkles,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -174,7 +175,8 @@ export function AttributesPage() {
 
   const totalCount = Object.keys(config).length;
   const requiredCount = Object.values(config).filter((def) => def.required).length;
-  const pageSize = 8;
+  const suggestionCount = Object.values(config).filter((def) => def.suggested_values?.length).length;
+  const pageSize = 9;
   const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
   const visibleEntries = filteredEntries.slice((page - 1) * pageSize, page * pageSize);
 
@@ -195,54 +197,62 @@ export function AttributesPage() {
   return (
     <div className="min-h-full">
       <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.08),transparent_28rem)]">
-        <div className="mx-auto w-full max-w-[1680px] space-y-5 p-4 md:p-6 xl:p-8">
-          <header className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20">
-                <Settings2 className="h-6 w-6" />
+        <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+          <section className="relative overflow-hidden rounded-3xl border bg-card/90 p-5 shadow-sm md:p-7">
+            <div className="pointer-events-none absolute -right-24 -top-32 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-36 left-1/3 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
+
+            <div className="relative flex flex-col gap-6 2xl:flex-row 2xl:items-start 2xl:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/25">
+                  <Settings2 className="h-6 w-6" />
+                  <Sparkles className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-card p-0.5 text-indigo-500" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Produktdaten-System</p>
+                  <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">Attributverwaltung</h1>
+                  <p className="mt-1 text-sm text-muted-foreground">Struktur, Pflichtangaben und Auswahlwerte an einem Ort verwalten.</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">Konfiguration</p>
-                <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Attribute</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Produktdaten zentral strukturieren und pflegen.</p>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" className="bg-background/70" onClick={() => setShowImportDialog(true)}>
+                  <Upload className="mr-2 h-4 w-4" />CSV importieren
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-background/70"
+                  onClick={async () => {
+                    try {
+                      await api.downloadAttributesJson();
+                      toast('JSON-Export gestartet', 'success');
+                    } catch (e) {
+                      toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');
+                    }
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />Exportieren
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-background/70 text-destructive hover:text-destructive"
+                  disabled={totalCount === 0}
+                  onClick={() => setShowDeleteAllConfirm(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />Alle löschen
+                </Button>
+                <Button className="shadow-md shadow-primary/20" onClick={() => setShowCreateDialog(true)}>
+                  <Plus className="mr-2 h-4 w-4" />Neues Attribut
+                </Button>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => setShowImportDialog(true)}>
-                <Upload className="mr-2 h-4 w-4" />CSV importieren
-              </Button>
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    await api.downloadAttributesJson();
-                    toast('JSON-Export gestartet', 'success');
-                  } catch (e) {
-                    toast(e instanceof Error ? e.message : 'Export fehlgeschlagen', 'error');
-                  }
-                }}
-              >
-                <Download className="mr-2 h-4 w-4" />Exportieren
-              </Button>
-              <Button
-                variant="outline"
-                className="text-destructive hover:text-destructive"
-                disabled={totalCount === 0}
-                onClick={() => setShowDeleteAllConfirm(true)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />Alle löschen
-              </Button>
-              <Button className="shadow-md shadow-primary/15" onClick={() => setShowCreateDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" />Neues Attribut
-              </Button>
+            <div className="relative mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard icon={Layers3} value={totalCount} label="Attribute insgesamt" detail="Vollständiger Datenkatalog" tone="indigo" />
+              <MetricCard icon={FolderTree} value={allCategoryNames.length} label="Kategorien" detail="Thematisch organisiert" tone="sky" />
+              <MetricCard icon={Asterisk} value={requiredCount} label="Pflichtattribute" detail="Für die Qualitätsprüfung" tone="amber" />
+              <MetricCard icon={ListChecks} value={suggestionCount} label="Mit Auswahlwerten" detail="Schneller und einheitlicher" tone="emerald" />
             </div>
-          </header>
-
-          <section className="grid gap-3 sm:grid-cols-3">
-            <MetricCard icon={Layers3} value={totalCount} label="Attribute insgesamt" tone="indigo" />
-            <MetricCard icon={FolderTree} value={allCategoryNames.length} label="Kategorien" tone="sky" />
-            <MetricCard icon={Asterisk} value={requiredCount} label="Pflichtattribute" tone="amber" />
           </section>
 
           <section className="rounded-2xl border bg-card/90 p-3 shadow-sm backdrop-blur md:p-4">
@@ -316,7 +326,7 @@ export function AttributesPage() {
                 <div className="mt-4 flex gap-2"><Button variant="outline" onClick={clearFilters}>Filter zurücksetzen</Button><Button onClick={() => setShowCreateDialog(true)}><Plus className="mr-2 h-4 w-4" />Attribut anlegen</Button></div>
               </div>
             ) : (
-              <div className="grid gap-3 lg:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {visibleEntries.map(({ key, def }) => {
                   const categoryEntries = categories.get(def.category) ?? [];
                   const categoryIndex = categoryEntries.findIndex((entry) => entry.key === key);
@@ -469,33 +479,39 @@ export function AttributesPage() {
   );
 }
 
-type MetricTone = 'indigo' | 'sky' | 'amber';
+type MetricTone = 'indigo' | 'sky' | 'amber' | 'emerald';
 
 function MetricCard({
   icon: Icon,
   value,
   label,
+  detail,
   tone,
 }: {
   icon: typeof Layers3;
   value: number;
   label: string;
+  detail: string;
   tone: MetricTone;
 }) {
   const tones: Record<MetricTone, string> = {
     indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
     sky: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
     amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border bg-card/90 p-4 shadow-sm">
-      <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone]}`}>
+    <div className="group flex items-center gap-3 rounded-2xl border bg-background/65 p-4 shadow-sm backdrop-blur transition-colors hover:bg-background">
+      <span className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${tones[tone]}`}>
         <Icon className="h-5 w-5" />
       </span>
-      <div>
-        <p className="text-2xl font-semibold leading-none">{value}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-2">
+          <p className="text-2xl font-semibold leading-none tabular-nums">{value}</p>
+          <p className="truncate text-sm font-medium">{label}</p>
+        </div>
+        <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
       </div>
     </div>
   );
