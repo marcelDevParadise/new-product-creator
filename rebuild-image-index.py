@@ -187,7 +187,7 @@ html_template = r'''<!doctype html>
       border: 1px solid rgba(255,255,255,.12);
       backdrop-filter: blur(18px);
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) 220px 180px auto;
+      grid-template-columns: minmax(220px, 1fr) 220px 180px;
       gap: 12px;
       box-shadow: 0 18px 48px rgba(0,0,0,.18);
     }
@@ -233,6 +233,10 @@ html_template = r'''<!doctype html>
       grid-template-columns: 260px minmax(0, 1fr);
       gap: 18px;
       align-items: start;
+    }
+
+    .layout > section {
+      min-width: 0;
     }
 
     .sidebar {
@@ -454,6 +458,8 @@ html_template = r'''<!doctype html>
     .copy-main {
       background: var(--brand);
       color: white;
+      font-size: 12px;
+      white-space: nowrap;
     }
 
     .copy-main:hover {
@@ -1051,6 +1057,60 @@ html_template = r'''<!doctype html>
       display: none;
     }
 
+    .product-nav {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      padding: 5px;
+      overflow-x: auto;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      box-shadow: 0 5px 18px rgba(15,23,42,.035);
+      scrollbar-width: thin;
+    }
+
+    .product-nav-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 36px;
+      flex: 0 0 auto;
+      padding: 0 12px;
+      color: #64748b;
+      background: transparent;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .product-nav-button:hover {
+      color: #1e293b;
+      background: #f8fafc;
+    }
+
+    .product-nav-button.active {
+      color: white;
+      background: var(--brand);
+      box-shadow: 0 5px 14px rgba(37,99,235,.23);
+    }
+
+    .product-nav-count {
+      min-width: 20px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      color: #64748b;
+      background: #f1f5f9;
+      font-size: 10px;
+      text-align: center;
+    }
+
+    .product-nav-button.active .product-nav-count {
+      color: #1d4ed8;
+      background: white;
+    }
+
     .toolbar input,
     .toolbar select {
       color: var(--text);
@@ -1104,7 +1164,7 @@ html_template = r'''<!doctype html>
 
     .library-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 15px;
     }
 
@@ -1227,6 +1287,12 @@ html_template = r'''<!doctype html>
       color: var(--brand);
     }
 
+    @media (max-width: 1280px) {
+      .library-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
     @media (max-width: 980px) {
       .layout,
       .toolbar {
@@ -1298,6 +1364,10 @@ html_template = r'''<!doctype html>
       .app-main {
         padding: 25px 15px 45px;
       }
+
+      .library-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 640px) {
@@ -1337,8 +1407,18 @@ html_template = r'''<!doctype html>
         grid-template-columns: 1fr;
       }
 
+      .library-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .recent-date {
         display: none;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .library-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -1450,7 +1530,6 @@ html_template = r'''<!doctype html>
             <input id="search" type="search" placeholder="Marke, Produkt oder Dateiname suchen ..." autocomplete="off">
           </label>
           <select id="brandFilter" aria-label="Marke filtern"><option value="">Alle Marken</option></select>
-          <select id="productFilter" aria-label="Produktgruppe filtern"><option value="">Alle Produktgruppen</option></select>
           <select id="sortMode" aria-label="Sortierung">
             <option value="path">Nach Pfad</option>
             <option value="newest">Neueste zuerst</option>
@@ -1471,6 +1550,7 @@ html_template = r'''<!doctype html>
               </div>
               <button id="resetFilters" class="reset-filter" type="button" hidden>Filter zurücksetzen</button>
             </div>
+            <nav id="productNav" class="product-nav" aria-label="Produktgruppen"></nav>
             <div id="content" class="library-grid"></div>
           </section>
         </div>
@@ -1536,9 +1616,9 @@ html_template = r'''<!doctype html>
       content: document.querySelector("#content"),
       search: document.querySelector("#search"),
       brandFilter: document.querySelector("#brandFilter"),
-      productFilter: document.querySelector("#productFilter"),
       sortMode: document.querySelector("#sortMode"),
       brandNav: document.querySelector("#brandNav"),
+      productNav: document.querySelector("#productNav"),
       libraryContext: document.querySelector("#libraryContext"),
       libraryCount: document.querySelector("#libraryCount"),
       resetFilters: document.querySelector("#resetFilters"),
@@ -1567,6 +1647,7 @@ html_template = r'''<!doctype html>
     const fmtBytes = new Intl.NumberFormat("de-DE", {
       maximumFractionDigits: 1,
     });
+    let activeProduct = "";
 
     function escapeAttr(value) {
       return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -1757,13 +1838,12 @@ html_template = r'''<!doctype html>
     function getFilteredItems() {
       const q = els.search.value.trim().toLowerCase();
       const brand = els.brandFilter.value;
-      const product = els.productFilter.value;
       const sort = els.sortMode.value;
 
       let result = IMAGES.filter(item => {
         const haystack = `${item.path} ${item.brandLabel} ${item.productLabel} ${item.file}`.toLowerCase();
         return (!brand || item.brand === brand)
-          && (!product || item.product === product)
+          && (!activeProduct || item.product === activeProduct)
           && (!q || haystack.includes(q));
       });
 
@@ -1792,35 +1872,43 @@ html_template = r'''<!doctype html>
       if (brands.some(item => item.brand === selected)) {
         els.brandFilter.value = selected;
       }
-      setupProductFilter();
+      setupProductNavigation();
     }
 
-    function setupProductFilter() {
-      const selected = els.productFilter.value;
+    function setupProductNavigation() {
       const brand = els.brandFilter.value;
-      const products = Object.values(groupBy(
+      const products = Object.entries(groupBy(
         IMAGES.filter(item => !brand || item.brand === brand),
         "product",
       ))
-        .map(items => items[0])
-        .toSorted((a, b) => a.productLabel.localeCompare(b.productLabel, "de"));
+        .toSorted(([, a], [, b]) => a[0].productLabel.localeCompare(b[0].productLabel, "de"));
 
-      els.productFilter.innerHTML = `<option value="">Alle Produktgruppen</option>`;
-      for (const item of products) {
-        const option = document.createElement("option");
-        option.value = item.product;
-        option.textContent = item.productLabel;
-        els.productFilter.appendChild(option);
+      if (!products.some(([product]) => product === activeProduct)) {
+        activeProduct = "";
       }
-      if (products.some(item => item.product === selected)) {
-        els.productFilter.value = selected;
-      }
+
+      const total = products.reduce((sum, [, rows]) => sum + rows.length, 0);
+      els.productNav.innerHTML = `
+        <button class="product-nav-button ${activeProduct ? "" : "active"}" type="button" onclick='setProductFilter("")'>
+          Alle
+          <span class="product-nav-count">${total}</span>
+        </button>
+      ` + products.map(([product, rows]) => `
+        <button class="product-nav-button ${activeProduct === product ? "active" : ""}" type="button" onclick='setProductFilter(${jsString(product)})'>
+          ${escapeText(rows[0].productLabel)}
+          <span class="product-nav-count">${rows.length}</span>
+        </button>
+      `).join("");
+    }
+
+    function setProductFilter(product = "") {
+      activeProduct = product;
+      render();
     }
 
     function setBrandFilter(brand = "") {
       els.brandFilter.value = brand;
-      els.productFilter.value = "";
-      setupProductFilter();
+      activeProduct = "";
       render();
     }
 
@@ -1937,8 +2025,9 @@ html_template = r'''<!doctype html>
       renderNav();
 
       const selectedBrand = IMAGES.find(item => item.brand === els.brandFilter.value);
+      setupProductNavigation();
       const selectedProduct = IMAGES.find(item =>
-        item.product === els.productFilter.value
+        item.product === activeProduct
         && (!els.brandFilter.value || item.brand === els.brandFilter.value)
       );
       const context = [
@@ -1950,7 +2039,7 @@ html_template = r'''<!doctype html>
       els.resetFilters.hidden = !(
         els.search.value.trim()
         || els.brandFilter.value
-        || els.productFilter.value
+        || activeProduct
       );
 
       if (!items.length) {
@@ -2024,17 +2113,14 @@ html_template = r'''<!doctype html>
 
     els.search.addEventListener("input", render);
     els.brandFilter.addEventListener("change", () => {
-      els.productFilter.value = "";
-      setupProductFilter();
+      activeProduct = "";
       render();
     });
-    els.productFilter.addEventListener("change", render);
     els.sortMode.addEventListener("change", render);
     els.resetFilters.addEventListener("click", () => {
       els.search.value = "";
       els.brandFilter.value = "";
-      els.productFilter.value = "";
-      setupProductFilter();
+      activeProduct = "";
       render();
     });
     window.addEventListener("hashchange", renderRoute);
