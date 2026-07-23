@@ -572,6 +572,11 @@ html_template = r'''<!doctype html>
       color: var(--text);
     }
 
+    dialog .token-help {
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
     .dialog-actions {
       display: flex;
       justify-content: flex-end;
@@ -1014,6 +1019,38 @@ html_template = r'''<!doctype html>
       backdrop-filter: none;
     }
 
+    .library-results-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 13px;
+    }
+
+    .library-results-head strong {
+      display: block;
+      font-size: 16px;
+      letter-spacing: -.015em;
+    }
+
+    .library-results-head span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .reset-filter {
+      min-height: 36px;
+      color: #475569;
+      background: white;
+      border: 1px solid var(--border);
+    }
+
+    .reset-filter[hidden] {
+      display: none;
+    }
+
     .toolbar input,
     .toolbar select {
       color: var(--text);
@@ -1052,12 +1089,58 @@ html_template = r'''<!doctype html>
       background: #f1f5f9;
     }
 
+    .nav-link.active {
+      color: #1d4ed8;
+      background: #eff6ff;
+    }
+
     .nav-link span:last-child {
       color: #94a3b8;
     }
 
     .brand-section {
       box-shadow: 0 8px 25px rgba(15,23,42,.05);
+    }
+
+    .library-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+      gap: 15px;
+    }
+
+    .library-grid .card {
+      min-width: 0;
+    }
+
+    .library-grid > .empty {
+      grid-column: 1 / -1;
+      box-shadow: none;
+      border: 1px solid var(--border);
+    }
+
+    .card-taxonomy {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 9px;
+    }
+
+    .taxonomy-chip {
+      max-width: 100%;
+      overflow: hidden;
+      padding: 4px 7px;
+      border-radius: 7px;
+      color: #475569;
+      background: #f1f5f9;
+      font-size: 10px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .taxonomy-chip.brand-chip {
+      color: #1d4ed8;
+      background: #eff6ff;
     }
 
     .brands-grid {
@@ -1310,7 +1393,7 @@ html_template = r'''<!doctype html>
             <circle cx="7.5" cy="15.5" r="5.5"></circle>
             <path d="m21 2-9.6 9.6M15 8l2 2m1-5 2 2"></path>
           </svg>
-          <span>API-Token verwalten</span>
+          <span>Lösch-Token verwalten</span>
         </button>
       </div>
     </aside>
@@ -1367,6 +1450,7 @@ html_template = r'''<!doctype html>
             <input id="search" type="search" placeholder="Marke, Produkt oder Dateiname suchen ..." autocomplete="off">
           </label>
           <select id="brandFilter" aria-label="Marke filtern"><option value="">Alle Marken</option></select>
+          <select id="productFilter" aria-label="Produktgruppe filtern"><option value="">Alle Produktgruppen</option></select>
           <select id="sortMode" aria-label="Sortierung">
             <option value="path">Nach Pfad</option>
             <option value="newest">Neueste zuerst</option>
@@ -1379,7 +1463,16 @@ html_template = r'''<!doctype html>
             <p class="sidebar-title">Schnellzugriff</p>
             <nav id="brandNav"></nav>
           </aside>
-          <section id="content" class="content"></section>
+          <section>
+            <div class="library-results-head">
+              <div>
+                <strong id="libraryContext">Alle Bilder</strong>
+                <span id="libraryCount">0 Bilder</span>
+              </div>
+              <button id="resetFilters" class="reset-filter" type="button" hidden>Filter zurücksetzen</button>
+            </div>
+            <div id="content" class="library-grid"></div>
+          </section>
         </div>
       </section>
 
@@ -1421,12 +1514,13 @@ html_template = r'''<!doctype html>
   <dialog id="tokenDialog">
     <form id="tokenForm">
       <div class="dialog-body">
-        <h2>API-Token</h2>
-        <p>Der Token wird nur für diese Browser-Sitzung gespeichert und zum Löschen benötigt.</p>
+        <h2>Token für Bildverwaltung</h2>
+        <p>Benötigt wird der Wert von <code>IMAGE_UPLOAD_TOKEN</code> aus <code>backend/.env</code> auf dem Raspberry Pi. Das ist nicht der Artikelwerk-API-Key.</p>
         <label class="dialog-field">
-          Image Upload Token
-          <input id="tokenInput" type="password" autocomplete="off" required>
+          IMAGE_UPLOAD_TOKEN
+          <input id="tokenInput" type="password" autocomplete="off" placeholder="Token vom Raspberry Pi einfügen" required>
         </label>
+        <p class="token-help">Der Token bleibt nur in dieser Browser-Sitzung gespeichert.</p>
       </div>
       <div class="dialog-actions">
         <button id="tokenCancel" class="dialog-cancel" type="button">Abbrechen</button>
@@ -1442,8 +1536,12 @@ html_template = r'''<!doctype html>
       content: document.querySelector("#content"),
       search: document.querySelector("#search"),
       brandFilter: document.querySelector("#brandFilter"),
+      productFilter: document.querySelector("#productFilter"),
       sortMode: document.querySelector("#sortMode"),
       brandNav: document.querySelector("#brandNav"),
+      libraryContext: document.querySelector("#libraryContext"),
+      libraryCount: document.querySelector("#libraryCount"),
+      resetFilters: document.querySelector("#resetFilters"),
       statImages: document.querySelector("#statImages"),
       statBrands: document.querySelector("#statBrands"),
       statProducts: document.querySelector("#statProducts"),
@@ -1659,11 +1757,14 @@ html_template = r'''<!doctype html>
     function getFilteredItems() {
       const q = els.search.value.trim().toLowerCase();
       const brand = els.brandFilter.value;
+      const product = els.productFilter.value;
       const sort = els.sortMode.value;
 
       let result = IMAGES.filter(item => {
         const haystack = `${item.path} ${item.brandLabel} ${item.productLabel} ${item.file}`.toLowerCase();
-        return (!brand || item.brand === brand) && (!q || haystack.includes(q));
+        return (!brand || item.brand === brand)
+          && (!product || item.product === product)
+          && (!q || haystack.includes(q));
       });
 
       result = result.toSorted((a, b) => {
@@ -1691,6 +1792,36 @@ html_template = r'''<!doctype html>
       if (brands.some(item => item.brand === selected)) {
         els.brandFilter.value = selected;
       }
+      setupProductFilter();
+    }
+
+    function setupProductFilter() {
+      const selected = els.productFilter.value;
+      const brand = els.brandFilter.value;
+      const products = Object.values(groupBy(
+        IMAGES.filter(item => !brand || item.brand === brand),
+        "product",
+      ))
+        .map(items => items[0])
+        .toSorted((a, b) => a.productLabel.localeCompare(b.productLabel, "de"));
+
+      els.productFilter.innerHTML = `<option value="">Alle Produktgruppen</option>`;
+      for (const item of products) {
+        const option = document.createElement("option");
+        option.value = item.product;
+        option.textContent = item.productLabel;
+        els.productFilter.appendChild(option);
+      }
+      if (products.some(item => item.product === selected)) {
+        els.productFilter.value = selected;
+      }
+    }
+
+    function setBrandFilter(brand = "") {
+      els.brandFilter.value = brand;
+      els.productFilter.value = "";
+      setupProductFilter();
+      render();
     }
 
     function renderStats(items) {
@@ -1703,9 +1834,8 @@ html_template = r'''<!doctype html>
     }
 
     function openLibrary(brand = "") {
-      els.brandFilter.value = brand;
+      setBrandFilter(brand);
       location.hash = "#/library";
-      render();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -1783,101 +1913,80 @@ html_template = r'''<!doctype html>
       `;
     }
 
-    function renderNav(items) {
-      const brands = groupBy(items, "brand");
+    function renderNav() {
+      const brands = groupBy(IMAGES, "brand");
       const entries = Object.entries(brands).toSorted(([, a], [, b]) =>
         a[0].brandLabel.localeCompare(b[0].brandLabel, "de")
       );
 
-      els.brandNav.innerHTML = entries.map(([brand, rows]) => `
-        <button class="nav-link" type="button" onclick='document.querySelector("#brand-${slug(brand)}")?.scrollIntoView({ behavior: "smooth" })'>
+      els.brandNav.innerHTML = `
+        <button class="nav-link ${els.brandFilter.value ? "" : "active"}" type="button" onclick='setBrandFilter("")'>
+          <span>Alle Bilder</span>
+          <span>${IMAGES.length}</span>
+        </button>
+      ` + entries.map(([brand, rows]) => `
+        <button class="nav-link ${els.brandFilter.value === brand ? "active" : ""}" type="button" onclick='setBrandFilter(${jsString(brand)})'>
           <span>${escapeText(rows[0].brandLabel)}</span>
           <span>${rows.length}</span>
         </button>
-      `).join("") || `<div class="nav-link"><span>Keine Treffer</span><span>0</span></div>`;
+      `).join("");
     }
 
     function render() {
       const items = getFilteredItems();
-      renderNav(items);
+      renderNav();
+
+      const selectedBrand = IMAGES.find(item => item.brand === els.brandFilter.value);
+      const selectedProduct = IMAGES.find(item =>
+        item.product === els.productFilter.value
+        && (!els.brandFilter.value || item.brand === els.brandFilter.value)
+      );
+      const context = [
+        selectedBrand?.brandLabel,
+        selectedProduct?.productLabel,
+      ].filter(Boolean);
+      els.libraryContext.textContent = context.join(" / ") || "Alle Bilder";
+      els.libraryCount.textContent = `${items.length} Bild${items.length === 1 ? "" : "er"}`;
+      els.resetFilters.hidden = !(
+        els.search.value.trim()
+        || els.brandFilter.value
+        || els.productFilter.value
+      );
 
       if (!items.length) {
         els.content.innerHTML = `
           <div class="empty">
             <h2>Keine Bilder gefunden</h2>
-            <p>Prüfe den Suchbegriff oder lade Bilder per API nach <code>/srv/images</code> hoch.</p>
+            <p>Ändere die Filter oder setze die Suche zurück.</p>
           </div>
         `;
         return;
       }
 
-      const brands = groupBy(items, "brand");
-
-      els.content.innerHTML = Object.entries(brands)
-        .toSorted(([, a], [, b]) => a[0].brandLabel.localeCompare(b[0].brandLabel, "de"))
-        .map(([brand, brandItems]) => {
-          const products = groupBy(brandItems, "product");
-
-          const productHtml = Object.entries(products)
-            .toSorted(([, a], [, b]) => a[0].productLabel.localeCompare(b[0].productLabel, "de"))
-            .map(([product, productItems]) => `
-              <section class="product-section">
-                <div class="product-head">
-                  <h3>${escapeText(productItems[0].productLabel)}</h3>
-                  <span>${productItems.length} Bild${productItems.length === 1 ? "" : "er"}</span>
-                </div>
-
-                <div class="grid">
-                  ${productItems.map(item => `
-                    <article class="card">
-                      <a class="preview" href="${escapeAttr(item.path)}" target="_blank" title="Original öffnen">
-                        <img src="${escapeAttr(item.path)}" loading="lazy" alt="${escapeAttr(item.file)}">
-                      </a>
-
-                      <div class="meta">
-                        <div class="file">${escapeText(item.file)}</div>
-                        <div class="path">${escapeText(item.path)}</div>
-                        <div class="path">${fileSize(item.size)} · geändert: ${escapeText(item.modified)}</div>
-
-                        <div class="actions">
-                          <button class="copy-main" type="button" onclick='copyText(urlFor(${jsString(item.path)}), this, "URL kopiert")'>URL kopieren</button>
-                          <button class="copy-html" type="button" title="HTML img-Tag kopieren" onclick='copyText(htmlImgFor(${jsString(item.path)}, ${jsString(item.file)}), this, "HTML")'>&lt;/&gt;</button>
-                          <button class="delete-image" type="button" title="Bild löschen" aria-label="${escapeAttr(item.file)} löschen" onclick='deleteImage(${jsString(item.path)}, this)'>
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                              <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  `).join("")}
-                </div>
-              </section>
-            `).join("");
-
-          return `
-            <section class="brand-section" id="brand-${slug(brand)}">
-              <header class="brand-head">
-                <div class="brand-title">
-                  <div class="brand-badge">${escapeText(brandItems[0].brandLabel.slice(0, 2))}</div>
-                  <div>
-                    <h2>${escapeText(brandItems[0].brandLabel)}</h2>
-                    <p>${new Set(brandItems.map(item => item.product)).size} Produkte · ${brandItems.length} Bilder</p>
-                  </div>
-                </div>
-                <div class="brand-actions">
-                  <button class="delete-brand" type="button" onclick='deleteBrand(${jsString(brand)}, ${jsString(brandItems[0].brandLabel)}, ${brandItems.length}, this)'>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
-                    </svg>
-                    <span>Marke löschen</span>
-                  </button>
-                </div>
-              </header>
-              ${productHtml}
-            </section>
-          `;
-        }).join("");
+      els.content.innerHTML = items.map(item => `
+        <article class="card">
+          <a class="preview" href="${escapeAttr(item.path)}" target="_blank" title="Original öffnen">
+            <img src="${escapeAttr(item.path)}" loading="lazy" alt="${escapeAttr(item.file)}">
+          </a>
+          <div class="meta">
+            <div class="card-taxonomy">
+              <span class="taxonomy-chip brand-chip">${escapeText(item.brandLabel)}</span>
+              <span class="taxonomy-chip">${escapeText(item.productLabel)}</span>
+            </div>
+            <div class="file" title="${escapeAttr(item.file)}">${escapeText(item.file)}</div>
+            <div class="path">${fileSize(item.size)} · ${escapeText(item.modified)}</div>
+            <div class="actions">
+              <button class="copy-main" type="button" onclick='copyText(urlFor(${jsString(item.path)}), this, "URL kopiert")'>URL kopieren</button>
+              <button class="copy-html" type="button" title="HTML img-Tag kopieren" onclick='copyText(htmlImgFor(${jsString(item.path)}, ${jsString(item.file)}), this, "HTML")'>&lt;/&gt;</button>
+              <button class="delete-image" type="button" title="Bild löschen" aria-label="${escapeAttr(item.file)} löschen" onclick='deleteImage(${jsString(item.path)}, this)'>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+      `).join("");
     }
 
     function renderAll() {
@@ -1914,8 +2023,20 @@ html_template = r'''<!doctype html>
     renderRoute();
 
     els.search.addEventListener("input", render);
-    els.brandFilter.addEventListener("change", render);
+    els.brandFilter.addEventListener("change", () => {
+      els.productFilter.value = "";
+      setupProductFilter();
+      render();
+    });
+    els.productFilter.addEventListener("change", render);
     els.sortMode.addEventListener("change", render);
+    els.resetFilters.addEventListener("click", () => {
+      els.search.value = "";
+      els.brandFilter.value = "";
+      els.productFilter.value = "";
+      setupProductFilter();
+      render();
+    });
     window.addEventListener("hashchange", renderRoute);
     els.tokenButton.addEventListener("click", () => {
       sessionStorage.removeItem("imageApiToken");
