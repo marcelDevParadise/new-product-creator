@@ -13,7 +13,7 @@ import unicodedata
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 
 
 router = APIRouter(prefix="/api/images", tags=["images"])
@@ -96,6 +96,42 @@ def _target_path(root: Path, brand: str, product: str, filename: str) -> Path:
     if root != resolved and root not in resolved.parents:
         raise HTTPException(400, "Ungueltiger Zielpfad.")
     return resolved
+
+
+def _existing_image_path(root: Path, relative_path: str) -> Path:
+    """Resolve a library-relative image path without allowing path traversal."""
+    candidate = (root / relative_path.lstrip("/")).resolve()
+    if root != candidate and root not in candidate.parents:
+        raise HTTPException(400, "Ungueltiger Bildpfad.")
+    if candidate.suffix.lower() not in IMAGE_EXTS:
+        raise HTTPException(400, "Nur Bilddateien koennen geloescht werden.")
+    if not candidate.is_file():
+        raise HTTPException(404, "Bild wurde nicht gefunden.")
+    return candidate
+
+
+def _brand_path(root: Path, brand: str) -> Path:
+    """Resolve a brand directory from the canonical products hierarchy."""
+    safe_brand = _slugify_segment(brand, "")
+    if not safe_brand or safe_brand != brand:
+        raise HTTPException(400, "Ungueltige Marke.")
+    candidate = (root / "produkte" / safe_brand).resolve()
+    if root not in candidate.parents:
+        raise HTTPException(400, "Ungueltiger Markenpfad.")
+    if not candidate.is_dir():
+        raise HTTPException(404, "Marke wurde nicht gefunden.")
+    return candidate
+
+
+def _remove_empty_parents(path: Path, stop: Path) -> None:
+    """Remove empty product/brand directories, but never the products root."""
+    current = path
+    while current != stop and stop in current.parents:
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        current = current.parent
 
 
 def _rebuild_index() -> dict:
@@ -186,3 +222,41 @@ async def upload_image(
 def rebuild_image_index():
     """Rebuild /srv/images/index.html after external file changes."""
     return _rebuild_index()
+
+
+@router.delete("/file", dependencies=[Depends(require_upload_token)])
+def delete_image(
+    path: Annotated[str, Query(min_length=1)],
+):
+    """Delete one image and clean up directories that became empty."""
+    root = _image_root()
+    target = _existing_image_path(root, path)
+    relative_path = target.relative_to(root).as_posix()
+    target.unlink()
+    _remove_empty_parents(target.parent, root / "produkte")
+
+    return {
+        "deleted": True,
+        "path": relative_path,
+        "rebuild": _rebuild_index(),
+    }
+
+
+@router.delete("/brand/{brand}", dependencies=[Depends(require_upload_token)])
+def delete_brand(brand: str):
+    """Delete a brand directory and every image below it."""
+    root = _image_root()
+    target = _brand_path(root, brand)
+    image_count = sum(
+        1
+        for item in target.rglob("*")
+        if item.is_file() and item.suffix.lower() in IMAGE_EXTS
+    )
+    shutil.rmtree(target)
+
+    return {
+        "deleted": True,
+        "brand": brand,
+        "images": image_count,
+        "rebuild": _rebuild_index(),
+    }

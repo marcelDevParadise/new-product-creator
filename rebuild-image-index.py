@@ -67,6 +67,8 @@ html_template = r'''<!doctype html>
       --brand: #2563eb;
       --brand-dark: #1d4ed8;
       --ok: #16a34a;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
       --shadow: 0 18px 45px rgba(15, 23, 42, .12);
       --radius: 18px;
     }
@@ -185,7 +187,7 @@ html_template = r'''<!doctype html>
       border: 1px solid rgba(255,255,255,.12);
       backdrop-filter: blur(18px);
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) 220px 180px;
+      grid-template-columns: minmax(220px, 1fr) 220px 180px auto;
       gap: 12px;
       box-shadow: 0 18px 48px rgba(0,0,0,.18);
     }
@@ -296,6 +298,12 @@ html_template = r'''<!doctype html>
       padding: 22px 24px;
       background: linear-gradient(180deg, #ffffff, #f8fafc);
       border-bottom: 1px solid var(--border);
+    }
+
+    .brand-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .brand-title {
@@ -423,7 +431,7 @@ html_template = r'''<!doctype html>
 
     .actions {
       display: grid;
-      grid-template-columns: 1fr 42px;
+      grid-template-columns: 1fr 42px 42px;
       gap: 8px;
       margin-top: 12px;
     }
@@ -455,6 +463,148 @@ html_template = r'''<!doctype html>
     .copy-html {
       background: #f1f5f9;
       color: #334155;
+    }
+
+    .icon-button,
+    .token-button {
+      display: inline-grid;
+      place-items: center;
+      min-width: 42px;
+      padding: 0 12px;
+      background: rgba(255,255,255,.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .icon-button svg,
+    .token-button svg {
+      width: 18px;
+      height: 18px;
+      pointer-events: none;
+    }
+
+    .delete-image {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .delete-image:hover,
+    .delete-brand:hover {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .delete-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      background: var(--danger-soft);
+      color: var(--danger);
+      white-space: nowrap;
+    }
+
+    .delete-brand svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    dialog {
+      width: min(460px, calc(100% - 28px));
+      padding: 0;
+      border: 0;
+      border-radius: 22px;
+      color: var(--text);
+      box-shadow: 0 30px 90px rgba(15,23,42,.35);
+    }
+
+    dialog::backdrop {
+      background: rgba(15,23,42,.7);
+      backdrop-filter: blur(5px);
+    }
+
+    .dialog-body {
+      padding: 24px;
+    }
+
+    .dialog-icon {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 16px;
+      border-radius: 15px;
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .dialog-icon svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    dialog h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+
+    dialog p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .dialog-field {
+      display: block;
+      margin-top: 18px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .dialog-field input {
+      height: 44px;
+      margin-top: 7px;
+      padding: 0 13px;
+      border-color: var(--border);
+      background: white;
+      color: var(--text);
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+    }
+
+    .dialog-cancel {
+      background: white;
+      color: #334155;
+      border: 1px solid var(--border);
+    }
+
+    .dialog-confirm {
+      background: var(--danger);
+      color: white;
+    }
+
+    .dialog-confirm:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    .dialog-save {
+      background: var(--brand);
+      color: white;
+    }
+
+    .busy {
+      opacity: .55;
+      pointer-events: none;
     }
 
     button.done {
@@ -540,6 +690,14 @@ html_template = r'''<!doctype html>
         padding-right: 16px;
       }
 
+      .brand-head {
+        align-items: flex-start;
+      }
+
+      .delete-brand span {
+        display: none;
+      }
+
       .grid {
         grid-template-columns: 1fr;
       }
@@ -591,6 +749,13 @@ html_template = r'''<!doctype html>
         <option value="newest">Neueste zuerst</option>
         <option value="name">Dateiname A–Z</option>
       </select>
+
+      <button id="tokenButton" class="token-button" type="button" title="API-Token verwalten" aria-label="API-Token verwalten">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="7.5" cy="15.5" r="5.5"></circle>
+          <path d="m21 2-9.6 9.6M15 8l2 2m1-5 2 2"></path>
+        </svg>
+      </button>
     </section>
 
     <main class="layout">
@@ -605,6 +770,43 @@ html_template = r'''<!doctype html>
 
   <div id="toast" class="toast">Kopiert</div>
 
+  <dialog id="confirmDialog">
+    <div class="dialog-body">
+      <div class="dialog-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+        </svg>
+      </div>
+      <h2 id="confirmTitle">Wirklich löschen?</h2>
+      <p id="confirmMessage"></p>
+      <label id="confirmField" class="dialog-field" hidden>
+        Zur Bestätigung eingeben: <strong id="confirmExpected"></strong>
+        <input id="confirmInput" type="text" autocomplete="off">
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button id="confirmCancel" class="dialog-cancel" type="button">Abbrechen</button>
+      <button id="confirmDelete" class="dialog-confirm" type="button">Löschen</button>
+    </div>
+  </dialog>
+
+  <dialog id="tokenDialog">
+    <form id="tokenForm">
+      <div class="dialog-body">
+        <h2>API-Token</h2>
+        <p>Der Token wird nur für diese Browser-Sitzung gespeichert und zum Löschen benötigt.</p>
+        <label class="dialog-field">
+          Image Upload Token
+          <input id="tokenInput" type="password" autocomplete="off" required>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button id="tokenCancel" class="dialog-cancel" type="button">Abbrechen</button>
+        <button class="dialog-save" type="submit">Token speichern</button>
+      </div>
+    </form>
+  </dialog>
+
   <script>
     const IMAGES = __IMAGES_JSON__;
 
@@ -618,6 +820,19 @@ html_template = r'''<!doctype html>
       statBrands: document.querySelector("#statBrands"),
       statProducts: document.querySelector("#statProducts"),
       toast: document.querySelector("#toast"),
+      tokenButton: document.querySelector("#tokenButton"),
+      tokenDialog: document.querySelector("#tokenDialog"),
+      tokenForm: document.querySelector("#tokenForm"),
+      tokenInput: document.querySelector("#tokenInput"),
+      tokenCancel: document.querySelector("#tokenCancel"),
+      confirmDialog: document.querySelector("#confirmDialog"),
+      confirmTitle: document.querySelector("#confirmTitle"),
+      confirmMessage: document.querySelector("#confirmMessage"),
+      confirmField: document.querySelector("#confirmField"),
+      confirmExpected: document.querySelector("#confirmExpected"),
+      confirmInput: document.querySelector("#confirmInput"),
+      confirmCancel: document.querySelector("#confirmCancel"),
+      confirmDelete: document.querySelector("#confirmDelete"),
     };
 
     const fmtBytes = new Intl.NumberFormat("de-DE", {
@@ -674,6 +889,129 @@ html_template = r'''<!doctype html>
       setTimeout(() => els.toast.classList.remove("show"), 1200);
     }
 
+    let tokenResolver = null;
+    let confirmResolver = null;
+
+    function requestToken() {
+      const saved = sessionStorage.getItem("imageApiToken");
+      if (saved) return Promise.resolve(saved);
+
+      els.tokenInput.value = "";
+      els.tokenDialog.showModal();
+      setTimeout(() => els.tokenInput.focus(), 0);
+      return new Promise(resolve => {
+        tokenResolver = resolve;
+      });
+    }
+
+    function finishToken(value) {
+      if (value) sessionStorage.setItem("imageApiToken", value);
+      els.tokenDialog.close();
+      tokenResolver?.(value || null);
+      tokenResolver = null;
+    }
+
+    function askConfirmation({ title, message, expected = "" }) {
+      els.confirmTitle.textContent = title;
+      els.confirmMessage.textContent = message;
+      els.confirmExpected.textContent = expected;
+      els.confirmInput.value = "";
+      els.confirmField.hidden = !expected;
+      els.confirmDelete.disabled = Boolean(expected);
+      els.confirmDialog.showModal();
+      if (expected) setTimeout(() => els.confirmInput.focus(), 0);
+
+      return new Promise(resolve => {
+        confirmResolver = resolve;
+      });
+    }
+
+    function finishConfirmation(confirmed) {
+      els.confirmDialog.close();
+      confirmResolver?.(confirmed);
+      confirmResolver = null;
+    }
+
+    async function apiDelete(endpoint) {
+      const token = await requestToken();
+      if (!token) return null;
+
+      const response = await fetch(endpoint, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json",
+        },
+      });
+
+      let body = {};
+      try {
+        body = await response.json();
+      } catch (_) {
+        // A proxy error may not return JSON.
+      }
+
+      if (!response.ok) {
+        if (response.status === 401) sessionStorage.removeItem("imageApiToken");
+        throw new Error(body.detail || `Löschen fehlgeschlagen (${response.status})`);
+      }
+      return body;
+    }
+
+    async function deleteImage(path, button) {
+      const item = IMAGES.find(row => row.path === path);
+      if (!item) return;
+      const confirmed = await askConfirmation({
+        title: "Bild löschen?",
+        message: `„${item.file}“ wird dauerhaft aus der Bildbibliothek entfernt.`,
+      });
+      if (!confirmed) return;
+
+      button.closest(".card")?.classList.add("busy");
+      try {
+        const result = await apiDelete(`/api/images/file?path=${encodeURIComponent(path)}`);
+        if (!result) {
+          button.closest(".card")?.classList.remove("busy");
+          return;
+        }
+        const index = IMAGES.findIndex(row => row.path === path);
+        if (index >= 0) IMAGES.splice(index, 1);
+        setupFilters();
+        render();
+        showToast("Bild gelöscht");
+      } catch (error) {
+        button.closest(".card")?.classList.remove("busy");
+        showToast(error.message);
+      }
+    }
+
+    async function deleteBrand(brand, label, count, button) {
+      const confirmed = await askConfirmation({
+        title: `${label} löschen?`,
+        message: `Die Marke und alle ${count} zugehörigen Bilder werden dauerhaft entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.`,
+        expected: label,
+      });
+      if (!confirmed) return;
+
+      button.closest(".brand-section")?.classList.add("busy");
+      try {
+        const result = await apiDelete(`/api/images/brand/${encodeURIComponent(brand)}`);
+        if (!result) {
+          button.closest(".brand-section")?.classList.remove("busy");
+          return;
+        }
+        for (let index = IMAGES.length - 1; index >= 0; index--) {
+          if (IMAGES[index].brand === brand) IMAGES.splice(index, 1);
+        }
+        setupFilters();
+        render();
+        showToast(`${result.images} Bilder gelöscht`);
+      } catch (error) {
+        button.closest(".brand-section")?.classList.remove("busy");
+        showToast(error.message);
+      }
+    }
+
     function slug(value) {
       return value.toLowerCase().replace(/[^a-z0-9äöüß-]+/gi, "-");
     }
@@ -707,15 +1045,20 @@ html_template = r'''<!doctype html>
     }
 
     function setupFilters() {
+      const selected = els.brandFilter.value;
       const brands = Object.values(groupBy(IMAGES, "brand"))
         .map(items => items[0])
         .toSorted((a, b) => a.brandLabel.localeCompare(b.brandLabel, "de"));
 
+      els.brandFilter.innerHTML = `<option value="">Alle Marken</option>`;
       for (const item of brands) {
         const option = document.createElement("option");
         option.value = item.brand;
         option.textContent = item.brandLabel;
         els.brandFilter.appendChild(option);
+      }
+      if (brands.some(item => item.brand === selected)) {
+        els.brandFilter.value = selected;
       }
     }
 
@@ -788,6 +1131,11 @@ html_template = r'''<!doctype html>
                         <div class="actions">
                           <button class="copy-main" type="button" onclick='copyText(urlFor(${jsString(item.path)}), this, "URL kopiert")'>URL kopieren</button>
                           <button class="copy-html" type="button" title="HTML img-Tag kopieren" onclick='copyText(htmlImgFor(${jsString(item.path)}, ${jsString(item.file)}), this, "HTML")'>&lt;/&gt;</button>
+                          <button class="delete-image" type="button" title="Bild löschen" aria-label="${escapeAttr(item.file)} löschen" onclick='deleteImage(${jsString(item.path)}, this)'>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     </article>
@@ -806,6 +1154,14 @@ html_template = r'''<!doctype html>
                     <p>${new Set(brandItems.map(item => item.product)).size} Produkte · ${brandItems.length} Bilder</p>
                   </div>
                 </div>
+                <div class="brand-actions">
+                  <button class="delete-brand" type="button" onclick='deleteBrand(${jsString(brand)}, ${jsString(brandItems[0].brandLabel)}, ${brandItems.length}, this)'>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+                    </svg>
+                    <span>Marke löschen</span>
+                  </button>
+                </div>
               </header>
               ${productHtml}
             </section>
@@ -819,6 +1175,30 @@ html_template = r'''<!doctype html>
     els.search.addEventListener("input", render);
     els.brandFilter.addEventListener("change", render);
     els.sortMode.addEventListener("change", render);
+    els.tokenButton.addEventListener("click", () => {
+      sessionStorage.removeItem("imageApiToken");
+      requestToken().then(token => {
+        if (token) showToast("Token gespeichert");
+      });
+    });
+    els.tokenForm.addEventListener("submit", event => {
+      event.preventDefault();
+      finishToken(els.tokenInput.value.trim());
+    });
+    els.tokenCancel.addEventListener("click", () => finishToken(null));
+    els.tokenDialog.addEventListener("cancel", event => {
+      event.preventDefault();
+      finishToken(null);
+    });
+    els.confirmInput.addEventListener("input", () => {
+      els.confirmDelete.disabled = els.confirmInput.value.trim() !== els.confirmExpected.textContent;
+    });
+    els.confirmDelete.addEventListener("click", () => finishConfirmation(true));
+    els.confirmCancel.addEventListener("click", () => finishConfirmation(false));
+    els.confirmDialog.addEventListener("cancel", event => {
+      event.preventDefault();
+      finishConfirmation(false);
+    });
   </script>
 </body>
 </html>
