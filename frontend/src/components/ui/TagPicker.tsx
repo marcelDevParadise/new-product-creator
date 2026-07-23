@@ -12,11 +12,12 @@ interface TagPickerProps {
 interface TagGroup {
   label: string | null;
   tags: string[];
+  parentTag: string | null;
 }
 
 function groupSuggestions(suggestions: string[]): TagGroup[] {
   const groups: TagGroup[] = [];
-  let current: TagGroup = { label: null, tags: [] };
+  let current: TagGroup = { label: null, tags: [], parentTag: null };
 
   for (const raw of suggestions) {
     const item = raw.trim();
@@ -25,7 +26,11 @@ function groupSuggestions(suggestions: string[]): TagGroup[] {
       if (current.tags.length > 0 || current.label !== null) {
         groups.push(current);
       }
-      current = { label: item.replace(/^#\s*/, '').trim() || 'Sonstige', tags: [] };
+      current = {
+        label: item.replace(/^#\s*/, '').trim() || 'Sonstige',
+        tags: [],
+        parentTag: null,
+      };
     } else {
       current.tags.push(item);
     }
@@ -33,7 +38,34 @@ function groupSuggestions(suggestions: string[]): TagGroup[] {
   if (current.tags.length > 0 || current.label !== null) {
     groups.push(current);
   }
-  return groups;
+  const tagsByLowerCase = new Map(
+    groups.flatMap(group => group.tags).map(tag => [tag.toLocaleLowerCase('de-DE'), tag]),
+  );
+
+  return groups.map(group => ({
+    ...group,
+    parentTag: findParentTag(group.label, tagsByLowerCase),
+  }));
+}
+
+function findParentTag(label: string | null, tagsByLowerCase: Map<string, string>): string | null {
+  const categoryPath = label?.match(/^subkategorien\s+(.+)$/i)?.[1]?.trim();
+  if (!categoryPath) return null;
+
+  const slug = categoryPath
+    .toLocaleLowerCase('de-DE')
+    .replace(/[^a-z0-9äöüß]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
+  const candidates = [
+    `cat-${slug}`,
+    `cat-${slug.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')}`,
+  ];
+
+  for (const candidate of candidates) {
+    const tag = tagsByLowerCase.get(candidate.toLocaleLowerCase('de-DE'));
+    if (tag) return tag;
+  }
+  return null;
 }
 
 export function TagPicker({ value, suggestions, onChange }: TagPickerProps) {
@@ -42,6 +74,26 @@ export function TagPicker({ value, suggestions, onChange }: TagPickerProps) {
 
   const groups = useMemo(() => groupSuggestions(suggestions), [suggestions]);
   const hasGroups = groups.some(g => g.label !== null);
+  const tagGroupIndexes = useMemo(() => {
+    const indexes = new Map<string, number>();
+    groups.forEach((group, index) => {
+      group.tags.forEach(tag => indexes.set(tag, index));
+    });
+    return indexes;
+  }, [groups]);
+
+  const isGroupVisible = (groupIndex: number, visited = new Set<number>()): boolean => {
+    const group = groups[groupIndex];
+    if (!group?.parentTag) return true;
+    if (!selectedSet.has(group.parentTag) || visited.has(groupIndex)) return false;
+
+    const parentGroupIndex = tagGroupIndexes.get(group.parentTag);
+    if (parentGroupIndex === undefined) return true;
+
+    const nextVisited = new Set(visited);
+    nextVisited.add(groupIndex);
+    return isGroupVisible(parentGroupIndex, nextVisited);
+  };
 
   const toggle = (tag: string) => {
     const next = selectedSet.has(tag)
@@ -99,6 +151,7 @@ export function TagPicker({ value, suggestions, onChange }: TagPickerProps) {
       {hasGroups ? (
         <div className="space-y-2.5">
           {groups.map((group, idx) => {
+            if (!isGroupVisible(idx)) return null;
             const visible = group.tags.filter(t => !selectedSet.has(t));
             if (visible.length === 0) return null;
             return (
