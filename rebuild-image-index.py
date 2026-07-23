@@ -652,15 +652,506 @@ html_template = r'''<!doctype html>
       opacity: 1;
     }
 
+    /* Application shell */
+    body {
+      background: #f4f6fa;
+      color: var(--text);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .app-sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 22px 16px;
+      background: #111827;
+      color: white;
+      border-right: 1px solid rgba(255,255,255,.07);
+    }
+
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 8px 26px;
+    }
+
+    .app-brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #60a5fa, #2563eb);
+      box-shadow: 0 10px 24px rgba(37,99,235,.34);
+    }
+
+    .app-brand-mark svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .app-brand strong,
+    .app-brand span {
+      display: block;
+    }
+
+    .app-brand strong {
+      font-size: 15px;
+    }
+
+    .app-brand span {
+      margin-top: 2px;
+      color: #94a3b8;
+      font-size: 11px;
+    }
+
+    .app-nav {
+      display: grid;
+      gap: 5px;
+    }
+
+    .app-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 11px 12px;
+      border-radius: 11px;
+      color: #aeb9ca;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      transition: .16s ease;
+    }
+
+    .app-nav-link svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .app-nav-link:hover {
+      color: white;
+      background: rgba(255,255,255,.06);
+    }
+
+    .app-nav-link.active {
+      color: white;
+      background: rgba(37,99,235,.2);
+      box-shadow: inset 3px 0 #60a5fa;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+
+    .sidebar-token {
+      width: 100%;
+      display: flex;
+      justify-content: flex-start;
+      gap: 10px;
+      color: #cbd5e1;
+    }
+
+    .app-main {
+      min-width: 0;
+      padding: 34px clamp(20px, 4vw, 54px) 60px;
+    }
+
+    .view {
+      display: none;
+      width: min(1480px, 100%);
+      margin: 0 auto;
+    }
+
+    .view.active {
+      display: block;
+      animation: view-in .2s ease;
+    }
+
+    @keyframes view-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 26px;
+    }
+
+    .page-kicker {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .page-head h1 {
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(30px, 4vw, 43px);
+      line-height: 1.05;
+      letter-spacing: -.045em;
+    }
+
+    .page-head p {
+      max-width: 680px;
+      margin: 9px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .stats {
+      min-width: 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 22px;
+    }
+
+    .stat {
+      position: relative;
+      overflow: hidden;
+      min-height: 132px;
+      padding: 22px;
+      color: var(--text);
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+    }
+
+    .stat::after {
+      content: "";
+      position: absolute;
+      right: -24px;
+      bottom: -34px;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: #eff6ff;
+    }
+
+    .stat strong {
+      position: relative;
+      z-index: 1;
+      font-size: 36px;
+    }
+
+    .stat span {
+      position: relative;
+      z-index: 1;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr);
+      gap: 20px;
+    }
+
+    .panel {
+      overflow: hidden;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      padding: 19px 21px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: -.02em;
+    }
+
+    .text-link {
+      color: var(--brand);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .recent-list {
+      display: grid;
+    }
+
+    .recent-list > .empty {
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .recent-row {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      gap: 13px;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .recent-row:last-child {
+      border-bottom: 0;
+    }
+
+    .recent-thumb {
+      width: 54px;
+      height: 48px;
+      object-fit: contain;
+      border-radius: 9px;
+      background: #f8fafc;
+      border: 1px solid #eef2f7;
+    }
+
+    .recent-name {
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .recent-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .recent-date {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .brand-summary-list {
+      display: grid;
+      padding: 8px;
+    }
+
+    .brand-summary {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      gap: 11px;
+      align-items: center;
+      padding: 10px 11px;
+      border-radius: 11px;
+      cursor: pointer;
+    }
+
+    .brand-summary:hover {
+      background: #f8fafc;
+    }
+
+    .mini-badge {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: #eff6ff;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .brand-summary strong,
+    .brand-summary span {
+      display: block;
+    }
+
+    .brand-summary strong {
+      overflow: hidden;
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .brand-summary span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .count-pill {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .toolbar {
+      position: static;
+      margin: 0 0 18px;
+      background: white;
+      border-color: var(--border);
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+      backdrop-filter: none;
+    }
+
+    .toolbar input,
+    .toolbar select {
+      color: var(--text);
+      background: #f8fafc;
+      border-color: var(--border);
+    }
+
+    .toolbar .token-button {
+      display: none;
+    }
+
+    .layout {
+      grid-template-columns: 230px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      top: 20px;
+      color: var(--text);
+      background: white;
+      border-color: var(--border);
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+    }
+
+    .sidebar-title {
+      color: var(--muted);
+    }
+
+    .nav-link {
+      width: 100%;
+      color: #475569;
+      background: transparent;
+      text-align: left;
+    }
+
+    .nav-link:hover {
+      background: #f1f5f9;
+    }
+
+    .nav-link span:last-child {
+      color: #94a3b8;
+    }
+
+    .brand-section {
+      box-shadow: 0 8px 25px rgba(15,23,42,.05);
+    }
+
+    .brands-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+      gap: 16px;
+    }
+
+    .brand-manage-card {
+      padding: 20px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 17px;
+      box-shadow: 0 8px 25px rgba(15,23,42,.04);
+      transition: .16s ease;
+    }
+
+    .brand-manage-card:hover {
+      transform: translateY(-2px);
+      border-color: #bfdbfe;
+      box-shadow: 0 12px 30px rgba(15,23,42,.08);
+    }
+
+    .brand-manage-top {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+
+    .brand-manage-top .brand-badge {
+      width: 46px;
+      height: 46px;
+    }
+
+    .brand-manage-top h2 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .brand-manage-top p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .brand-manage-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 18px 0;
+    }
+
+    .brand-manage-stat {
+      padding: 11px;
+      border-radius: 11px;
+      background: #f8fafc;
+    }
+
+    .brand-manage-stat strong,
+    .brand-manage-stat span {
+      display: block;
+    }
+
+    .brand-manage-stat strong {
+      font-size: 19px;
+    }
+
+    .brand-manage-stat span {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .brand-manage-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .view-brand {
+      background: #eff6ff;
+      color: var(--brand);
+    }
+
     @media (max-width: 980px) {
-      .hero,
       .layout,
       .toolbar {
         grid-template-columns: 1fr;
       }
 
-      .stats {
-        min-width: 0;
+      .dashboard-grid {
+        grid-template-columns: 1fr;
       }
 
       .sidebar {
@@ -669,19 +1160,80 @@ html_template = r'''<!doctype html>
       }
     }
 
+    @media (max-width: 760px) {
+      .app-shell {
+        display: block;
+      }
+
+      .app-sidebar {
+        position: sticky;
+        z-index: 50;
+        height: auto;
+        flex-direction: row;
+        align-items: center;
+        padding: 10px 12px;
+      }
+
+      .app-brand {
+        padding: 0 10px 0 0;
+      }
+
+      .app-brand > div:last-child,
+      .sidebar-token span {
+        display: none;
+      }
+
+      .app-nav {
+        display: flex;
+        flex: 1;
+        justify-content: center;
+      }
+
+      .app-nav-link {
+        padding: 10px;
+      }
+
+      .app-nav-link span {
+        display: none;
+      }
+
+      .app-nav-link.active {
+        box-shadow: inset 0 -3px #60a5fa;
+      }
+
+      .sidebar-footer {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      .sidebar-token {
+        width: 42px;
+        justify-content: center;
+      }
+
+      .app-main {
+        padding: 25px 15px 45px;
+      }
+    }
+
     @media (max-width: 640px) {
-      .shell {
-        width: min(100% - 20px, 1440px);
-        padding-top: 10px;
-      }
-
-      .hero {
-        padding: 20px;
-        border-radius: 22px;
-      }
-
       .stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .stat {
+        min-height: 102px;
+        padding: 15px 12px;
+      }
+
+      .stat strong {
+        font-size: 27px;
+      }
+
+      .page-head {
+        margin-bottom: 20px;
       }
 
       .brand-head,
@@ -701,70 +1253,146 @@ html_template = r'''<!doctype html>
       .grid {
         grid-template-columns: 1fr;
       }
+
+      .recent-date {
+        display: none;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <header class="hero">
-      <div>
-        <div class="eyebrow">Private Tailnet Image Library</div>
-        <h1>Image Hosting</h1>
-        <p class="subtitle">
-          Bilder per Upload-API nach <code>/srv/images</code> schieben. Diese Übersicht gruppiert automatisch nach Marke und Produkt und erzeugt kopierbare URLs.
-        </p>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="app-brand">
+        <div class="app-brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+            <circle cx="9" cy="9" r="2"></circle>
+            <path d="m21 15-5-5L5 21"></path>
+          </svg>
+        </div>
+        <div>
+          <strong>Image Library</strong>
+          <span>Attribut Generator</span>
+        </div>
       </div>
 
-      <div class="stats">
-        <div class="stat">
-          <strong id="statImages">0</strong>
-          <span>Bilder</span>
-        </div>
-        <div class="stat">
-          <strong id="statBrands">0</strong>
+      <nav class="app-nav" aria-label="Hauptnavigation">
+        <a class="app-nav-link" href="#/overview" data-route="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </svg>
+          <span>Übersicht</span>
+        </a>
+        <a class="app-nav-link" href="#/library" data-route="library">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+            <circle cx="9" cy="9" r="2"></circle>
+            <path d="m21 15-5-5L5 21"></path>
+          </svg>
+          <span>Bibliothek</span>
+        </a>
+        <a class="app-nav-link" href="#/brands" data-route="brands">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 13 11 22l-9-9V4a2 2 0 0 1 2-2h9l7 7a3 3 0 0 1 0 4Z"></path>
+            <circle cx="7.5" cy="7.5" r="1.5"></circle>
+          </svg>
           <span>Marken</span>
-        </div>
-        <div class="stat">
-          <strong id="statProducts">0</strong>
-          <span>Produkte</span>
-        </div>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="tokenButton" class="token-button sidebar-token" type="button" title="API-Token verwalten">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="7.5" cy="15.5" r="5.5"></circle>
+            <path d="m21 2-9.6 9.6M15 8l2 2m1-5 2 2"></path>
+          </svg>
+          <span>API-Token verwalten</span>
+        </button>
       </div>
-    </header>
+    </aside>
 
-    <section class="toolbar" aria-label="Filter">
-      <label class="field">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <path d="m21 21-4.35-4.35"></path>
-        </svg>
-        <input id="search" type="search" placeholder="Suchen: Marke, Produkt, Dateiname ..." autocomplete="off">
-      </label>
+    <main class="app-main">
+      <section id="view-overview" class="view">
+        <header class="page-head">
+          <div>
+            <span class="page-kicker">Bildverwaltung</span>
+            <h1>Alles im Blick.</h1>
+            <p>Alle Bilder, Marken und Produktgruppen an einem Ort. Zuletzt geänderte Dateien und die größten Marken siehst du direkt hier.</p>
+          </div>
+        </header>
 
-      <select id="brandFilter" aria-label="Marke filtern">
-        <option value="">Alle Marken</option>
-      </select>
+        <div class="stats">
+          <div class="stat"><strong id="statImages">0</strong><span>Bilder insgesamt</span></div>
+          <div class="stat"><strong id="statBrands">0</strong><span>Marken</span></div>
+          <div class="stat"><strong id="statProducts">0</strong><span>Produktgruppen</span></div>
+        </div>
 
-      <select id="sortMode" aria-label="Sortierung">
-        <option value="path">Nach Pfad</option>
-        <option value="newest">Neueste zuerst</option>
-        <option value="name">Dateiname A–Z</option>
-      </select>
+        <div class="dashboard-grid">
+          <section class="panel">
+            <header class="panel-head">
+              <h2>Zuletzt geändert</h2>
+              <a class="text-link" href="#/library">Alle Bilder</a>
+            </header>
+            <div id="recentImages" class="recent-list"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2>Größte Marken</h2>
+              <a class="text-link" href="#/brands">Verwalten</a>
+            </header>
+            <div id="dashboardBrands" class="brand-summary-list"></div>
+          </section>
+        </div>
+      </section>
 
-      <button id="tokenButton" class="token-button" type="button" title="API-Token verwalten" aria-label="API-Token verwalten">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="7.5" cy="15.5" r="5.5"></circle>
-          <path d="m21 2-9.6 9.6M15 8l2 2m1-5 2 2"></path>
-        </svg>
-      </button>
-    </section>
+      <section id="view-library" class="view">
+        <header class="page-head">
+          <div>
+            <span class="page-kicker">Bibliothek</span>
+            <h1>Alle Bilder</h1>
+            <p>Durchsuche deine Dateien, kopiere URLs oder entferne nicht mehr benötigte Motive.</p>
+          </div>
+        </header>
 
-    <main class="layout">
-      <aside class="sidebar">
-        <p class="sidebar-title">Marken</p>
-        <nav id="brandNav"></nav>
-      </aside>
+        <section class="toolbar" aria-label="Filter">
+          <label class="field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            <input id="search" type="search" placeholder="Marke, Produkt oder Dateiname suchen ..." autocomplete="off">
+          </label>
+          <select id="brandFilter" aria-label="Marke filtern"><option value="">Alle Marken</option></select>
+          <select id="sortMode" aria-label="Sortierung">
+            <option value="path">Nach Pfad</option>
+            <option value="newest">Neueste zuerst</option>
+            <option value="name">Dateiname A–Z</option>
+          </select>
+        </section>
 
-      <section id="content" class="content"></section>
+        <div class="layout">
+          <aside class="sidebar">
+            <p class="sidebar-title">Schnellzugriff</p>
+            <nav id="brandNav"></nav>
+          </aside>
+          <section id="content" class="content"></section>
+        </div>
+      </section>
+
+      <section id="view-brands" class="view">
+        <header class="page-head">
+          <div>
+            <span class="page-kicker">Verwaltung</span>
+            <h1>Marken</h1>
+            <p>Prüfe den Umfang jeder Marke, öffne ihre Bilder oder entferne eine Marke vollständig.</p>
+          </div>
+        </header>
+        <div id="brandsContent" class="brands-grid"></div>
+      </section>
     </main>
   </div>
 
@@ -819,6 +1447,9 @@ html_template = r'''<!doctype html>
       statImages: document.querySelector("#statImages"),
       statBrands: document.querySelector("#statBrands"),
       statProducts: document.querySelector("#statProducts"),
+      recentImages: document.querySelector("#recentImages"),
+      dashboardBrands: document.querySelector("#dashboardBrands"),
+      brandsContent: document.querySelector("#brandsContent"),
       toast: document.querySelector("#toast"),
       tokenButton: document.querySelector("#tokenButton"),
       tokenDialog: document.querySelector("#tokenDialog"),
@@ -977,7 +1608,7 @@ html_template = r'''<!doctype html>
         const index = IMAGES.findIndex(row => row.path === path);
         if (index >= 0) IMAGES.splice(index, 1);
         setupFilters();
-        render();
+        renderAll();
         showToast("Bild gelöscht");
       } catch (error) {
         button.closest(".card")?.classList.remove("busy");
@@ -993,21 +1624,21 @@ html_template = r'''<!doctype html>
       });
       if (!confirmed) return;
 
-      button.closest(".brand-section")?.classList.add("busy");
+      button.closest(".brand-section, .brand-manage-card")?.classList.add("busy");
       try {
         const result = await apiDelete(`/api/images/brand/${encodeURIComponent(brand)}`);
         if (!result) {
-          button.closest(".brand-section")?.classList.remove("busy");
+          button.closest(".brand-section, .brand-manage-card")?.classList.remove("busy");
           return;
         }
         for (let index = IMAGES.length - 1; index >= 0; index--) {
           if (IMAGES[index].brand === brand) IMAGES.splice(index, 1);
         }
         setupFilters();
-        render();
+        renderAll();
         showToast(`${result.images} Bilder gelöscht`);
       } catch (error) {
-        button.closest(".brand-section")?.classList.remove("busy");
+        button.closest(".brand-section, .brand-manage-card")?.classList.remove("busy");
         showToast(error.message);
       }
     }
@@ -1071,6 +1702,87 @@ html_template = r'''<!doctype html>
       els.statProducts.textContent = products.size;
     }
 
+    function openLibrary(brand = "") {
+      els.brandFilter.value = brand;
+      location.hash = "#/library";
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function renderDashboard() {
+      renderStats(IMAGES);
+
+      const newest = IMAGES.toSorted((a, b) => b.modified.localeCompare(a.modified)).slice(0, 7);
+      els.recentImages.innerHTML = newest.map(item => `
+        <div class="recent-row">
+          <img class="recent-thumb" src="${escapeAttr(item.path)}" loading="lazy" alt="">
+          <div>
+            <div class="recent-name">${escapeText(item.file)}</div>
+            <div class="recent-meta">${escapeText(item.brandLabel)} · ${escapeText(item.productLabel)}</div>
+          </div>
+          <span class="recent-date">${escapeText(item.modified)}</span>
+        </div>
+      `).join("") || `
+        <div class="empty">
+          <h2>Noch keine Bilder</h2>
+          <p>Nach dem ersten Upload erscheinen die neuesten Dateien hier.</p>
+        </div>
+      `;
+
+      const brands = Object.entries(groupBy(IMAGES, "brand"))
+        .toSorted(([, a], [, b]) => b.length - a.length)
+        .slice(0, 8);
+      els.dashboardBrands.innerHTML = brands.map(([brand, rows]) => `
+        <div class="brand-summary" role="button" tabindex="0" onclick='openLibrary(${jsString(brand)})' onkeydown='if(event.key === "Enter") openLibrary(${jsString(brand)})'>
+          <div class="mini-badge">${escapeText(rows[0].brandLabel.slice(0, 2))}</div>
+          <div>
+            <strong>${escapeText(rows[0].brandLabel)}</strong>
+            <span>${new Set(rows.map(item => item.product)).size} Produktgruppen</span>
+          </div>
+          <span class="count-pill">${rows.length}</span>
+        </div>
+      `).join("") || `<div class="brand-summary"><span>Keine Marken vorhanden</span></div>`;
+    }
+
+    function renderBrands() {
+      const brands = Object.entries(groupBy(IMAGES, "brand"))
+        .toSorted(([, a], [, b]) => a[0].brandLabel.localeCompare(b[0].brandLabel, "de"));
+
+      els.brandsContent.innerHTML = brands.map(([brand, rows]) => {
+        const productCount = new Set(rows.map(item => item.product)).size;
+        const totalSize = rows.reduce((sum, item) => sum + item.size, 0);
+        return `
+          <article class="brand-manage-card">
+            <div class="brand-manage-top">
+              <div class="brand-badge">${escapeText(rows[0].brandLabel.slice(0, 2))}</div>
+              <div>
+                <h2>${escapeText(rows[0].brandLabel)}</h2>
+                <p>${escapeText(brand)}</p>
+              </div>
+            </div>
+            <div class="brand-manage-stats">
+              <div class="brand-manage-stat"><strong>${rows.length}</strong><span>Bilder</span></div>
+              <div class="brand-manage-stat"><strong>${productCount}</strong><span>Produkte</span></div>
+              <div class="brand-manage-stat"><strong>${fileSize(totalSize)}</strong><span>Speicher</span></div>
+            </div>
+            <div class="brand-manage-actions">
+              <button class="view-brand" type="button" onclick='openLibrary(${jsString(brand)})'>Bilder ansehen</button>
+              <button class="delete-image" type="button" title="Marke löschen" aria-label="${escapeAttr(rows[0].brandLabel)} löschen" onclick='deleteBrand(${jsString(brand)}, ${jsString(rows[0].brandLabel)}, ${rows.length}, this)'>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+                </svg>
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("") || `
+        <div class="empty">
+          <h2>Keine Marken vorhanden</h2>
+          <p>Marken werden beim Hochladen automatisch angelegt.</p>
+        </div>
+      `;
+    }
+
     function renderNav(items) {
       const brands = groupBy(items, "brand");
       const entries = Object.entries(brands).toSorted(([, a], [, b]) =>
@@ -1078,16 +1790,15 @@ html_template = r'''<!doctype html>
       );
 
       els.brandNav.innerHTML = entries.map(([brand, rows]) => `
-        <a class="nav-link" href="#brand-${slug(brand)}">
+        <button class="nav-link" type="button" onclick='document.querySelector("#brand-${slug(brand)}")?.scrollIntoView({ behavior: "smooth" })'>
           <span>${escapeText(rows[0].brandLabel)}</span>
           <span>${rows.length}</span>
-        </a>
+        </button>
       `).join("") || `<div class="nav-link"><span>Keine Treffer</span><span>0</span></div>`;
     }
 
     function render() {
       const items = getFilteredItems();
-      renderStats(items);
       renderNav(items);
 
       if (!items.length) {
@@ -1169,12 +1880,43 @@ html_template = r'''<!doctype html>
         }).join("");
     }
 
+    function renderAll() {
+      render();
+      renderDashboard();
+      renderBrands();
+    }
+
+    function currentRoute() {
+      const route = location.hash.replace(/^#\//, "");
+      return ["overview", "library", "brands"].includes(route) ? route : "overview";
+    }
+
+    function renderRoute() {
+      const route = currentRoute();
+      document.querySelectorAll(".view").forEach(view => {
+        view.classList.toggle("active", view.id === `view-${route}`);
+      });
+      document.querySelectorAll(".app-nav-link").forEach(link => {
+        link.classList.toggle("active", link.dataset.route === route);
+      });
+      document.title = {
+        overview: "Übersicht · Image Library",
+        library: "Bibliothek · Image Library",
+        brands: "Marken · Image Library",
+      }[route];
+    }
+
     setupFilters();
-    render();
+    renderAll();
+    if (!location.hash.startsWith("#/")) {
+      history.replaceState(null, "", "#/overview");
+    }
+    renderRoute();
 
     els.search.addEventListener("input", render);
     els.brandFilter.addEventListener("change", render);
     els.sortMode.addEventListener("change", render);
+    window.addEventListener("hashchange", renderRoute);
     els.tokenButton.addEventListener("click", () => {
       sessionStorage.removeItem("imageApiToken");
       requestToken().then(token => {
