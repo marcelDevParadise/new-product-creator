@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from integrations.artikelwerk.schemas import ArtikelwerkSettings
+from integrations.artikelwerk.schemas import ARTIKELWERK_TAX_RATE, ArtikelwerkSettings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -48,7 +48,7 @@ _DEFAULTS: dict = {
         "inventory_tracking": True,
         "customer_group_id": 1,
         "currency": "EUR",
-        "tax_rate": 19.0,
+        "tax_rate": ARTIKELWERK_TAX_RATE,
         "publish_price": True,
         "publish_purchase": True,
         "publish_manufacturer": True,
@@ -240,14 +240,19 @@ def update_varianten(body: VariantenSettings):
 
 
 def get_artikelwerk_settings() -> ArtikelwerkSettings:
-    return ArtikelwerkSettings(**_load_settings().get("artikelwerk", {}))
+    raw = dict(_load_settings().get("artikelwerk", {}))
+    # Older installations may still contain tax_rate=0. Normalize before
+    # validation so they work immediately after deployment without requiring a
+    # manual settings edit.
+    raw["tax_rate"] = ARTIKELWERK_TAX_RATE
+    return ArtikelwerkSettings(**raw)
 
 
 def save_artikelwerk_settings(body: ArtikelwerkSettings) -> ArtikelwerkSettings:
     data = _load_settings()
-    data["artikelwerk"] = body.model_dump()
+    data["artikelwerk"] = {**body.model_dump(), "tax_rate": ARTIKELWERK_TAX_RATE}
     _save_settings(data)
-    return body
+    return ArtikelwerkSettings(**data["artikelwerk"])
 
 
 # --- All Settings (combined read) ---

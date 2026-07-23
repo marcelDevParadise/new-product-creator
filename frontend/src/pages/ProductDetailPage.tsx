@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronRight, AlertTriangle, Wand2, Archive, History, Layers, CloudUpload } from 'lucide-react';
+import { ChevronLeft, AlertTriangle, Wand2, Archive, History, Layers, CloudUpload, Package, CircleCheckBig, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
@@ -9,6 +9,7 @@ import { AttributeWizard } from '../components/products/wizard/AttributeWizard';
 import { api } from '../api/client';
 import type { Product, AttributeConfig, ProductHistoryEntry, ArtikelwerkPreview, ArtikelwerkPublication } from '../types';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 
 export function ProductDetailPage() {
   const { sku } = useParams<{ sku: string }>();
@@ -117,43 +118,25 @@ export function ProductDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex flex-wrap items-center gap-2 sm:gap-4 px-4 md:px-8 py-3 md:py-4 border-b bg-white">
-        <nav className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground">
-          <button onClick={() => navigate('/products')} className="hover:text-foreground transition-colors">
-            Produkte
-          </button>
-          <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-foreground font-medium truncate max-w-[200px]">{product.artikelnummer}</span>
-        </nav>
-        <div className="hidden sm:block flex-1" />
-        <div className="w-full sm:flex-1 min-w-0 order-first sm:order-none">
-          <h2 className="text-base font-semibold truncate">{product.artikelname}</h2>
-          <div className="flex items-center gap-x-3 gap-y-0.5 mt-0.5 flex-wrap">
-            <span className="text-xs text-muted-foreground font-mono">{product.artikelnummer}</span>
-            {product.ek != null && (
-              <span className="text-xs text-muted-foreground">EK {product.ek.toFixed(2)} €</span>
-            )}
-            {product.preis != null && (
-              <span className="text-xs text-muted-foreground">VK {product.preis.toFixed(2)} €</span>
-            )}
-            {product.gewicht != null && (
-              <span className="text-xs text-muted-foreground">{product.gewicht} g</span>
-            )}
-            {product.hersteller && (
-              <span className="text-xs text-muted-foreground">{product.hersteller}</span>
-            )}
-            {product.ean && (
-              <span className="hidden sm:inline text-xs text-muted-foreground font-mono">{product.ean}</span>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 ml-auto">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow={`Produkt · ${product.artikelnummer}`}
+        title={product.artikelname}
+        description={[product.hersteller, product.ean ? `EAN ${product.ean}` : null, product.gewicht != null ? `${product.gewicht} g` : null].filter(Boolean).join(' · ') || 'Produktattribute und Historie verwalten.'}
+        icon={Package}
+        stats={[
+          { label: 'Attribute', value: Object.keys(product.attributes).length, icon: Layers, tone: 'indigo' },
+          { label: 'Stammdaten', value: product.stammdaten_complete ? 'Komplett' : 'Offen', icon: CircleCheckBig, tone: product.stammdaten_complete ? 'emerald' : 'amber' },
+          { label: 'EK-Preis', value: product.ek != null ? `${product.ek.toFixed(2)} €` : '–', icon: Banknote, tone: 'sky' },
+          { label: 'VK-Preis', value: product.preis != null ? `${product.preis.toFixed(2)} €` : '–', icon: Banknote, tone: 'violet' },
+        ]}
+        actions={<>
+          <Button variant="outline" className="bg-background/70" onClick={() => navigate('/products')}><ChevronLeft className="mr-2 h-4 w-4" />Produkte</Button>
           {product.stammdaten_complete && (
-            <Button variant="outline" size="sm" onClick={handleSmartDefaults} className="shrink-0 gap-1.5">
+            <Button variant="outline" onClick={handleSmartDefaults} className="shrink-0 gap-1.5 bg-background/70">
               <Wand2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Smart Defaults</span>
-              <span className="sm:hidden">Smart</span>
+              Smart Defaults
             </Button>
           )}
           {product.exported && (
@@ -163,25 +146,25 @@ export function ProductDetailPage() {
             <Badge variant="secondary" className="shrink-0">Artikelwerk: {artikelwerkStatus.status}</Badge>
           )}
           {!product.parent_sku && (
-            <Button variant="outline" size="sm" onClick={handleArtikelwerkPreview} disabled={artikelwerkLoading} className="shrink-0 gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+            <Button variant="outline" onClick={handleArtikelwerkPreview} disabled={artikelwerkLoading} className="shrink-0 gap-1.5 bg-background/70 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
               <CloudUpload className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Artikelwerk</span>
+              Artikelwerk
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleArchive} className="shrink-0 gap-1.5 text-amber-600 border-amber-200 hover:bg-amber-50">
+          <Button variant="outline" onClick={handleArchive} className="shrink-0 gap-1.5 bg-background/70 text-amber-600 border-amber-200 hover:bg-amber-50">
             <Archive className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Archivieren</span>
+            Archivieren
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
-      <div className="flex-1 overflow-auto flex flex-col">
+      <section className="rounded-3xl border bg-card/90 shadow-sm">
         {/* Tabs */}
-        <div className="px-4 md:px-8 pt-3 md:pt-4 flex gap-1 border-b bg-white overflow-x-auto">
+        <div className="flex gap-1 border-b p-2">
           <button
             onClick={() => setTab('attributes')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 whitespace-nowrap min-h-[44px] ${
-              tab === 'attributes' ? 'bg-gray-50 border border-b-white -mb-px text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+            className={`flex min-h-10 items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              tab === 'attributes' ? 'bg-indigo-600 text-white shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
@@ -189,8 +172,8 @@ export function ProductDetailPage() {
           </button>
           <button
             onClick={() => setTab('history')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors flex items-center gap-1.5 whitespace-nowrap min-h-[44px] ${
-              tab === 'history' ? 'bg-gray-50 border border-b-white -mb-px text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+            className={`flex min-h-10 items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+              tab === 'history' ? 'bg-indigo-600 text-white shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
           >
             <History className="w-3.5 h-3.5" />
@@ -198,7 +181,7 @@ export function ProductDetailPage() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-4 md:p-8 flex flex-col min-h-0">
+        <div className="flex min-h-0 flex-col p-4 md:p-6">
           {tab === 'attributes' && (
             <>
               {!product.stammdaten_complete ? (
@@ -238,6 +221,7 @@ export function ProductDetailPage() {
             <HistoryTab entries={history} loading={historyLoading} />
           )}
         </div>
+      </section>
       </div>
 
       <Dialog open={artikelwerkPreview !== null} onOpenChange={open => { if (!open) setArtikelwerkPreview(null); }}>
@@ -322,13 +306,13 @@ function HistoryTab({ entries, loading }: { entries: ProductHistoryEntry[]; load
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-4xl space-y-6">
       {Object.entries(grouped).map(([day, items]) => (
         <div key={day}>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">{day}</h3>
           <div className="space-y-2">
             {items.map((e) => (
-              <div key={e.id} className="flex items-start gap-3 bg-white border rounded-lg px-4 py-3">
+              <div key={e.id} className="flex items-start gap-3 rounded-2xl border bg-background/70 px-4 py-3 shadow-sm">
                 <span className={`shrink-0 px-2 py-0.5 rounded text-[11px] font-medium ${EVENT_COLORS[e.event_type] ?? 'bg-gray-100 text-gray-600'}`}>
                   {EVENT_LABELS[e.event_type] ?? e.event_type}
                 </span>

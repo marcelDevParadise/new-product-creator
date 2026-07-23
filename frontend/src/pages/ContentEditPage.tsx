@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker } from 'react-router-dom';
-import { Save, ChevronRight, FileText, Plus, X } from 'lucide-react';
+import { Save, ChevronLeft, FileText, Plus, X, CheckCircle2, Tags } from 'lucide-react';
 import { api } from '@/api/client';
 import { useToast } from '@/components/ui/Toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { WorkspaceHeader } from '@/components/layout/WorkspaceHeader';
+import { Button } from '@/components/ui/button';
 import { HtmlEditor } from '@/components/ui/HtmlEditor';
 import type { Product } from '@/types';
 
@@ -95,8 +96,11 @@ export function ContentEditPage() {
     return <LoadingSpinner className="h-full" />;
   }
 
+  const contentFields = [product.artikelname, kurzbeschreibung, beschreibung, product.title_tag, product.meta_description];
+  const contentScore = contentFields.filter((value) => Boolean(value?.trim())).length;
+
   return (
-    <div className="h-full flex flex-col">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
       {blocker.state === 'blocked' && (
         <ConfirmDialog
           title="Ungespeicherte Änderungen"
@@ -108,58 +112,23 @@ export function ContentEditPage() {
         />
       )}
 
-      {/* Header */}
-      <div className="shrink-0 px-4 md:px-8 pt-4 md:pt-6 pb-4">
-        <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
-          <button onClick={() => navigate('/stammdaten')} className="hover:text-gray-900 transition-colors">
-            Stammdaten
-          </button>
-          <ChevronRight className="w-3.5 h-3.5" />
-          <button onClick={() => navigate(`/stammdaten/${encodeURIComponent(product.artikelnummer)}`)} className="hover:text-gray-900 transition-colors">
-            {product.artikelnummer}
-          </button>
-          <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-gray-900 font-medium">Beschreibungen</span>
-        </nav>
-        <PageHeader
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 pb-24 md:p-6 md:pb-24 xl:px-8 xl:py-7 xl:pb-24 2xl:px-10">
+        <WorkspaceHeader
+          eyebrow={`Content · ${product.artikelnummer}`}
           title={product.artikelname}
-          description="Kurzbeschreibung & Beschreibung als HTML bearbeiten"
+          description="Kurzbeschreibung, ausführlichen Produkttext und SEO-Keywords bearbeiten."
+          icon={FileText}
+          stats={[
+            { label: 'Content-Score', value: `${contentScore}/5`, icon: CheckCircle2, tone: contentScore === 5 ? 'emerald' : 'amber' },
+            { label: 'SEO-Keywords', value: seoKeywords.length, icon: Tags, tone: 'violet' },
+            { label: 'Status', value: dirty ? 'Geändert' : 'Gespeichert', icon: Save, tone: dirty ? 'amber' : 'emerald' },
+          ]}
+          actions={<Button variant="outline" className="bg-background/70" onClick={() => navigate(`/stammdaten/${encodeURIComponent(product.artikelnummer)}`)}><ChevronLeft className="mr-2 h-4 w-4" />Stammdaten</Button>}
         />
-        {(() => {
-          const fields = [
-            { label: 'Artikelname', ok: !!product.artikelname?.trim() },
-            { label: 'Kurzbeschreibung', ok: !!kurzbeschreibung.trim() },
-            { label: 'Beschreibung', ok: !!beschreibung.trim() },
-            { label: 'Title Tag', ok: !!product.title_tag?.trim() },
-            { label: 'Meta-Description', ok: !!product.meta_description?.trim() },
-          ];
-          const score = fields.filter(f => f.ok).length;
-          const missing = fields.filter(f => !f.ok);
-          return (
-            <div className="flex items-center gap-3 mt-2">
-              <div className="flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-muted-foreground" />
-                <span className={`text-sm font-semibold ${score === 5 ? 'text-emerald-600' : score >= 3 ? 'text-amber-600' : 'text-red-600'}`}>
-                  Content-Score: {score}/5
-                </span>
-              </div>
-              {missing.length > 0 && (
-                <div className="flex gap-1.5 flex-wrap">
-                  {missing.map(f => (
-                    <span key={f.label} className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400 px-2 py-0.5 rounded-full">
-                      {f.label}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto px-4 md:px-8 pb-8">
-        <div className="max-w-4xl space-y-8">
+      <div className="rounded-3xl border bg-card/90 p-5 shadow-sm md:p-7">
+        <div className="max-w-5xl space-y-8">
           {/* Kurzbeschreibung */}
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Kurzbeschreibung</label>
@@ -237,9 +206,10 @@ export function ContentEditPage() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Footer */}
-      <div className="shrink-0 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between px-4 md:px-8 py-3 md:py-4 bg-white border-t border-gray-200">
+      <div className="sticky bottom-0 z-20 flex shrink-0 flex-col-reverse gap-3 border-t bg-background/90 px-4 py-3 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur sm:flex-row sm:items-center sm:justify-between md:px-8 md:py-4">
         <button
           onClick={() => navigate(`/stammdaten/${encodeURIComponent(product.artikelnummer)}`)}
           className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"

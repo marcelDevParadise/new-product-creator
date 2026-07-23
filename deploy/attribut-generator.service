@@ -15,7 +15,7 @@ ExecStart=__REPO__/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000 --wor
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=45
-UMask=0077
+UMask=0022
 StandardOutput=journal
 StandardError=journal
 

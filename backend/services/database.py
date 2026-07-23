@@ -94,6 +94,12 @@ def init_db() -> None:
             )
         """)
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS app_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS activity_log (
                 id BIGSERIAL PRIMARY KEY,
                 event_type TEXT NOT NULL,
@@ -999,11 +1005,38 @@ def delete_attribute_definition(key: str) -> None:
         cur.execute("DELETE FROM attribute_definitions WHERE key = %s", (key,))
 
 
+def delete_all_attribute_definitions() -> int:
+    """Remove every attribute definition and return the deleted row count."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM attribute_definitions")
+        count = int(cur.fetchone()[0])
+        cur.execute("DELETE FROM attribute_definitions")
+        return count
+
+
 def count_attribute_definitions() -> int:
     """Return the number of attribute definitions in the database."""
     with _conn() as conn, conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM attribute_definitions")
         return cur.fetchone()[0]
+
+
+def get_app_metadata(key: str) -> str | None:
+    """Return one persistent application metadata value."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT value FROM app_metadata WHERE key = %s", (key,))
+        row = cur.fetchone()
+        return str(row[0]) if row else None
+
+
+def set_app_metadata(key: str, value: str) -> None:
+    """Persist one application metadata value."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO app_metadata (key, value) VALUES (%s, %s)
+               ON CONFLICT (key) DO UPDATE SET value=excluded.value""",
+            (key, value),
+        )
 
 
 # --- Activity Log ---

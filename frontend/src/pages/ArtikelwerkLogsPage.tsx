@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, Clock3, Copy, RefreshCw, ScrollText, Search } from 'lucide-react';
 import { api } from '../api/client';
 import type { ArtikelwerkLogJob } from '../types';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { useToast } from '../components/ui/Toast';
@@ -73,21 +73,22 @@ export function ArtikelwerkLogsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-      <PageHeader
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Artikelwerk Integration"
         title="Logs"
         description="Nachvollziehbare API-Schritte für Veröffentlichungen von Artikeln an Artikelwerk."
         icon={ScrollText}
-        actions={<Button variant="outline" onClick={load} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Aktualisieren</Button>}
+        stats={[
+          { label: 'Fehler', value: counts.failed, icon: AlertCircle, tone: 'amber' },
+          { label: 'Aktiv', value: counts.active, icon: Clock3, tone: 'sky' },
+          { label: 'Veröffentlicht', value: counts.published, icon: CheckCircle2, tone: 'emerald' },
+        ]}
+        actions={<Button variant="outline" className="bg-background/70" onClick={load} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Aktualisieren</Button>}
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><AlertCircle className="h-4 w-4 text-red-500" /> Fehler</div><p className="mt-1 text-2xl font-semibold">{counts.failed}</p></div>
-        <div className="rounded-xl border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock3 className="h-4 w-4 text-blue-500" /> Aktiv</div><p className="mt-1 text-2xl font-semibold">{counts.active}</p></div>
-        <div className="rounded-xl border bg-card p-4"><div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Veröffentlicht</div><p className="mt-1 text-2xl font-semibold">{counts.published}</p></div>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-3xl border bg-card/90 p-4 shadow-sm sm:flex-row sm:items-center md:p-5">
         <label className="relative min-w-0 flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm" value={search} onChange={event => setSearch(event.target.value)} placeholder="SKU, Job-ID, Fehlercode oder Request-ID suchen …" />
@@ -106,7 +107,7 @@ export function ArtikelwerkLogsPage() {
         {jobs.map(job => {
           const hasError = job.status === 'failed' || job.status === 'partial';
           return (
-            <details key={job.job_id} open={hasError} className="group rounded-xl border bg-card">
+            <details key={job.job_id} open={hasError} className="group rounded-3xl border bg-card/90 shadow-sm">
               <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 p-4">
                 <div className="min-w-40 flex-1"><p className="font-mono text-sm font-semibold">{job.root_sku}</p><p className="mt-0.5 text-xs text-muted-foreground">{formatTime(job.created_at)} · Job {job.job_id.slice(0, 8)}</p></div>
                 <span className="text-xs text-muted-foreground">{job.current_phase || '–'} · {job.progress_current}/{job.progress_total}</span>
@@ -131,6 +132,7 @@ export function ArtikelwerkLogsPage() {
             </details>
           );
         })}
+      </div>
       </div>
     </div>
   );

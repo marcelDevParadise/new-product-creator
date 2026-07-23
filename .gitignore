@@ -58,3 +58,7 @@ vorlagen/ausgabe/
 *.md
 !deploy/ARTIKELWERK-UPDATE-DIAGNOSE.md
 *.html
+
+attribute/*.json
+attribute/*.csv
+deploy/jtl-workflows/disable-inventory-tracking/*.ps1

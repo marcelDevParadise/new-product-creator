@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CloudDownload, CloudUpload, Pencil, Plus, Search, Trash2, Truck, X } from 'lucide-react';
+import { CloudDownload, CloudUpload, Pencil, Plus, Search, Trash2, Truck, X, Package, Link2 } from 'lucide-react';
 import { api } from '../api/client';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
+import { Button } from '../components/ui/button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
 import type { Supplier, SupplierPayload } from '../types';
 
-const inputClass = 'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900';
+const inputClass = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40';
 
 type SupplierForm = {
   name: string;
@@ -157,7 +158,8 @@ export function SuppliersPage() {
   if (loading) return <LoadingSpinner className="h-full" />;
 
   return (
-    <div className="space-y-6 p-4 md:p-8">
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
       {deleteTarget && (
         <ConfirmDialog
           title="Lieferant löschen"
@@ -169,33 +171,40 @@ export function SuppliersPage() {
         />
       )}
 
-      <PageHeader
+      <WorkspaceHeader
+        eyebrow="Beschaffung"
         title="Lieferanten"
-        description={`${suppliers.length} Lieferant${suppliers.length === 1 ? '' : 'en'} angelegt`}
+        description="Lieferantenstammdaten und Artikelwerk-Zuordnungen verwalten."
         icon={Truck}
+        stats={[
+          { label: 'Lieferanten', value: suppliers.length, icon: Truck, tone: 'indigo' },
+          { label: 'Aktiv', value: suppliers.filter(supplier => supplier.active).length, icon: Package, tone: 'emerald' },
+          { label: 'Artikelwerk', value: suppliers.filter(supplier => supplier.articlewerk_supplier_id).length, icon: Link2, tone: 'sky' },
+          { label: 'Produkte', value: suppliers.reduce((sum, supplier) => sum + supplier.product_count, 0), icon: Package, tone: 'violet' },
+        ]}
         actions={(
           <>
-            <button
+            <Button
+              variant="outline"
               type="button"
               onClick={importFromArtikelwerk}
               disabled={importing}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+              className="bg-background/70"
             >
               <CloudDownload className="h-4 w-4" /> {importing ? 'Lädt…' : 'Aus Artikelwerk laden'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => { setForm(emptyForm); setEditingId(null); setFormOpen(true); }}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
             >
               <Plus className="h-4 w-4" /> Neuer Lieferant
-            </button>
+            </Button>
           </>
         )}
       />
 
       {formOpen && (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-5">
+        <div className="rounded-3xl border bg-card/90 p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h3 className="font-semibold">{editingId === null ? 'Neuer Lieferant' : 'Lieferant bearbeiten'}</h3>
@@ -299,6 +308,7 @@ export function SuppliersPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

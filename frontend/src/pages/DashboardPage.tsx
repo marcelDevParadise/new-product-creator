@@ -20,6 +20,9 @@ import {
   FileText,
   DollarSign,
   TrendingDown,
+  Sparkles,
+  ArrowUpRight,
+  LayoutDashboard,
 } from 'lucide-react';
 import { api } from '../api/client';
 import type { DashboardStats, PriceStats } from '../types';
@@ -43,6 +46,51 @@ function ProgressBar({ percent }: { percent: number }) {
         className="h-2 rounded-full bg-indigo-600 transition-all duration-500"
         style={{ width: `${Math.min(percent, 100)}%` }}
       />
+    </div>
+  );
+}
+
+type DashboardTone = 'indigo' | 'sky' | 'violet' | 'emerald';
+
+function DashboardKpi({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  progress,
+  tone,
+}: {
+  icon: typeof Package;
+  label: string;
+  value: string | number;
+  detail: string;
+  progress?: number;
+  tone: DashboardTone;
+}) {
+  const tones: Record<DashboardTone, { icon: string; bar: string }> = {
+    indigo: { icon: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400', bar: 'bg-indigo-500' },
+    sky: { icon: 'bg-sky-500/10 text-sky-600 dark:text-sky-400', bar: 'bg-sky-500' },
+    violet: { icon: 'bg-violet-500/10 text-violet-600 dark:text-violet-400', bar: 'bg-violet-500' },
+    emerald: { icon: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', bar: 'bg-emerald-500' },
+  };
+
+  return (
+    <div className="group rounded-2xl border bg-background/65 p-4 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:bg-background hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">{value}</p>
+        </div>
+        <span className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${tones[tone].icon}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+      <p className="mt-2 truncate text-xs text-muted-foreground">{detail}</p>
+      {progress !== undefined && (
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+          <div className={`h-full rounded-full transition-all duration-500 ${tones[tone].bar}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -102,13 +150,16 @@ export function DashboardPage() {
   useEffect(() => {
     loadStats();
 
-    const onFocus = () => loadStats();
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') onFocus();
-    });
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') loadStats();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     const interval = setInterval(loadStats, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearInterval(interval);
+    };
   }, [loadStats]);
 
   if (error) {
@@ -140,88 +191,53 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader title="Dashboard" description="Übersicht über alle Produkte und Aktivitäten" />
-        <div className="flex items-center gap-3 sm:shrink-0">
-          {lastRefresh && (
-            <span className="hidden sm:inline text-xs text-muted-foreground">
-              Aktualisiert {formatRelativeTime(lastRefresh.toISOString().replace('Z', ''))}
-            </span>
-          )}
-          <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Aktualisieren
-          </Button>
-        </div>
-      </div>
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+        <section className="relative overflow-hidden rounded-3xl border bg-card/90 p-5 shadow-sm md:p-7">
+          <div className="pointer-events-none absolute -right-20 -top-40 h-96 w-96 rounded-full bg-indigo-500/12 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-40 left-1/3 h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" />
 
-      {/* KPI Cards - Primary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Produkte</CardTitle>
-            <Package className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.products_total}</div>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:bg-emerald-950 dark:text-emerald-400">
-                {stats.products_active} aktiv
-              </Badge>
-              <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400">
-                {stats.products_archived} archiviert
-              </Badge>
+          <div className="relative flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/25">
+                <LayoutDashboard className="h-6 w-6" />
+                <Sparkles className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-card p-0.5 text-indigo-500" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">Arbeitsübersicht</p>
+                <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">Dashboard</h1>
+                <p className="mt-1 text-sm text-muted-foreground">Produktqualität, Bereitschaft und aktuelle Vorgänge auf einen Blick.</p>
+              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Stammdaten</CardTitle>
-            <ClipboardCheck className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.stammdaten_percent}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.stammdaten_complete} von {stats.products_active} vollständig
-            </p>
-            <ProgressBar percent={stats.stammdaten_percent} />
-          </CardContent>
-        </Card>
+            <div className="flex flex-wrap items-center gap-2">
+              {lastRefresh && <span className="mr-1 text-xs text-muted-foreground">Aktualisiert {formatRelativeTime(lastRefresh.toISOString().replace('Z', ''))}</span>}
+              <Button variant="outline" className="bg-background/70" onClick={() => navigate('/import')}><Upload className="mr-2 h-4 w-4" />Import starten</Button>
+              <Button variant="outline" className="bg-background/70" onClick={() => navigate('/products')}>Produkte öffnen<ArrowUpRight className="ml-2 h-4 w-4" /></Button>
+              <Button onClick={handleManualRefresh} disabled={refreshing}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />Aktualisieren
+              </Button>
+            </div>
+          </div>
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Attribut-Abdeckung</CardTitle>
-            <Tags className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.attributes_percent}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.attributes_with} von {stats.products_active} mit Attributen
-            </p>
-            <ProgressBar percent={stats.attributes_percent} />
-          </CardContent>
-        </Card>
+          <div className="relative mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <DashboardKpi icon={Package} label="Produkte" value={stats.products_total} detail={`${stats.products_active} aktiv · ${stats.products_archived} archiviert`} tone="indigo" />
+            <DashboardKpi icon={ClipboardCheck} label="Stammdaten vollständig" value={`${stats.stammdaten_percent}%`} detail={`${stats.stammdaten_complete} von ${stats.products_active} Produkten`} progress={stats.stammdaten_percent} tone="sky" />
+            <DashboardKpi icon={Tags} label="Attribut-Abdeckung" value={`${stats.attributes_percent}%`} detail={`${stats.attributes_with} Produkte mit Attributen`} progress={stats.attributes_percent} tone="violet" />
+            <DashboardKpi icon={Rocket} label="Exportbereit" value={stats.export_ready} detail={`${stats.export_ready_percent}% aller aktiven Produkte`} progress={stats.export_ready_percent} tone="emerald" />
+          </div>
+        </section>
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Export-Bereit</CardTitle>
-            <Rocket className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.export_ready}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {stats.export_ready_percent}% — Stammdaten ✓ + Attribute ✓
-            </p>
-            <ProgressBar percent={stats.export_ready_percent} />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* KPI Cards - Secondary */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-        <Card className="shadow-sm">
+        <section className="rounded-3xl border bg-card/70 p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Datenqualität</h2>
+              <p className="text-xs text-muted-foreground">Content, Auffindbarkeit und fehlende Produktangaben</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/quality')}>Qualität öffnen<ArrowUpRight className="ml-2 h-4 w-4" /></Button>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Card className="rounded-2xl bg-background/70 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Content-Score</CardTitle>
             <FileText className="w-4 h-4 text-muted-foreground" />
@@ -235,7 +251,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        <Card className="rounded-2xl bg-background/70 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">SEO-Abdeckung</CardTitle>
             <Globe className="w-4 h-4 text-muted-foreground" />
@@ -249,7 +265,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        <Card className="rounded-2xl bg-background/70 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Ohne Bilder</CardTitle>
             <ImageOff className="w-4 h-4 text-muted-foreground" />
@@ -264,7 +280,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        <Card className="rounded-2xl bg-background/70 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Ohne EAN</CardTitle>
             <Barcode className="w-4 h-4 text-muted-foreground" />
@@ -279,7 +295,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        <Card className="rounded-2xl bg-background/70 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">⌀ Attribute</CardTitle>
             <Tags className="w-4 h-4 text-muted-foreground" />
@@ -291,12 +307,17 @@ export function DashboardPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </section>
 
-      {/* Price Stats */}
-      {priceStats && (priceStats.avg_ek > 0 || priceStats.avg_vk > 0) && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="shadow-sm">
+        {priceStats && (priceStats.avg_ek > 0 || priceStats.avg_vk > 0) && (
+          <section className="rounded-3xl border bg-card/70 p-4 shadow-sm md:p-5">
+            <div className="mb-4">
+              <h2 className="font-semibold">Preise & Wirtschaftlichkeit</h2>
+              <p className="text-xs text-muted-foreground">Durchschnittswerte und offene Preisangaben</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Card className="rounded-2xl bg-background/70 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">⌀ EK-Preis</CardTitle>
               <DollarSign className="w-4 h-4 text-muted-foreground" />
@@ -309,7 +330,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="rounded-2xl bg-background/70 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">⌀ VK-Preis</CardTitle>
               <DollarSign className="w-4 h-4 text-muted-foreground" />
@@ -322,7 +343,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="rounded-2xl bg-background/70 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">⌀ Marge</CardTitle>
               <DollarSign className="w-4 h-4 text-muted-foreground" />
@@ -335,7 +356,7 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="rounded-2xl bg-background/70 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Fehlende Preise</CardTitle>
               <TrendingDown className="w-4 h-4 text-muted-foreground" />
@@ -352,13 +373,13 @@ export function DashboardPage() {
               </p>
             </CardContent>
           </Card>
-        </div>
-      )}
+            </div>
+          </section>
+        )}
 
-      {/* Bottom row */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         {/* Left: Incomplete Products */}
-        <Card className="shadow-sm">
+        <Card className="rounded-3xl bg-card/90 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Unvollständige Produkte</CardTitle>
           </CardHeader>
@@ -449,7 +470,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Right: Activity Log */}
-        <Card className="shadow-sm">
+        <Card className="rounded-3xl bg-card/90 shadow-sm">
           <CardHeader
             className="cursor-pointer hover:bg-gray-50 rounded-t-lg transition-colors"
             onClick={() => navigate('/activity')}
@@ -486,6 +507,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </div>
   );
 }

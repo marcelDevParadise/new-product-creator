@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CloudUpload, RefreshCw, Save, Server } from 'lucide-react';
+import { CloudUpload, RefreshCw, Save, Server, Clock3, AlertCircle } from 'lucide-react';
 import { api } from '../api/client';
 import type { ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkJob, ArtikelwerkSettings } from '../types';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '../components/ui/Toast';
@@ -71,11 +71,17 @@ export function ArtikelwerkPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6 max-w-6xl mx-auto">
-      <PageHeader title="Artikelwerk" description="Direkte, wiederaufnehmbare Veröffentlichung über die Integrations-API." icon={CloudUpload}
-        actions={<Button variant="outline" onClick={() => load()} disabled={loading}><RefreshCw className="w-4 h-4" /> Aktualisieren</Button>} />
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader eyebrow="Integration" title="Artikelwerk" description="Direkte, wiederaufnehmbare Veröffentlichung über die Integrations-API." icon={CloudUpload}
+        stats={[
+          { label: 'Verbindung', value: connection?.reachable ? 'Online' : 'Offline', icon: Server, tone: connection?.reachable ? 'emerald' : 'amber' },
+          { label: 'Jobs', value: jobs.length, icon: Clock3, tone: 'sky' },
+          { label: 'Fehler', value: jobs.filter(job => job.status === 'failed' || job.status === 'partial').length, icon: AlertCircle, tone: 'amber' },
+        ]}
+        actions={<Button variant="outline" className="bg-background/70" onClick={() => load()} disabled={loading}><RefreshCw className="w-4 h-4" /> Aktualisieren</Button>} />
 
-      <section className="rounded-xl border bg-white p-5 space-y-3">
+      <section className="space-y-3 rounded-3xl border bg-card/90 p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2"><Server className="w-5 h-5 text-indigo-600" /><h3 className="font-semibold">Verbindung</h3></div>
           <Badge className={connection?.reachable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
@@ -88,7 +94,7 @@ export function ArtikelwerkPage() {
       </section>
 
       {settings && (
-        <section className="rounded-xl border bg-white p-5 space-y-5">
+        <section className="space-y-5 rounded-3xl border bg-card/90 p-5 shadow-sm">
           <div><h3 className="font-semibold">Veröffentlichungseinstellungen</h3><p className="text-sm text-gray-500">Der geheime API-Key wird hier bewusst nicht angezeigt.</p></div>
           <div className="grid sm:grid-cols-3 gap-4">
             <label className="text-sm">Mandanten
@@ -101,7 +107,10 @@ export function ArtikelwerkPage() {
             <label className="text-sm">Plattform-ID<input type="number" min={0} className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.platform_id} onChange={e => setSettings({ ...settings, platform_id: Number(e.target.value) })} /></label>
             <label className="text-sm">Kundengruppen-ID<input type="number" min={1} className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.customer_group_id} onChange={e => setSettings({ ...settings, customer_group_id: Number(e.target.value) })} /></label>
             <label className="text-sm">Währung<input maxLength={3} className="mt-1 w-full rounded-lg border px-3 py-2 uppercase" value={settings.currency} onChange={e => setSettings({ ...settings, currency: e.target.value.toUpperCase() })} /></label>
-            <label className="text-sm">Steuersatz (%)<input type="number" min={0} max={100} step="0.01" className="mt-1 w-full rounded-lg border px-3 py-2" value={settings.tax_rate} onChange={e => setSettings({ ...settings, tax_rate: Number(e.target.value) })} /></label>
+            <label className="text-sm">Steuersatz (%)
+              <input type="number" className="mt-1 w-full cursor-not-allowed rounded-lg border bg-muted/60 px-3 py-2 text-muted-foreground" value={19} readOnly aria-describedby="artikelwerk-tax-note" />
+              <span id="artikelwerk-tax-note" className="mt-1 block text-xs text-muted-foreground">Fest auf den deutschen Regelsteuersatz von 19 % eingestellt.</span>
+            </label>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {([
@@ -118,7 +127,7 @@ export function ArtikelwerkPage() {
         </section>
       )}
 
-      <section className="rounded-xl border bg-white overflow-hidden">
+      <section className="overflow-hidden rounded-3xl border bg-card/90 shadow-sm">
         <div className="p-5 border-b"><h3 className="font-semibold">Veröffentlichungsjobs</h3><p className="text-sm text-gray-500">Der Status wird automatisch aktualisiert.</p></div>
         {jobs.length === 0 ? <p className="p-5 text-sm text-gray-500">Noch keine Veröffentlichungen.</p> : (
           <div className="divide-y">{jobs.map(job => (
@@ -131,6 +140,7 @@ export function ArtikelwerkPage() {
           ))}</div>
         )}
       </section>
+      </div>
     </div>
   );
 }

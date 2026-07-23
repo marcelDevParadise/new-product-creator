@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { FlaskConical, Plus, Trash2, Edit, X, Save } from 'lucide-react';
 import { api } from '../api/client';
 import { useToast } from '../components/ui/Toast';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
+import { Button } from '../components/ui/button';
 import type { Ingredient } from '../types';
 
 export function IngredientsPage() {
@@ -80,20 +81,26 @@ export function IngredientsPage() {
   if (loading) return <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>;
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <PageHeader
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Produktdeklaration"
         title="Inhaltsstoff-Deklaration"
-        subtitle={`${ingredients.length} Inhaltsstoff${ingredients.length !== 1 ? 'e' : ''}`}
+        description="INCI-Namen, CAS-Nummern und Inhaltsstoffgruppen zentral pflegen."
+        icon={FlaskConical}
+        stats={[
+          { label: 'Inhaltsstoffe', value: ingredients.length, icon: FlaskConical, tone: 'indigo' },
+          { label: 'Kategorien', value: categories.length, icon: Save, tone: 'sky' },
+          { label: 'Verwendungen', value: ingredients.reduce((sum, item) => sum + (item.usage_count ?? 0), 0), icon: Edit, tone: 'emerald' },
+        ]}
         actions={
-          <button onClick={() => { resetForm(); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-            <Plus className="w-4 h-4" /> Neuer Inhaltsstoff
-          </button>
+          <Button onClick={() => { resetForm(); setShowForm(true); }}><Plus className="mr-2 h-4 w-4" />Neuer Inhaltsstoff</Button>
         }
       />
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 sm:p-6 space-y-4">
+        <div className="space-y-4 rounded-3xl border bg-card/90 p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">{editId ? 'Inhaltsstoff bearbeiten' : 'Neuer Inhaltsstoff'}</h3>
             <button onClick={resetForm}><X className="w-5 h-5 text-gray-400 hover:text-gray-600" /></button>
@@ -151,12 +158,12 @@ export function IngredientsPage() {
 
       {/* Ingredient list */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
+        <div className="rounded-3xl border border-dashed bg-card/70 py-16 text-center text-muted-foreground">
           <FlaskConical className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>Keine Inhaltsstoffe vorhanden</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-x-auto">
+        <div className="overflow-x-auto rounded-3xl border bg-card/90 shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
@@ -188,6 +195,7 @@ export function IngredientsPage() {
           </table>
         </div>
       )}
+      </div>
     </div>
   );
 }

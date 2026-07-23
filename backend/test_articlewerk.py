@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import httpx
+from pydantic import ValidationError
 
 from config import ArtikelwerkConfig
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
@@ -25,9 +26,14 @@ from integrations.artikelwerk.publisher import (
     _sync_tenants,
     prepare_image_payload,
 )
-from integrations.artikelwerk.schemas import ArtikelwerkSettings
+from integrations.artikelwerk.schemas import (
+    ARTIKELWERK_STANDARD_TAX_CLASS_ID,
+    ARTIKELWERK_TAX_RATE,
+    ArtikelwerkSettings,
+)
 from models.attribute import AttributeDefinition
 from models.product import Product
+from routers import settings as settings_router
 from services import database as database_service
 from services.sqlite_backend import make_pool as make_sqlite_pool
 
@@ -56,6 +62,47 @@ CONTEXT = {
 
 
 class MapperTests(unittest.TestCase):
+    def test_normalizes_legacy_zero_tax_setting_on_load(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings_path = Path(directory) / "settings.local.json"
+            settings_path.write_text(
+                json.dumps({"artikelwerk": {"tenant_ids": [4], "tax_rate": 0}}),
+                encoding="utf-8",
+            )
+            with patch.object(settings_router, "SETTINGS_PATH", settings_path):
+                settings = settings_router.get_artikelwerk_settings()
+
+        self.assertEqual(settings.tax_rate, ARTIKELWERK_TAX_RATE)
+        self.assertEqual(settings.tenant_ids, [4])
+
+    def test_rejects_non_standard_articlewerk_tax_rate(self):
+        with self.assertRaises(ValidationError):
+            ArtikelwerkSettings(tenant_ids=[4], tax_rate=0)
+
+    def test_price_payload_always_uses_19_percent_tax(self):
+        product = Product(artikelnummer="CYL-TAX", artikelname="Steuertest", preis=119)
+        # model_construct simulates a stale persisted setting and verifies the
+        # mapper's final defense independently of settings validation.
+        stale_settings = ArtikelwerkSettings.model_construct(
+            **{**ArtikelwerkSettings(tenant_ids=[4]).model_dump(), "tax_rate": 0},
+        )
+        preview = build_preview(
+            product, children=[], attribute_config={}, context=CONTEXT,
+            capabilities=CAPABILITIES, settings=stale_settings,
+        )
+        price = preview.steps[0].payload["price"]
+        self.assertEqual(price["taxRate"], ARTIKELWERK_TAX_RATE)
+        self.assertEqual(price["net"], 100)
+        self.assertEqual(
+            preview.steps[0].payload["taxClassId"],
+            ARTIKELWERK_STANDARD_TAX_CLASS_ID,
+        )
+        sync_article = next(step for step in preview.steps if step.operation == "sync_article")
+        self.assertEqual(
+            sync_article.payload["article"]["taxClassId"],
+            ARTIKELWERK_STANDARD_TAX_CLASS_ID,
+        )
+
     def test_normalizes_typographic_apostrophes_for_reference_matching(self):
         self.assertEqual(searchable_reference_name("24B\u2019MOONS CO., LTD."), "24B'MOONS CO., LTD.")
         self.assertEqual(

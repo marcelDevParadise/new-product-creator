@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Search, Pencil, Copy, FileText, ChevronRight, Folder, Save, X, Package, SlidersHorizontal } from 'lucide-react';
-import { PageHeader } from '../components/layout/PageHeader';
+import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import { TemplateAttributeEditor } from '../components/products/TemplateAttributeEditor';
 import { api } from '../api/client';
 import type { Template, AttributeConfig } from '../types';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 
 const UNCATEGORIZED = 'Ohne Kategorie';
 
@@ -157,38 +159,41 @@ export function TemplatesPage() {
   if (loading) return <div className="p-10"><LoadingSpinner /></div>;
 
   const templateCount = Object.keys(templates).length;
+  const assignedAttributeCount = Object.values(templates).reduce((sum, template) => sum + Object.keys(template.attributes).length, 0);
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      <PageHeader
-        title="Vorlagen-Verwaltung"
-        description={`${templateCount} Vorlagen · ${categories.length} Kategorien`}
-        actions={
-          <button
-            onClick={() => setCreating(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Neue Vorlage
-          </button>
-        }
+    <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
+      <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
+      <WorkspaceHeader
+        eyebrow="Automatisierung"
+        title="Vorlagen"
+        description="Wiederverwendbare Attributsets organisieren und auf Produkte anwenden."
+        icon={FileText}
+        stats={[
+          { label: 'Vorlagen', value: templateCount, icon: FileText, tone: 'indigo' },
+          { label: 'Kategorien', value: categories.length, icon: Folder, tone: 'sky' },
+          { label: 'Attributzuweisungen', value: assignedAttributeCount, icon: SlidersHorizontal, tone: 'violet' },
+        ]}
+        actions={<Button onClick={() => setCreating(true)}><Plus className="mr-2 h-4 w-4" />Neue Vorlage</Button>}
       />
 
       {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Suche nach Name, Kategorie oder Notiz…"
-          className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-        />
-      </div>
+      <section className="rounded-3xl border bg-card/90 p-4 shadow-sm md:p-5">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Suche nach Name, Kategorie oder Notiz…"
+            className="h-11 rounded-xl bg-background pl-10"
+          />
+        </div>
+      </section>
 
       {/* Create inline */}
       {creating && (
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+        <div className="space-y-3 rounded-3xl border border-indigo-500/25 bg-indigo-500/5 p-5 shadow-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-600">Name</label>
@@ -230,7 +235,7 @@ export function TemplatesPage() {
 
       {/* Groups */}
       {templateCount === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 py-14 text-center">
+        <div className="rounded-3xl border border-dashed border-gray-200 py-16 text-center dark:border-gray-700">
           <FileText className="w-10 h-10 mx-auto mb-2 text-gray-300" />
           <p className="text-sm text-gray-500">Noch keine Vorlagen angelegt</p>
         </div>
@@ -261,7 +266,7 @@ export function TemplatesPage() {
                       const isRenaming = renameOf === tpl.name;
                       const isCloning = cloneOf === tpl.name;
                       return (
-                        <div key={tpl.name} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-2 hover:border-indigo-200 dark:hover:border-indigo-400 transition-colors">
+                        <div key={tpl.name} className="space-y-2 rounded-2xl border bg-card/90 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-500/30 hover:shadow-md">
                           <div className="flex items-start gap-3">
                             <div className="w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-sm font-bold text-indigo-700 dark:text-indigo-300 shrink-0">
                               {tpl.name.charAt(0).toUpperCase()}
@@ -414,6 +419,7 @@ export function TemplatesPage() {
           onSaved={load}
         />
       )}
+      </div>
     </div>
   );
 }

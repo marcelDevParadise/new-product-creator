@@ -26,6 +26,10 @@ class ReorderRequest(PydanticBaseModel):
     ordered_keys: list[str]
 
 
+class AttributeResetRequest(PydanticBaseModel):
+    confirm: bool = False
+
+
 class AttributeImportWarning(PydanticBaseModel):
     row: int
     field: str
@@ -40,8 +44,10 @@ IMPORT_COLUMN_ALIASES = {
     "name": {"name", "anzeigename", "attributname"},
     "description": {"description", "beschreibung"},
     "required": {"required", "pflicht", "pflichtfeld"},
+    "required_for_types": {"required_for_types", "pflicht_fuer_typen", "pflichttypen"},
     "default_value": {"default_value", "standardwert"},
     "suggested_values": {"suggested_values", "vorgeschlagene_werte", "werte"},
+    "smart_defaults": {"smart_defaults", "intelligente_standardwerte", "titelregeln"},
 }
 
 
@@ -71,6 +77,65 @@ def _parse_suggested_values(value: str) -> list[str]:
     if not value.strip():
         return []
     return [item.strip() for item in value.replace("\n", "|").split("|") if item.strip()]
+
+
+def _parse_smart_defaults(
+    value: str,
+    row_idx: int,
+    warnings: list[AttributeImportWarning],
+) -> list[dict[str, str]]:
+    """Parse smart defaults from JSON or readable ``Titel=>Wert|...`` syntax."""
+    raw = value.strip()
+    if not raw:
+        return []
+
+    if raw.startswith("["):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list) and all(
+            isinstance(item, dict)
+            and str(item.get("title_contains", "")).strip()
+            and str(item.get("value", "")).strip()
+            for item in parsed
+        ):
+            return [
+                {
+                    "title_contains": str(item["title_contains"]).strip(),
+                    "value": str(item["value"]).strip(),
+                }
+                for item in parsed
+            ]
+        warnings.append(AttributeImportWarning(
+            row=row_idx,
+            field="smart_defaults",
+            message="Smart Defaults konnten nicht als JSON-Liste gelesen werden.",
+        ))
+        return []
+
+    result: list[dict[str, str]] = []
+    for item in raw.replace("\n", "|").split("|"):
+        item = item.strip()
+        if not item:
+            continue
+        if "=>" not in item:
+            warnings.append(AttributeImportWarning(
+                row=row_idx,
+                field="smart_defaults",
+                message=f"Titelregel '{item}' wurde uebersprungen. Erwartet wird Titel=>Wert.",
+            ))
+            continue
+        title_contains, default_value = (part.strip() for part in item.split("=>", 1))
+        if not title_contains or not default_value:
+            warnings.append(AttributeImportWarning(
+                row=row_idx,
+                field="smart_defaults",
+                message=f"Unvollstaendige Titelregel '{item}' wurde uebersprungen.",
+            ))
+            continue
+        result.append({"title_contains": title_contains, "value": default_value})
+    return result
 
 
 # --- Attribute definitions CRUD ---
@@ -136,7 +201,10 @@ def export_attributes_json():
 @router.get("/definitions/import/template")
 def download_attribute_import_template():
     """Download a UTF-8 CSV template for bulk importing attribute definitions."""
-    columns = ["key", "id", "category", "name", "description", "required", "default_value", "suggested_values"]
+    columns = [
+        "key", "id", "category", "name", "description", "required",
+        "required_for_types", "default_value", "suggested_values", "smart_defaults",
+    ]
     examples = [
         [
             "meta_material",
@@ -146,7 +214,9 @@ def download_attribute_import_template():
             "Material oder Materialmix des Produkts",
             "true",
             "",
+            "",
             "Baumwolle|Polyester|Silikon",
+            "",
         ],
         [
             "meta_color",
@@ -156,7 +226,9 @@ def download_attribute_import_template():
             "Hauptfarbe des Produkts",
             "false",
             "",
+            "",
             "Schwarz|Weiß|Rot|Blau",
+            "XL=>Schwarz|White Edition=>Weiß",
         ],
     ]
 
@@ -258,11 +330,19 @@ async def import_attribute_definitions(file: UploadFile):
             data["description"] = normalized_row.get("description", "")
         if "required" in present_columns:
             data["required"] = _parse_required(normalized_row.get("required", ""), row_idx, warnings)
+        if "required_for_types" in present_columns:
+            data["required_for_types"] = _parse_suggested_values(
+                normalized_row.get("required_for_types", "")
+            )
         if "default_value" in present_columns:
             default_value = normalized_row.get("default_value", "")
             data["default_value"] = default_value or None
         if "suggested_values" in present_columns:
             data["suggested_values"] = _parse_suggested_values(normalized_row.get("suggested_values", ""))
+        if "smart_defaults" in present_columns:
+            data["smart_defaults"] = _parse_smart_defaults(
+                normalized_row.get("smart_defaults", ""), row_idx, warnings
+            )
 
         attr = AttributeDefinition(**data)
         if existing:
@@ -322,6 +402,22 @@ def reorder_attribute_definitions(body: ReorderRequest):
     from services.database import load_all_attribute_definitions
     state.attribute_config = load_all_attribute_definitions()
     return {"reordered": len(body.ordered_keys)}
+
+
+@router.post("/definitions/reset")
+def reset_attribute_definitions(body: AttributeResetRequest):
+    """Delete all definitions permanently while preserving assigned values."""
+    if not body.confirm:
+        raise HTTPException(400, "Zum Loeschen aller Attribute muss confirm=true gesetzt sein.")
+    deleted = state.clear_attribute_definitions()
+    if deleted:
+        log_activity("attribute_definitions_reset", f"{deleted} Attributdefinitionen geloescht", deleted)
+    return {
+        "deleted": deleted,
+        "total": len(state.attribute_config),
+        "product_values_preserved": True,
+        "template_values_preserved": True,
+    }
 
 
 @router.put("/definitions/{key}")
