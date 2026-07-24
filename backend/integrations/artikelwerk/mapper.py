@@ -136,10 +136,10 @@ def build_preview(
                     "currency": str(supplier.get("currency") or settings.currency).upper(), "isDefault": True,
                 }
 
-    category_names = [value for value in (
+    category_names = [str(value).strip() for value in (
         product.kategorie_1, product.kategorie_2, product.kategorie_3,
         product.kategorie_4, product.kategorie_5, product.kategorie_6,
-    ) if _present(value)]
+    ) if value is not None and str(value).strip()]
     if settings.publish_categories and category_names:
         if not features.get("categoryWrite", False):
             issues.append(PreviewIssue(severity="error", code="FEATURE_DISABLED", message="Kategorien sind in Artikelwerk nicht freigeschaltet.", field="kategorie_1"))

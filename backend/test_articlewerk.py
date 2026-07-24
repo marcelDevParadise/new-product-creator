@@ -33,6 +33,7 @@ from integrations.artikelwerk.schemas import (
 )
 from models.attribute import AttributeDefinition
 from models.product import Product
+from routers.articlewerk import _resolve_create_references
 from routers import settings as settings_router
 from services import database as database_service
 from services.sqlite_backend import make_pool as make_sqlite_pool
@@ -249,6 +250,60 @@ class MapperTests(unittest.TestCase):
         deletes = [step for step in preview.steps if step.operation == "delete_attribute"]
         self.assertEqual([step.payload["attributeId"] for step in deletes], ["color"])
         self.assertNotIn("external", {step.payload["attributeId"] for step in deletes})
+
+
+class ReferenceResolutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_resolves_the_exact_complete_category_path(self):
+        catalog = {
+            "CleanYourLeather": [
+                {"id": "10", "name": "CleanYourLeather", "parentId": None,
+                 "path": ["CleanYourLeather"]},
+                # SQL views may expose the same category more than once. It is
+                # still one unambiguous category when the stable ID is equal.
+                {"id": "10", "name": "CleanYourLeather", "parentId": None,
+                 "path": ["CleanYourLeather"]},
+            ],
+            "BDSM": [
+                {"id": "20", "name": "BDSM", "parentId": "10",
+                 "path": ["CleanYourLeather", "BDSM"]},
+                {"id": "99", "name": "BDSM", "parentId": "90",
+                 "path": ["Anderer Shop", "BDSM"]},
+            ],
+            "Bondage": [
+                {"id": "30", "name": "Bondage", "parentId": "20",
+                 "path": ["CleanYourLeather", "BDSM", "Bondage"]},
+            ],
+            "Bondage-Seile & Tape": [
+                {"id": "40", "name": "Bondage-Seile & Tape", "parentId": "30",
+                 "path": ["CleanYourLeather", "BDSM", "Bondage", "Bondage-Seile & Tape"]},
+            ],
+        }
+
+        class CategoryClient:
+            async def search_categories(self, search):
+                return {"items": catalog.get(search, [])}
+
+        product = Product(
+            artikelnummer="CYL-00407",
+            artikelname="Test",
+            kategorie_1="CleanYourLeather",
+            kategorie_2="BDSM",
+            kategorie_3="Bondage",
+            kategorie_4="Bondage-Seile & Tape",
+            kategorie_5="   ",
+        )
+        context = {}
+
+        await _resolve_create_references(
+            CategoryClient(), product, context,
+            ArtikelwerkSettings(
+                tenant_ids=[4],
+                publish_manufacturer=False,
+                publish_purchase=False,
+            ),
+        )
+
+        self.assertEqual(context["resolvedCategoryIds"], ["10", "20", "30", "40"])
 
 
 class ImagePayloadTests(unittest.TestCase):

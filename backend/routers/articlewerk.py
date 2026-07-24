@@ -48,6 +48,30 @@ def _reference_id(item: dict, kind: str) -> object | None:
     return item.get("id") if item.get("id") is not None else item.get(f"{kind}Id")
 
 
+def _category_parent_id(item: dict) -> object | None:
+    return item.get("parentId") if "parentId" in item else item.get("parentCategoryId")
+
+
+def _category_path(item: dict) -> tuple[str, ...]:
+    path = item.get("path")
+    if not isinstance(path, list):
+        return ()
+    return tuple(normalized_reference_name(value) for value in path)
+
+
+def _unique_references(items: list[dict], kind: str) -> list[dict]:
+    """Collapse duplicate catalog rows without hiding genuinely ambiguous IDs."""
+    unique: dict[str, dict] = {}
+    without_id: list[dict] = []
+    for item in items:
+        reference_id = _reference_id(item, kind)
+        if reference_id is None:
+            without_id.append(item)
+        else:
+            unique.setdefault(str(reference_id), item)
+    return [*unique.values(), *without_id]
+
+
 async def _resolve_create_references(
     client: ArtikelwerkClient, product, context: dict, settings: ArtikelwerkSettings,
 ) -> None:
@@ -80,24 +104,28 @@ async def _resolve_create_references(
             if len(matches) == 1 and _reference_id(matches[0], "supplier") is not None:
                 context["resolvedSupplier"] = {**matches[0], "id": _reference_id(matches[0], "supplier")}
 
-    category_names = [value for value in (
+    category_names = [str(value).strip() for value in (
         product.kategorie_1, product.kategorie_2, product.kategorie_3,
         product.kategorie_4, product.kategorie_5, product.kategorie_6,
-    ) if value] if settings.publish_categories else []
+    ) if value is not None and str(value).strip()] if settings.publish_categories else []
     resolved_ids: list[object] = []
     parent_id: object | None = None
-    for name in category_names:
-        matches = _exact_named(_items(await client.search_categories(name)), name)
-        if parent_id is None:
-            matches = [
-                item for item in matches
-                if (item.get("parentId") if "parentId" in item else item.get("parentCategoryId")) in (None, 0, "0", "")
-            ]
+    for index, name in enumerate(category_names):
+        matches = _exact_named(
+            _items(await client.search_categories(searchable_reference_name(name))),
+            name,
+        )
+        expected_path = tuple(normalized_reference_name(value) for value in category_names[:index + 1])
+        path_matches = [item for item in matches if _category_path(item) == expected_path]
+        if path_matches:
+            matches = path_matches
+        elif parent_id is None:
+            matches = [item for item in matches if _category_parent_id(item) in (None, 0, "0", "")]
         else:
             matches = [
-                item for item in matches
-                if str(item.get("parentId") if "parentId" in item else item.get("parentCategoryId")) == str(parent_id)
+                item for item in matches if str(_category_parent_id(item)) == str(parent_id)
             ]
+        matches = _unique_references(matches, "category")
         category_id = _reference_id(matches[0], "category") if len(matches) == 1 else None
         if category_id is None:
             break
