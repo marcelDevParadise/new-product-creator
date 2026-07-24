@@ -67,6 +67,8 @@ html_template = r'''<!doctype html>
       --brand: #2563eb;
       --brand-dark: #1d4ed8;
       --ok: #16a34a;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
       --shadow: 0 18px 45px rgba(15, 23, 42, .12);
       --radius: 18px;
     }
@@ -233,6 +235,10 @@ html_template = r'''<!doctype html>
       align-items: start;
     }
 
+    .layout > section {
+      min-width: 0;
+    }
+
     .sidebar {
       position: sticky;
       top: 92px;
@@ -296,6 +302,12 @@ html_template = r'''<!doctype html>
       padding: 22px 24px;
       background: linear-gradient(180deg, #ffffff, #f8fafc);
       border-bottom: 1px solid var(--border);
+    }
+
+    .brand-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .brand-title {
@@ -423,7 +435,7 @@ html_template = r'''<!doctype html>
 
     .actions {
       display: grid;
-      grid-template-columns: 1fr 42px;
+      grid-template-columns: 1fr 42px 42px;
       gap: 8px;
       margin-top: 12px;
     }
@@ -446,6 +458,8 @@ html_template = r'''<!doctype html>
     .copy-main {
       background: var(--brand);
       color: white;
+      font-size: 12px;
+      white-space: nowrap;
     }
 
     .copy-main:hover {
@@ -455,6 +469,153 @@ html_template = r'''<!doctype html>
     .copy-html {
       background: #f1f5f9;
       color: #334155;
+    }
+
+    .icon-button,
+    .token-button {
+      display: inline-grid;
+      place-items: center;
+      min-width: 42px;
+      padding: 0 12px;
+      background: rgba(255,255,255,.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .icon-button svg,
+    .token-button svg {
+      width: 18px;
+      height: 18px;
+      pointer-events: none;
+    }
+
+    .delete-image {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .delete-image:hover,
+    .delete-brand:hover {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .delete-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 40px;
+      background: var(--danger-soft);
+      color: var(--danger);
+      white-space: nowrap;
+    }
+
+    .delete-brand svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    dialog {
+      width: min(460px, calc(100% - 28px));
+      padding: 0;
+      border: 0;
+      border-radius: 22px;
+      color: var(--text);
+      box-shadow: 0 30px 90px rgba(15,23,42,.35);
+    }
+
+    dialog::backdrop {
+      background: rgba(15,23,42,.7);
+      backdrop-filter: blur(5px);
+    }
+
+    .dialog-body {
+      padding: 24px;
+    }
+
+    .dialog-icon {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 16px;
+      border-radius: 15px;
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .dialog-icon svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    dialog h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+
+    dialog p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .dialog-field {
+      display: block;
+      margin-top: 18px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .dialog-field input {
+      height: 44px;
+      margin-top: 7px;
+      padding: 0 13px;
+      border-color: var(--border);
+      background: white;
+      color: var(--text);
+    }
+
+    dialog .token-help {
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 9px;
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+    }
+
+    .dialog-cancel {
+      background: white;
+      color: #334155;
+      border: 1px solid var(--border);
+    }
+
+    .dialog-confirm {
+      background: var(--danger);
+      color: white;
+    }
+
+    .dialog-confirm:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    .dialog-save {
+      background: var(--brand);
+      color: white;
+    }
+
+    .busy {
+      opacity: .55;
+      pointer-events: none;
     }
 
     button.done {
@@ -502,15 +663,644 @@ html_template = r'''<!doctype html>
       opacity: 1;
     }
 
+    /* Application shell */
+    body {
+      background: #f4f6fa;
+      color: var(--text);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .app-sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 22px 16px;
+      background: #111827;
+      color: white;
+      border-right: 1px solid rgba(255,255,255,.07);
+    }
+
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 8px 26px;
+    }
+
+    .app-brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #60a5fa, #2563eb);
+      box-shadow: 0 10px 24px rgba(37,99,235,.34);
+    }
+
+    .app-brand-mark svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .app-brand strong,
+    .app-brand span {
+      display: block;
+    }
+
+    .app-brand strong {
+      font-size: 15px;
+    }
+
+    .app-brand span {
+      margin-top: 2px;
+      color: #94a3b8;
+      font-size: 11px;
+    }
+
+    .app-nav {
+      display: grid;
+      gap: 5px;
+    }
+
+    .app-nav-link {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 11px 12px;
+      border-radius: 11px;
+      color: #aeb9ca;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 700;
+      transition: .16s ease;
+    }
+
+    .app-nav-link svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .app-nav-link:hover {
+      color: white;
+      background: rgba(255,255,255,.06);
+    }
+
+    .app-nav-link.active {
+      color: white;
+      background: rgba(37,99,235,.2);
+      box-shadow: inset 3px 0 #60a5fa;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+
+    .sidebar-token {
+      width: 100%;
+      display: flex;
+      justify-content: flex-start;
+      gap: 10px;
+      color: #cbd5e1;
+    }
+
+    .app-main {
+      min-width: 0;
+      padding: 34px clamp(20px, 4vw, 54px) 60px;
+    }
+
+    .view {
+      display: none;
+      width: min(1480px, 100%);
+      margin: 0 auto;
+    }
+
+    .view.active {
+      display: block;
+      animation: view-in .2s ease;
+    }
+
+    @keyframes view-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 26px;
+    }
+
+    .page-kicker {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .page-head h1 {
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(30px, 4vw, 43px);
+      line-height: 1.05;
+      letter-spacing: -.045em;
+    }
+
+    .page-head p {
+      max-width: 680px;
+      margin: 9px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .stats {
+      min-width: 0;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-bottom: 22px;
+    }
+
+    .stat {
+      position: relative;
+      overflow: hidden;
+      min-height: 132px;
+      padding: 22px;
+      color: var(--text);
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+    }
+
+    .stat::after {
+      content: "";
+      position: absolute;
+      right: -24px;
+      bottom: -34px;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: #eff6ff;
+    }
+
+    .stat strong {
+      position: relative;
+      z-index: 1;
+      font-size: 36px;
+    }
+
+    .stat span {
+      position: relative;
+      z-index: 1;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr);
+      gap: 20px;
+    }
+
+    .panel {
+      overflow: hidden;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      padding: 19px 21px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 17px;
+      letter-spacing: -.02em;
+    }
+
+    .text-link {
+      color: var(--brand);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .recent-list {
+      display: grid;
+    }
+
+    .recent-list > .empty {
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .recent-row {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr) auto;
+      gap: 13px;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .recent-row:last-child {
+      border-bottom: 0;
+    }
+
+    .recent-thumb {
+      width: 54px;
+      height: 48px;
+      object-fit: contain;
+      border-radius: 9px;
+      background: #f8fafc;
+      border: 1px solid #eef2f7;
+    }
+
+    .recent-name {
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .recent-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .recent-date {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .brand-summary-list {
+      display: grid;
+      padding: 8px;
+    }
+
+    .brand-summary {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      gap: 11px;
+      align-items: center;
+      padding: 10px 11px;
+      border-radius: 11px;
+      cursor: pointer;
+    }
+
+    .brand-summary:hover {
+      background: #f8fafc;
+    }
+
+    .mini-badge {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 11px;
+      background: #eff6ff;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .brand-summary strong,
+    .brand-summary span {
+      display: block;
+    }
+
+    .brand-summary strong {
+      overflow: hidden;
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .brand-summary span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .count-pill {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .toolbar {
+      position: static;
+      margin: 0 0 18px;
+      background: white;
+      border-color: var(--border);
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+      backdrop-filter: none;
+    }
+
+    .library-results-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 13px;
+    }
+
+    .library-results-head strong {
+      display: block;
+      font-size: 16px;
+      letter-spacing: -.015em;
+    }
+
+    .library-results-head span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .reset-filter {
+      min-height: 36px;
+      color: #475569;
+      background: white;
+      border: 1px solid var(--border);
+    }
+
+    .reset-filter[hidden] {
+      display: none;
+    }
+
+    .product-nav {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      padding: 5px;
+      overflow-x: auto;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      box-shadow: 0 5px 18px rgba(15,23,42,.035);
+      scrollbar-width: thin;
+    }
+
+    .product-nav-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 36px;
+      flex: 0 0 auto;
+      padding: 0 12px;
+      color: #64748b;
+      background: transparent;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .product-nav-button:hover {
+      color: #1e293b;
+      background: #f8fafc;
+    }
+
+    .product-nav-button.active {
+      color: white;
+      background: var(--brand);
+      box-shadow: 0 5px 14px rgba(37,99,235,.23);
+    }
+
+    .product-nav-count {
+      min-width: 20px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      color: #64748b;
+      background: #f1f5f9;
+      font-size: 10px;
+      text-align: center;
+    }
+
+    .product-nav-button.active .product-nav-count {
+      color: #1d4ed8;
+      background: white;
+    }
+
+    .toolbar input,
+    .toolbar select {
+      color: var(--text);
+      background: #f8fafc;
+      border-color: var(--border);
+    }
+
+    .toolbar .token-button {
+      display: none;
+    }
+
+    .layout {
+      grid-template-columns: 230px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      top: 20px;
+      color: var(--text);
+      background: white;
+      border-color: var(--border);
+      box-shadow: 0 8px 25px rgba(15,23,42,.045);
+    }
+
+    .sidebar-title {
+      color: var(--muted);
+    }
+
+    .nav-link {
+      width: 100%;
+      color: #475569;
+      background: transparent;
+      text-align: left;
+    }
+
+    .nav-link:hover {
+      background: #f1f5f9;
+    }
+
+    .nav-link.active {
+      color: #1d4ed8;
+      background: #eff6ff;
+    }
+
+    .nav-link span:last-child {
+      color: #94a3b8;
+    }
+
+    .brand-section {
+      box-shadow: 0 8px 25px rgba(15,23,42,.05);
+    }
+
+    .library-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 15px;
+    }
+
+    .library-grid .card {
+      min-width: 0;
+    }
+
+    .library-grid > .empty {
+      grid-column: 1 / -1;
+      box-shadow: none;
+      border: 1px solid var(--border);
+    }
+
+    .card-taxonomy {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 9px;
+    }
+
+    .taxonomy-chip {
+      max-width: 100%;
+      overflow: hidden;
+      padding: 4px 7px;
+      border-radius: 7px;
+      color: #475569;
+      background: #f1f5f9;
+      font-size: 10px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .taxonomy-chip.brand-chip {
+      color: #1d4ed8;
+      background: #eff6ff;
+    }
+
+    .brands-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+      gap: 16px;
+    }
+
+    .brand-manage-card {
+      padding: 20px;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 17px;
+      box-shadow: 0 8px 25px rgba(15,23,42,.04);
+      transition: .16s ease;
+    }
+
+    .brand-manage-card:hover {
+      transform: translateY(-2px);
+      border-color: #bfdbfe;
+      box-shadow: 0 12px 30px rgba(15,23,42,.08);
+    }
+
+    .brand-manage-top {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+    }
+
+    .brand-manage-top .brand-badge {
+      width: 46px;
+      height: 46px;
+    }
+
+    .brand-manage-top h2 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .brand-manage-top p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .brand-manage-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 18px 0;
+    }
+
+    .brand-manage-stat {
+      padding: 11px;
+      border-radius: 11px;
+      background: #f8fafc;
+    }
+
+    .brand-manage-stat strong,
+    .brand-manage-stat span {
+      display: block;
+    }
+
+    .brand-manage-stat strong {
+      font-size: 19px;
+    }
+
+    .brand-manage-stat span {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .brand-manage-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .view-brand {
+      background: #eff6ff;
+      color: var(--brand);
+    }
+
+    @media (max-width: 1280px) {
+      .library-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
     @media (max-width: 980px) {
-      .hero,
       .layout,
       .toolbar {
         grid-template-columns: 1fr;
       }
 
-      .stats {
-        min-width: 0;
+      .dashboard-grid {
+        grid-template-columns: 1fr;
       }
 
       .sidebar {
@@ -519,19 +1309,84 @@ html_template = r'''<!doctype html>
       }
     }
 
+    @media (max-width: 760px) {
+      .app-shell {
+        display: block;
+      }
+
+      .app-sidebar {
+        position: sticky;
+        z-index: 50;
+        height: auto;
+        flex-direction: row;
+        align-items: center;
+        padding: 10px 12px;
+      }
+
+      .app-brand {
+        padding: 0 10px 0 0;
+      }
+
+      .app-brand > div:last-child,
+      .sidebar-token span {
+        display: none;
+      }
+
+      .app-nav {
+        display: flex;
+        flex: 1;
+        justify-content: center;
+      }
+
+      .app-nav-link {
+        padding: 10px;
+      }
+
+      .app-nav-link span {
+        display: none;
+      }
+
+      .app-nav-link.active {
+        box-shadow: inset 0 -3px #60a5fa;
+      }
+
+      .sidebar-footer {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      .sidebar-token {
+        width: 42px;
+        justify-content: center;
+      }
+
+      .app-main {
+        padding: 25px 15px 45px;
+      }
+
+      .library-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
     @media (max-width: 640px) {
-      .shell {
-        width: min(100% - 20px, 1440px);
-        padding-top: 10px;
-      }
-
-      .hero {
-        padding: 20px;
-        border-radius: 22px;
-      }
-
       .stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .stat {
+        min-height: 102px;
+        padding: 15px 12px;
+      }
+
+      .stat strong {
+        font-size: 27px;
+      }
+
+      .page-head {
+        margin-bottom: 20px;
       }
 
       .brand-head,
@@ -540,70 +1395,219 @@ html_template = r'''<!doctype html>
         padding-right: 16px;
       }
 
+      .brand-head {
+        align-items: flex-start;
+      }
+
+      .delete-brand span {
+        display: none;
+      }
+
       .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .library-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .recent-date {
+        display: none;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .library-grid {
         grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <header class="hero">
-      <div>
-        <div class="eyebrow">Private Tailnet Image Library</div>
-        <h1>Image Hosting</h1>
-        <p class="subtitle">
-          Bilder per Upload-API nach <code>/srv/images</code> schieben. Diese Übersicht gruppiert automatisch nach Marke und Produkt und erzeugt kopierbare URLs.
-        </p>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="app-brand">
+        <div class="app-brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+            <circle cx="9" cy="9" r="2"></circle>
+            <path d="m21 15-5-5L5 21"></path>
+          </svg>
+        </div>
+        <div>
+          <strong>Image Library</strong>
+          <span>Attribut Generator</span>
+        </div>
       </div>
 
-      <div class="stats">
-        <div class="stat">
-          <strong id="statImages">0</strong>
-          <span>Bilder</span>
-        </div>
-        <div class="stat">
-          <strong id="statBrands">0</strong>
+      <nav class="app-nav" aria-label="Hauptnavigation">
+        <a class="app-nav-link" href="#/overview" data-route="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </svg>
+          <span>Übersicht</span>
+        </a>
+        <a class="app-nav-link" href="#/library" data-route="library">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+            <circle cx="9" cy="9" r="2"></circle>
+            <path d="m21 15-5-5L5 21"></path>
+          </svg>
+          <span>Bibliothek</span>
+        </a>
+        <a class="app-nav-link" href="#/brands" data-route="brands">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 13 11 22l-9-9V4a2 2 0 0 1 2-2h9l7 7a3 3 0 0 1 0 4Z"></path>
+            <circle cx="7.5" cy="7.5" r="1.5"></circle>
+          </svg>
           <span>Marken</span>
-        </div>
-        <div class="stat">
-          <strong id="statProducts">0</strong>
-          <span>Produkte</span>
-        </div>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="tokenButton" class="token-button sidebar-token" type="button" title="API-Token verwalten">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="7.5" cy="15.5" r="5.5"></circle>
+            <path d="m21 2-9.6 9.6M15 8l2 2m1-5 2 2"></path>
+          </svg>
+          <span>Lösch-Token verwalten</span>
+        </button>
       </div>
-    </header>
+    </aside>
 
-    <section class="toolbar" aria-label="Filter">
-      <label class="field">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <path d="m21 21-4.35-4.35"></path>
-        </svg>
-        <input id="search" type="search" placeholder="Suchen: Marke, Produkt, Dateiname ..." autocomplete="off">
-      </label>
+    <main class="app-main">
+      <section id="view-overview" class="view">
+        <header class="page-head">
+          <div>
+            <span class="page-kicker">Bildverwaltung</span>
+            <h1>Alles im Blick.</h1>
+            <p>Alle Bilder, Marken und Produktgruppen an einem Ort. Zuletzt geänderte Dateien und die größten Marken siehst du direkt hier.</p>
+          </div>
+        </header>
 
-      <select id="brandFilter" aria-label="Marke filtern">
-        <option value="">Alle Marken</option>
-      </select>
+        <div class="stats">
+          <div class="stat"><strong id="statImages">0</strong><span>Bilder insgesamt</span></div>
+          <div class="stat"><strong id="statBrands">0</strong><span>Marken</span></div>
+          <div class="stat"><strong id="statProducts">0</strong><span>Produktgruppen</span></div>
+        </div>
 
-      <select id="sortMode" aria-label="Sortierung">
-        <option value="path">Nach Pfad</option>
-        <option value="newest">Neueste zuerst</option>
-        <option value="name">Dateiname A–Z</option>
-      </select>
-    </section>
+        <div class="dashboard-grid">
+          <section class="panel">
+            <header class="panel-head">
+              <h2>Zuletzt geändert</h2>
+              <a class="text-link" href="#/library">Alle Bilder</a>
+            </header>
+            <div id="recentImages" class="recent-list"></div>
+          </section>
+          <section class="panel">
+            <header class="panel-head">
+              <h2>Größte Marken</h2>
+              <a class="text-link" href="#/brands">Verwalten</a>
+            </header>
+            <div id="dashboardBrands" class="brand-summary-list"></div>
+          </section>
+        </div>
+      </section>
 
-    <main class="layout">
-      <aside class="sidebar">
-        <p class="sidebar-title">Marken</p>
-        <nav id="brandNav"></nav>
-      </aside>
+      <section id="view-library" class="view">
+        <header class="page-head">
+          <div>
+            <span class="page-kicker">Bibliothek</span>
+            <h1>Alle Bilder</h1>
+            <p>Durchsuche deine Dateien, kopiere URLs oder entferne nicht mehr benötigte Motive.</p>
+          </div>
+        </header>
 
-      <section id="content" class="content"></section>
+        <section class="toolbar" aria-label="Filter">
+          <label class="field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="m21 21-4.35-4.35"></path>
+            </svg>
+            <input id="search" type="search" placeholder="Marke, Produkt oder Dateiname suchen ..." autocomplete="off">
+          </label>
+          <select id="brandFilter" aria-label="Marke filtern"><option value="">Alle Marken</option></select>
+          <select id="sortMode" aria-label="Sortierung">
+            <option value="path">Nach Pfad</option>
+            <option value="newest">Neueste zuerst</option>
+            <option value="name">Dateiname A–Z</option>
+          </select>
+        </section>
+
+        <div class="layout">
+          <aside class="sidebar">
+            <p class="sidebar-title">Schnellzugriff</p>
+            <nav id="brandNav"></nav>
+          </aside>
+          <section>
+            <div class="library-results-head">
+              <div>
+                <strong id="libraryContext">Alle Bilder</strong>
+                <span id="libraryCount">0 Bilder</span>
+              </div>
+              <button id="resetFilters" class="reset-filter" type="button" hidden>Filter zurücksetzen</button>
+            </div>
+            <nav id="productNav" class="product-nav" aria-label="Produktgruppen"></nav>
+            <div id="content" class="library-grid"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="view-brands" class="view">
+        <header class="page-head">
+          <div>
+            <span class="page-kicker">Verwaltung</span>
+            <h1>Marken</h1>
+            <p>Prüfe den Umfang jeder Marke, öffne ihre Bilder oder entferne eine Marke vollständig.</p>
+          </div>
+        </header>
+        <div id="brandsContent" class="brands-grid"></div>
+      </section>
     </main>
   </div>
 
   <div id="toast" class="toast">Kopiert</div>
+
+  <dialog id="confirmDialog">
+    <div class="dialog-body">
+      <div class="dialog-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+        </svg>
+      </div>
+      <h2 id="confirmTitle">Wirklich löschen?</h2>
+      <p id="confirmMessage"></p>
+      <label id="confirmField" class="dialog-field" hidden>
+        Zur Bestätigung eingeben: <strong id="confirmExpected"></strong>
+        <input id="confirmInput" type="text" autocomplete="off">
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button id="confirmCancel" class="dialog-cancel" type="button">Abbrechen</button>
+      <button id="confirmDelete" class="dialog-confirm" type="button">Löschen</button>
+    </div>
+  </dialog>
+
+  <dialog id="tokenDialog">
+    <form id="tokenForm">
+      <div class="dialog-body">
+        <h2>Token für Bildverwaltung</h2>
+        <p>Benötigt wird der Wert von <code>IMAGE_UPLOAD_TOKEN</code> aus <code>backend/.env</code> auf dem Raspberry Pi. Das ist nicht der Artikelwerk-API-Key.</p>
+        <label class="dialog-field">
+          IMAGE_UPLOAD_TOKEN
+          <input id="tokenInput" type="password" autocomplete="off" placeholder="Token vom Raspberry Pi einfügen" required>
+        </label>
+        <p class="token-help">Der Token bleibt nur in dieser Browser-Sitzung gespeichert.</p>
+      </div>
+      <div class="dialog-actions">
+        <button id="tokenCancel" class="dialog-cancel" type="button">Abbrechen</button>
+        <button class="dialog-save" type="submit">Token speichern</button>
+      </div>
+    </form>
+  </dialog>
 
   <script>
     const IMAGES = __IMAGES_JSON__;
@@ -614,15 +1618,36 @@ html_template = r'''<!doctype html>
       brandFilter: document.querySelector("#brandFilter"),
       sortMode: document.querySelector("#sortMode"),
       brandNav: document.querySelector("#brandNav"),
+      productNav: document.querySelector("#productNav"),
+      libraryContext: document.querySelector("#libraryContext"),
+      libraryCount: document.querySelector("#libraryCount"),
+      resetFilters: document.querySelector("#resetFilters"),
       statImages: document.querySelector("#statImages"),
       statBrands: document.querySelector("#statBrands"),
       statProducts: document.querySelector("#statProducts"),
+      recentImages: document.querySelector("#recentImages"),
+      dashboardBrands: document.querySelector("#dashboardBrands"),
+      brandsContent: document.querySelector("#brandsContent"),
       toast: document.querySelector("#toast"),
+      tokenButton: document.querySelector("#tokenButton"),
+      tokenDialog: document.querySelector("#tokenDialog"),
+      tokenForm: document.querySelector("#tokenForm"),
+      tokenInput: document.querySelector("#tokenInput"),
+      tokenCancel: document.querySelector("#tokenCancel"),
+      confirmDialog: document.querySelector("#confirmDialog"),
+      confirmTitle: document.querySelector("#confirmTitle"),
+      confirmMessage: document.querySelector("#confirmMessage"),
+      confirmField: document.querySelector("#confirmField"),
+      confirmExpected: document.querySelector("#confirmExpected"),
+      confirmInput: document.querySelector("#confirmInput"),
+      confirmCancel: document.querySelector("#confirmCancel"),
+      confirmDelete: document.querySelector("#confirmDelete"),
     };
 
     const fmtBytes = new Intl.NumberFormat("de-DE", {
       maximumFractionDigits: 1,
     });
+    let activeProduct = "";
 
     function escapeAttr(value) {
       return String(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -674,6 +1699,129 @@ html_template = r'''<!doctype html>
       setTimeout(() => els.toast.classList.remove("show"), 1200);
     }
 
+    let tokenResolver = null;
+    let confirmResolver = null;
+
+    function requestToken() {
+      const saved = sessionStorage.getItem("imageApiToken");
+      if (saved) return Promise.resolve(saved);
+
+      els.tokenInput.value = "";
+      els.tokenDialog.showModal();
+      setTimeout(() => els.tokenInput.focus(), 0);
+      return new Promise(resolve => {
+        tokenResolver = resolve;
+      });
+    }
+
+    function finishToken(value) {
+      if (value) sessionStorage.setItem("imageApiToken", value);
+      els.tokenDialog.close();
+      tokenResolver?.(value || null);
+      tokenResolver = null;
+    }
+
+    function askConfirmation({ title, message, expected = "" }) {
+      els.confirmTitle.textContent = title;
+      els.confirmMessage.textContent = message;
+      els.confirmExpected.textContent = expected;
+      els.confirmInput.value = "";
+      els.confirmField.hidden = !expected;
+      els.confirmDelete.disabled = Boolean(expected);
+      els.confirmDialog.showModal();
+      if (expected) setTimeout(() => els.confirmInput.focus(), 0);
+
+      return new Promise(resolve => {
+        confirmResolver = resolve;
+      });
+    }
+
+    function finishConfirmation(confirmed) {
+      els.confirmDialog.close();
+      confirmResolver?.(confirmed);
+      confirmResolver = null;
+    }
+
+    async function apiDelete(endpoint) {
+      const token = await requestToken();
+      if (!token) return null;
+
+      const response = await fetch(endpoint, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json",
+        },
+      });
+
+      let body = {};
+      try {
+        body = await response.json();
+      } catch (_) {
+        // A proxy error may not return JSON.
+      }
+
+      if (!response.ok) {
+        if (response.status === 401) sessionStorage.removeItem("imageApiToken");
+        throw new Error(body.detail || `Löschen fehlgeschlagen (${response.status})`);
+      }
+      return body;
+    }
+
+    async function deleteImage(path, button) {
+      const item = IMAGES.find(row => row.path === path);
+      if (!item) return;
+      const confirmed = await askConfirmation({
+        title: "Bild löschen?",
+        message: `„${item.file}“ wird dauerhaft aus der Bildbibliothek entfernt.`,
+      });
+      if (!confirmed) return;
+
+      button.closest(".card")?.classList.add("busy");
+      try {
+        const result = await apiDelete(`/api/images/file?path=${encodeURIComponent(path)}`);
+        if (!result) {
+          button.closest(".card")?.classList.remove("busy");
+          return;
+        }
+        const index = IMAGES.findIndex(row => row.path === path);
+        if (index >= 0) IMAGES.splice(index, 1);
+        setupFilters();
+        renderAll();
+        showToast("Bild gelöscht");
+      } catch (error) {
+        button.closest(".card")?.classList.remove("busy");
+        showToast(error.message);
+      }
+    }
+
+    async function deleteBrand(brand, label, count, button) {
+      const confirmed = await askConfirmation({
+        title: `${label} löschen?`,
+        message: `Die Marke und alle ${count} zugehörigen Bilder werden dauerhaft entfernt. Dieser Vorgang kann nicht rückgängig gemacht werden.`,
+        expected: label,
+      });
+      if (!confirmed) return;
+
+      button.closest(".brand-section, .brand-manage-card")?.classList.add("busy");
+      try {
+        const result = await apiDelete(`/api/images/brand/${encodeURIComponent(brand)}`);
+        if (!result) {
+          button.closest(".brand-section, .brand-manage-card")?.classList.remove("busy");
+          return;
+        }
+        for (let index = IMAGES.length - 1; index >= 0; index--) {
+          if (IMAGES[index].brand === brand) IMAGES.splice(index, 1);
+        }
+        setupFilters();
+        renderAll();
+        showToast(`${result.images} Bilder gelöscht`);
+      } catch (error) {
+        button.closest(".brand-section, .brand-manage-card")?.classList.remove("busy");
+        showToast(error.message);
+      }
+    }
+
     function slug(value) {
       return value.toLowerCase().replace(/[^a-z0-9äöüß-]+/gi, "-");
     }
@@ -694,7 +1842,9 @@ html_template = r'''<!doctype html>
 
       let result = IMAGES.filter(item => {
         const haystack = `${item.path} ${item.brandLabel} ${item.productLabel} ${item.file}`.toLowerCase();
-        return (!brand || item.brand === brand) && (!q || haystack.includes(q));
+        return (!brand || item.brand === brand)
+          && (!activeProduct || item.product === activeProduct)
+          && (!q || haystack.includes(q));
       });
 
       result = result.toSorted((a, b) => {
@@ -707,16 +1857,59 @@ html_template = r'''<!doctype html>
     }
 
     function setupFilters() {
+      const selected = els.brandFilter.value;
       const brands = Object.values(groupBy(IMAGES, "brand"))
         .map(items => items[0])
         .toSorted((a, b) => a.brandLabel.localeCompare(b.brandLabel, "de"));
 
+      els.brandFilter.innerHTML = `<option value="">Alle Marken</option>`;
       for (const item of brands) {
         const option = document.createElement("option");
         option.value = item.brand;
         option.textContent = item.brandLabel;
         els.brandFilter.appendChild(option);
       }
+      if (brands.some(item => item.brand === selected)) {
+        els.brandFilter.value = selected;
+      }
+      setupProductNavigation();
+    }
+
+    function setupProductNavigation() {
+      const brand = els.brandFilter.value;
+      const products = Object.entries(groupBy(
+        IMAGES.filter(item => !brand || item.brand === brand),
+        "product",
+      ))
+        .toSorted(([, a], [, b]) => a[0].productLabel.localeCompare(b[0].productLabel, "de"));
+
+      if (!products.some(([product]) => product === activeProduct)) {
+        activeProduct = "";
+      }
+
+      const total = products.reduce((sum, [, rows]) => sum + rows.length, 0);
+      els.productNav.innerHTML = `
+        <button class="product-nav-button ${activeProduct ? "" : "active"}" type="button" onclick='setProductFilter("")'>
+          Alle
+          <span class="product-nav-count">${total}</span>
+        </button>
+      ` + products.map(([product, rows]) => `
+        <button class="product-nav-button ${activeProduct === product ? "active" : ""}" type="button" onclick='setProductFilter(${jsString(product)})'>
+          ${escapeText(rows[0].productLabel)}
+          <span class="product-nav-count">${rows.length}</span>
+        </button>
+      `).join("");
+    }
+
+    function setProductFilter(product = "") {
+      activeProduct = product;
+      render();
+    }
+
+    function setBrandFilter(brand = "") {
+      els.brandFilter.value = brand;
+      activeProduct = "";
+      render();
     }
 
     function renderStats(items) {
@@ -728,97 +1921,233 @@ html_template = r'''<!doctype html>
       els.statProducts.textContent = products.size;
     }
 
-    function renderNav(items) {
-      const brands = groupBy(items, "brand");
+    function openLibrary(brand = "") {
+      setBrandFilter(brand);
+      location.hash = "#/library";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function renderDashboard() {
+      renderStats(IMAGES);
+
+      const newest = IMAGES.toSorted((a, b) => b.modified.localeCompare(a.modified)).slice(0, 7);
+      els.recentImages.innerHTML = newest.map(item => `
+        <div class="recent-row">
+          <img class="recent-thumb" src="${escapeAttr(item.path)}" loading="lazy" alt="">
+          <div>
+            <div class="recent-name">${escapeText(item.file)}</div>
+            <div class="recent-meta">${escapeText(item.brandLabel)} · ${escapeText(item.productLabel)}</div>
+          </div>
+          <span class="recent-date">${escapeText(item.modified)}</span>
+        </div>
+      `).join("") || `
+        <div class="empty">
+          <h2>Noch keine Bilder</h2>
+          <p>Nach dem ersten Upload erscheinen die neuesten Dateien hier.</p>
+        </div>
+      `;
+
+      const brands = Object.entries(groupBy(IMAGES, "brand"))
+        .toSorted(([, a], [, b]) => b.length - a.length)
+        .slice(0, 8);
+      els.dashboardBrands.innerHTML = brands.map(([brand, rows]) => `
+        <div class="brand-summary" role="button" tabindex="0" onclick='openLibrary(${jsString(brand)})' onkeydown='if(event.key === "Enter") openLibrary(${jsString(brand)})'>
+          <div class="mini-badge">${escapeText(rows[0].brandLabel.slice(0, 2))}</div>
+          <div>
+            <strong>${escapeText(rows[0].brandLabel)}</strong>
+            <span>${new Set(rows.map(item => item.product)).size} Produktgruppen</span>
+          </div>
+          <span class="count-pill">${rows.length}</span>
+        </div>
+      `).join("") || `<div class="brand-summary"><span>Keine Marken vorhanden</span></div>`;
+    }
+
+    function renderBrands() {
+      const brands = Object.entries(groupBy(IMAGES, "brand"))
+        .toSorted(([, a], [, b]) => a[0].brandLabel.localeCompare(b[0].brandLabel, "de"));
+
+      els.brandsContent.innerHTML = brands.map(([brand, rows]) => {
+        const productCount = new Set(rows.map(item => item.product)).size;
+        const totalSize = rows.reduce((sum, item) => sum + item.size, 0);
+        return `
+          <article class="brand-manage-card">
+            <div class="brand-manage-top">
+              <div class="brand-badge">${escapeText(rows[0].brandLabel.slice(0, 2))}</div>
+              <div>
+                <h2>${escapeText(rows[0].brandLabel)}</h2>
+                <p>${escapeText(brand)}</p>
+              </div>
+            </div>
+            <div class="brand-manage-stats">
+              <div class="brand-manage-stat"><strong>${rows.length}</strong><span>Bilder</span></div>
+              <div class="brand-manage-stat"><strong>${productCount}</strong><span>Produkte</span></div>
+              <div class="brand-manage-stat"><strong>${fileSize(totalSize)}</strong><span>Speicher</span></div>
+            </div>
+            <div class="brand-manage-actions">
+              <button class="view-brand" type="button" onclick='openLibrary(${jsString(brand)})'>Bilder ansehen</button>
+              <button class="delete-image" type="button" title="Marke löschen" aria-label="${escapeAttr(rows[0].brandLabel)} löschen" onclick='deleteBrand(${jsString(brand)}, ${jsString(rows[0].brandLabel)}, ${rows.length}, this)'>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+                </svg>
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("") || `
+        <div class="empty">
+          <h2>Keine Marken vorhanden</h2>
+          <p>Marken werden beim Hochladen automatisch angelegt.</p>
+        </div>
+      `;
+    }
+
+    function renderNav() {
+      const brands = groupBy(IMAGES, "brand");
       const entries = Object.entries(brands).toSorted(([, a], [, b]) =>
         a[0].brandLabel.localeCompare(b[0].brandLabel, "de")
       );
 
-      els.brandNav.innerHTML = entries.map(([brand, rows]) => `
-        <a class="nav-link" href="#brand-${slug(brand)}">
+      els.brandNav.innerHTML = `
+        <button class="nav-link ${els.brandFilter.value ? "" : "active"}" type="button" onclick='setBrandFilter("")'>
+          <span>Alle Bilder</span>
+          <span>${IMAGES.length}</span>
+        </button>
+      ` + entries.map(([brand, rows]) => `
+        <button class="nav-link ${els.brandFilter.value === brand ? "active" : ""}" type="button" onclick='setBrandFilter(${jsString(brand)})'>
           <span>${escapeText(rows[0].brandLabel)}</span>
           <span>${rows.length}</span>
-        </a>
-      `).join("") || `<div class="nav-link"><span>Keine Treffer</span><span>0</span></div>`;
+        </button>
+      `).join("");
     }
 
     function render() {
       const items = getFilteredItems();
-      renderStats(items);
-      renderNav(items);
+      renderNav();
+
+      const selectedBrand = IMAGES.find(item => item.brand === els.brandFilter.value);
+      setupProductNavigation();
+      const selectedProduct = IMAGES.find(item =>
+        item.product === activeProduct
+        && (!els.brandFilter.value || item.brand === els.brandFilter.value)
+      );
+      const context = [
+        selectedBrand?.brandLabel,
+        selectedProduct?.productLabel,
+      ].filter(Boolean);
+      els.libraryContext.textContent = context.join(" / ") || "Alle Bilder";
+      els.libraryCount.textContent = `${items.length} Bild${items.length === 1 ? "" : "er"}`;
+      els.resetFilters.hidden = !(
+        els.search.value.trim()
+        || els.brandFilter.value
+        || activeProduct
+      );
 
       if (!items.length) {
         els.content.innerHTML = `
           <div class="empty">
             <h2>Keine Bilder gefunden</h2>
-            <p>Prüfe den Suchbegriff oder lade Bilder per API nach <code>/srv/images</code> hoch.</p>
+            <p>Ändere die Filter oder setze die Suche zurück.</p>
           </div>
         `;
         return;
       }
 
-      const brands = groupBy(items, "brand");
+      els.content.innerHTML = items.map(item => `
+        <article class="card">
+          <a class="preview" href="${escapeAttr(item.path)}" target="_blank" title="Original öffnen">
+            <img src="${escapeAttr(item.path)}" loading="lazy" alt="${escapeAttr(item.file)}">
+          </a>
+          <div class="meta">
+            <div class="card-taxonomy">
+              <span class="taxonomy-chip brand-chip">${escapeText(item.brandLabel)}</span>
+              <span class="taxonomy-chip">${escapeText(item.productLabel)}</span>
+            </div>
+            <div class="file" title="${escapeAttr(item.file)}">${escapeText(item.file)}</div>
+            <div class="path">${fileSize(item.size)} · ${escapeText(item.modified)}</div>
+            <div class="actions">
+              <button class="copy-main" type="button" onclick='copyText(urlFor(${jsString(item.path)}), this, "URL kopiert")'>URL kopieren</button>
+              <button class="copy-html" type="button" title="HTML img-Tag kopieren" onclick='copyText(htmlImgFor(${jsString(item.path)}, ${jsString(item.file)}), this, "HTML")'>&lt;/&gt;</button>
+              <button class="delete-image" type="button" title="Bild löschen" aria-label="${escapeAttr(item.file)} löschen" onclick='deleteImage(${jsString(item.path)}, this)'>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 6h18M8 6V4h8v2m-9 0 1 15h8l1-15M10 11v5m4-5v5"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+      `).join("");
+    }
 
-      els.content.innerHTML = Object.entries(brands)
-        .toSorted(([, a], [, b]) => a[0].brandLabel.localeCompare(b[0].brandLabel, "de"))
-        .map(([brand, brandItems]) => {
-          const products = groupBy(brandItems, "product");
+    function renderAll() {
+      render();
+      renderDashboard();
+      renderBrands();
+    }
 
-          const productHtml = Object.entries(products)
-            .toSorted(([, a], [, b]) => a[0].productLabel.localeCompare(b[0].productLabel, "de"))
-            .map(([product, productItems]) => `
-              <section class="product-section">
-                <div class="product-head">
-                  <h3>${escapeText(productItems[0].productLabel)}</h3>
-                  <span>${productItems.length} Bild${productItems.length === 1 ? "" : "er"}</span>
-                </div>
+    function currentRoute() {
+      const route = location.hash.replace(/^#\//, "");
+      return ["overview", "library", "brands"].includes(route) ? route : "overview";
+    }
 
-                <div class="grid">
-                  ${productItems.map(item => `
-                    <article class="card">
-                      <a class="preview" href="${escapeAttr(item.path)}" target="_blank" title="Original öffnen">
-                        <img src="${escapeAttr(item.path)}" loading="lazy" alt="${escapeAttr(item.file)}">
-                      </a>
-
-                      <div class="meta">
-                        <div class="file">${escapeText(item.file)}</div>
-                        <div class="path">${escapeText(item.path)}</div>
-                        <div class="path">${fileSize(item.size)} · geändert: ${escapeText(item.modified)}</div>
-
-                        <div class="actions">
-                          <button class="copy-main" type="button" onclick='copyText(urlFor(${jsString(item.path)}), this, "URL kopiert")'>URL kopieren</button>
-                          <button class="copy-html" type="button" title="HTML img-Tag kopieren" onclick='copyText(htmlImgFor(${jsString(item.path)}, ${jsString(item.file)}), this, "HTML")'>&lt;/&gt;</button>
-                        </div>
-                      </div>
-                    </article>
-                  `).join("")}
-                </div>
-              </section>
-            `).join("");
-
-          return `
-            <section class="brand-section" id="brand-${slug(brand)}">
-              <header class="brand-head">
-                <div class="brand-title">
-                  <div class="brand-badge">${escapeText(brandItems[0].brandLabel.slice(0, 2))}</div>
-                  <div>
-                    <h2>${escapeText(brandItems[0].brandLabel)}</h2>
-                    <p>${new Set(brandItems.map(item => item.product)).size} Produkte · ${brandItems.length} Bilder</p>
-                  </div>
-                </div>
-              </header>
-              ${productHtml}
-            </section>
-          `;
-        }).join("");
+    function renderRoute() {
+      const route = currentRoute();
+      document.querySelectorAll(".view").forEach(view => {
+        view.classList.toggle("active", view.id === `view-${route}`);
+      });
+      document.querySelectorAll(".app-nav-link").forEach(link => {
+        link.classList.toggle("active", link.dataset.route === route);
+      });
+      document.title = {
+        overview: "Übersicht · Image Library",
+        library: "Bibliothek · Image Library",
+        brands: "Marken · Image Library",
+      }[route];
     }
 
     setupFilters();
-    render();
+    renderAll();
+    if (!location.hash.startsWith("#/")) {
+      history.replaceState(null, "", "#/overview");
+    }
+    renderRoute();
 
     els.search.addEventListener("input", render);
-    els.brandFilter.addEventListener("change", render);
+    els.brandFilter.addEventListener("change", () => {
+      activeProduct = "";
+      render();
+    });
     els.sortMode.addEventListener("change", render);
+    els.resetFilters.addEventListener("click", () => {
+      els.search.value = "";
+      els.brandFilter.value = "";
+      activeProduct = "";
+      render();
+    });
+    window.addEventListener("hashchange", renderRoute);
+    els.tokenButton.addEventListener("click", () => {
+      sessionStorage.removeItem("imageApiToken");
+      requestToken().then(token => {
+        if (token) showToast("Token gespeichert");
+      });
+    });
+    els.tokenForm.addEventListener("submit", event => {
+      event.preventDefault();
+      finishToken(els.tokenInput.value.trim());
+    });
+    els.tokenCancel.addEventListener("click", () => finishToken(null));
+    els.tokenDialog.addEventListener("cancel", event => {
+      event.preventDefault();
+      finishToken(null);
+    });
+    els.confirmInput.addEventListener("input", () => {
+      els.confirmDelete.disabled = els.confirmInput.value.trim() !== els.confirmExpected.textContent;
+    });
+    els.confirmDelete.addEventListener("click", () => finishConfirmation(true));
+    els.confirmCancel.addEventListener("click", () => finishConfirmation(false));
+    els.confirmDialog.addEventListener("cancel", event => {
+      event.preventDefault();
+      finishConfirmation(false);
+    });
   </script>
 </body>
 </html>
