@@ -5,12 +5,42 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
-import type { Product } from '../types';
+import type { Product, WorkflowItem, WorkflowStatus } from '../types';
 import { BulkStammdatenModal } from '../components/products/BulkStammdatenModal';
 import { VariantGroupModal } from '../components/products/VariantGroupModal';
 import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUp, Plus, Trash2, Archive, ArchiveRestore, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy, Package } from 'lucide-react';
 
 type EditingCell = { sku: string; field: string } | null;
+
+const WORKFLOW_BADGES: Record<WorkflowStatus, { label: string; className: string }> = {
+  draft: { label: 'Entwurf', className: 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300' },
+  in_progress: { label: 'In Bearbeitung', className: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300' },
+  review: { label: 'In Prüfung', className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' },
+  approved: { label: 'Freigegeben', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' },
+  published: { label: 'Veröffentlicht', className: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300' },
+  error: { label: 'Fehlerhaft', className: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300' },
+  archived: { label: 'Archiviert', className: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' },
+};
+
+function WorkflowStatusBadge({ item }: { item?: WorkflowItem }) {
+  const status = item?.status ?? 'draft';
+  const badge = WORKFLOW_BADGES[status];
+  const label = item?.approval_stale ? 'Erneute Prüfung' : badge.label;
+  const title = [
+    `Workflow: ${label}`,
+    item?.assignee ? `Verantwortlich: ${item.assignee}` : null,
+    item?.approval_stale ? 'Produkt wurde nach der Freigabe geändert.' : null,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <span
+      title={title}
+      className={`inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}
+    >
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
 
 function compareByArtikelnummer(a: Product, b: Product) {
   return a.artikelnummer.localeCompare(b.artikelnummer, undefined, { numeric: true, sensitivity: 'base' });
@@ -19,6 +49,7 @@ function compareByArtikelnummer(a: Product, b: Product) {
 export function StammdatenPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [archivedProducts, setArchivedProducts] = useState<Product[]>([]);
+  const [workflowBySku, setWorkflowBySku] = useState<Map<string, WorkflowItem>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showArchive, setShowArchive] = useState(false);
@@ -64,6 +95,9 @@ export function StammdatenPage() {
     try {
       const updated = await api.updateStammdaten(sku, payload);
       setProducts(prev => prev.map(p => p.artikelnummer === sku ? updated : p));
+      api.getWorkflowBoard()
+        .then(workflow => setWorkflowBySku(new Map(workflow.items.map(item => [item.artikelnummer, item]))))
+        .catch(() => {});
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Speichern fehlgeschlagen', 'error');
     }
@@ -152,12 +186,14 @@ export function StammdatenPage() {
   const reload = async () => {
     setLoading(true);
     try {
-      const [active, archived] = await Promise.all([
+      const [active, archived, workflow] = await Promise.all([
         api.getProducts(),
         api.getProducts(true),
+        api.getWorkflowBoard(),
       ]);
       setProducts(active);
       setArchivedProducts(archived);
+      setWorkflowBySku(new Map(workflow.items.map(item => [item.artikelnummer, item])));
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Produkte konnten nicht geladen werden', 'error');
     } finally {
@@ -532,6 +568,9 @@ export function StammdatenPage() {
                       <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                         {p.artikelname}
                       </div>
+                      <div className="mt-1.5">
+                        <WorkflowStatusBadge item={workflowBySku.get(p.artikelnummer)} />
+                      </div>
                       {isChild && Object.entries(p.variant_attributes).length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {Object.entries(p.variant_attributes).map(([k, v]) => (
@@ -596,6 +635,7 @@ export function StammdatenPage() {
                     </span>
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">Artikelname</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[130px]">Workflow</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">EK (Netto)</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">VK (Brutto)</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">Gewicht (g)</th>
@@ -660,6 +700,9 @@ export function StammdatenPage() {
                           </span>
                         ))}
                       </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <WorkflowStatusBadge item={workflowBySku.get(p.artikelnummer)} />
                     </td>
                     <td className="px-4 py-2 text-right text-gray-600 dark:text-gray-400 tabular-nums" onClick={(e) => { e.stopPropagation(); startEdit(p.artikelnummer, 'ek', p.ek != null ? p.ek.toFixed(2) : ''); }}>
                       {editingCell?.sku === p.artikelnummer && editingCell.field === 'ek' ? (
@@ -753,7 +796,7 @@ export function StammdatenPage() {
                 })}
                 {groupedRows.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
+                    <td colSpan={11} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
                       Keine Treffer für „{searchQuery}"
                     </td>
                   </tr>
@@ -796,6 +839,7 @@ export function StammdatenPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs text-gray-600 dark:text-gray-400 mb-1">{p.artikelnummer}</div>
                     <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{p.artikelname}</div>
+                    <div className="mt-1.5"><WorkflowStatusBadge item={workflowBySku.get(p.artikelnummer)} /></div>
                   </div>
                   <button
                     onClick={() => handleUnarchive(p.artikelnummer)}
@@ -835,6 +879,7 @@ export function StammdatenPage() {
                     </span>
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">Artikelname</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[130px]">Workflow</th>
                   <th className="px-4 py-3 w-[120px]" />
                 </tr>
               </thead>
@@ -851,6 +896,7 @@ export function StammdatenPage() {
                     </td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">{p.artikelnummer}</td>
                     <td className="px-4 py-2 text-gray-700 dark:text-gray-200">{p.artikelname}</td>
+                    <td className="px-4 py-2"><WorkflowStatusBadge item={workflowBySku.get(p.artikelnummer)} /></td>
                     <td className="px-4 py-2 text-right">
                       <button
                         onClick={() => handleUnarchive(p.artikelnummer)}
@@ -863,7 +909,7 @@ export function StammdatenPage() {
                 ))}
                 {filteredArchived.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
+                    <td colSpan={5} className="text-center py-8 text-sm text-gray-400 dark:text-gray-500">
                       Keine archivierten Produkte.
                     </td>
                   </tr>
