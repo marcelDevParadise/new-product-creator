@@ -25,6 +25,7 @@ import { IngredientsPage } from './pages/IngredientsPage';
 import { ArtikelwerkPage } from './pages/ArtikelwerkPage';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { ArtikelwerkLogsPage } from './pages/ArtikelwerkLogsPage';
+import { APP_NAME, APP_VERSION } from './lib/app-version';
 
 function Layout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -66,7 +67,8 @@ function Layout() {
               <div className="w-7 h-7 bg-indigo-500 rounded-lg flex items-center justify-center shrink-0">
                 <Layers className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">Attribut Generator</span>
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{APP_NAME}</span>
+              <span className="rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:bg-white/10 dark:text-gray-400">{APP_VERSION}</span>
             </div>
           </header>
           <main className="flex-1 overflow-auto">

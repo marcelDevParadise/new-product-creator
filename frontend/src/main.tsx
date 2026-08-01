@@ -2,6 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { APP_NAME, APP_VERSION } from './lib/app-version'
+
+document.title = `${APP_NAME} · ${APP_VERSION}`
 
 // Apply saved theme before first render to prevent flash
 const savedTheme = localStorage.getItem('theme');

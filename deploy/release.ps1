@@ -6,6 +6,8 @@ param(
 	[string]$PiHost = "marcel@100.87.118.91",
 	[string]$PiRepoPath = "/home/marcel/new-product-creator",
 	[int]$DeployTimeoutSeconds = 900,
+	[ValidateSet("patch", "minor", "major")]
+	[string]$Bump = "patch",
 	[switch]$SkipDeployWait
 )
 
@@ -34,15 +36,50 @@ function Invoke-Git {
 	return $output
 }
 
-function Get-NextDeployTag {
-	$base = "deploy-" + (Get-Date -Format "yyyy-MM-dd")
-	$highest = 0
-	foreach ($existingTag in @(Invoke-Git tag -l "$base-*")) {
-		if ($existingTag -match "^$([regex]::Escape($base))-(\d+)$") {
-			$highest = [Math]::Max($highest, [int]$Matches[1])
+function Get-NextVersionTag {
+	param(
+		[ValidateSet("patch", "minor", "major")]
+		[string]$BumpType = "patch"
+	)
+
+	$highest = @(0, 0, 0)
+	foreach ($existingTag in @(Invoke-Git tag -l "v*")) {
+		if ($existingTag -notmatch '^v(\d+)\.(\d+)\.(\d+)$') {
+			continue
+		}
+
+		$candidate = @([int]$Matches[1], [int]$Matches[2], [int]$Matches[3])
+		$isHigher = $false
+		for ($index = 0; $index -lt 3; $index++) {
+			if ($candidate[$index] -gt $highest[$index]) {
+				$isHigher = $true
+				break
+			}
+			if ($candidate[$index] -lt $highest[$index]) {
+				break
+			}
+		}
+		if ($isHigher) {
+			$highest = $candidate
 		}
 	}
-	return "$base-$($highest + 1)"
+
+	switch ($BumpType) {
+		"major" {
+			$highest[0] += 1
+			$highest[1] = 0
+			$highest[2] = 0
+		}
+		"minor" {
+			$highest[1] += 1
+			$highest[2] = 0
+		}
+		default {
+			$highest[2] += 1
+		}
+	}
+
+	return "v$($highest[0]).$($highest[1]).$($highest[2])"
 }
 
 function Invoke-SshCommand {
@@ -174,8 +211,11 @@ $shortCommit = "$(Invoke-Git rev-parse --short=12 HEAD)".Trim()
 
 if ($Version) {
 	$tag = "v$($Version.TrimStart('v'))"
+	if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+		throw "Version '$Version' ist ungueltig. Erwartet wird zum Beispiel 1.2.3."
+	}
 } else {
-	$tag = Get-NextDeployTag
+	$tag = Get-NextVersionTag -BumpType $Bump
 }
 
 $localTag = @(Invoke-Git tag -l $tag)

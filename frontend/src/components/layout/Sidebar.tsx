@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon, FileText, GitBranch, AlertTriangle, FlaskConical, X, CloudUpload, Truck, ScrollText } from 'lucide-react';
 import { useTheme } from '../../lib/use-theme';
+import { APP_NAME, APP_VERSION } from '../../lib/app-version';
 
 interface NavItem {
   to: string;
@@ -108,8 +109,11 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose, onSear
               <Layers className="w-4.5 h-4.5 text-white" />
             </div>
             <div className={`min-w-0 flex-1 ${isCompact ? 'md:hidden' : ''}`}>
-              <h1 className="text-sm font-semibold text-white truncate">Attribut Generator</h1>
-              <p className="text-[11px] text-gray-500">Shopify · JTL Ameise</p>
+              <h1 className="text-sm font-semibold text-white truncate">{APP_NAME}</h1>
+              <p className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                <span>JTL · Shopify</span>
+                <span className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-[10px] text-gray-400">{APP_VERSION}</span>
+              </p>
             </div>
             {/* Close-Button nur auf Mobile */}
             <button

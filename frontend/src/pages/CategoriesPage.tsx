@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core';
 import {
   Plus, Trash2, ChevronRight, ChevronDown, Pencil, Check, X, FolderTree,
-  Search, Layers3, Network, Sparkles, RotateCcw, GripVertical, Undo2,
+  Search, Layers3, Network, Sparkles, RotateCcw, GripVertical, Undo2, Lock,
 } from 'lucide-react';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -33,10 +33,11 @@ interface TreeNodeProps {
   onDelete: (path: string[], name: string) => void;
   depth: number;
   moving: boolean;
+  dragEnabled: boolean;
   forceExpanded?: boolean;
 }
 
-function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, moving, forceExpanded = false }: TreeNodeProps) {
+function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, moving, dragEnabled, forceExpanded = false }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(depth < 2);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -55,7 +56,7 @@ function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, movi
   } = useDraggable({
     id: `drag:${dragId}`,
     data: { path: fullPath, name },
-    disabled: editing || adding || moving,
+    disabled: !dragEnabled || editing || adding || moving,
   });
   const {
     isOver,
@@ -63,7 +64,7 @@ function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, movi
   } = useDroppable({
     id: `drop:${dragId}`,
     data: { path: fullPath, name },
-    disabled: isDragging || moving,
+    disabled: !dragEnabled || isDragging || moving,
   });
   const setNodeRef = useCallback((node: HTMLDivElement | null) => {
     setDraggableRef(node);
@@ -100,9 +101,9 @@ function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, movi
         <button
           type="button"
           className="flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
-          title="Kategorie verschieben"
+          title={dragEnabled ? 'Kategorie verschieben' : 'Verschieben ist ausgeschaltet'}
           aria-label={`${name} verschieben`}
-          disabled={editing || adding || moving}
+          disabled={!dragEnabled || editing || adding || moving}
           {...attributes}
           {...listeners}
         >
@@ -188,6 +189,7 @@ function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, movi
               onDelete={onDelete}
               depth={depth + 1}
               moving={moving}
+              dragEnabled={dragEnabled}
               forceExpanded={forceExpanded}
             />
           ))}
@@ -230,6 +232,13 @@ export function CategoriesPage() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<{ path: string[]; name: string } | null>(null);
   const [moving, setMoving] = useState(false);
+  const [dragEnabled, setDragEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem('categories.dragEnabled') !== 'false';
+    } catch {
+      return true;
+    }
+  });
   const { toast } = useToast();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -289,6 +298,7 @@ export function CategoriesPage() {
   };
 
   const handleDragStart = (event: DragStartEvent) => {
+    if (!dragEnabled) return;
     const path = event.active.data.current?.path as string[] | undefined;
     const name = event.active.data.current?.name as string | undefined;
     if (path && name) setActiveCategory({ path, name });
@@ -326,6 +336,17 @@ export function CategoriesPage() {
   };
 
   const handleDragCancel = () => setActiveCategory(null);
+
+  const handleToggleDrag = () => {
+    const nextValue = !dragEnabled;
+    setDragEnabled(nextValue);
+    setActiveCategory(null);
+    try {
+      window.localStorage.setItem('categories.dragEnabled', String(nextValue));
+    } catch {
+      // Die Funktion bleibt auch ohne verfügbaren Browser-Speicher nutzbar.
+    }
+  };
 
   if (loading || !tree) {
     return <LoadingSpinner className="h-full" />;
@@ -382,9 +403,25 @@ export function CategoriesPage() {
           <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between md:p-5">
             <div>
               <h2 className="font-semibold">Kategoriebaum</h2>
-              <p className="text-xs text-muted-foreground">Am Griff ziehen und auf einer Kategorie ablegen, um sie unterzuordnen.</p>
+              <p className="text-xs text-muted-foreground">
+                {dragEnabled
+                  ? 'Verschieben ist aktiv: Am Griff ziehen und auf einer Kategorie ablegen.'
+                  : 'Verschieben ist ausgeschaltet. Die Kategorien können sicher bearbeitet werden.'}
+              </p>
             </div>
-            <div className="flex w-full gap-2 md:w-auto">
+            <div className="flex w-full flex-wrap gap-2 md:w-auto md:flex-nowrap">
+              <Button
+                type="button"
+                variant={dragEnabled ? 'default' : 'outline'}
+                className="h-10 shrink-0 rounded-xl"
+                aria-pressed={dragEnabled}
+                onClick={handleToggleDrag}
+                disabled={moving}
+                title={dragEnabled ? 'Drag-and-drop ausschalten' : 'Drag-and-drop einschalten'}
+              >
+                {dragEnabled ? <GripVertical className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                Verschieben {dragEnabled ? 'an' : 'aus'}
+              </Button>
               <div className="relative min-w-0 flex-1 md:w-80">
                 <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -452,6 +489,7 @@ export function CategoriesPage() {
                     onDelete={(path, delName) => setDeleteTarget({ path, name: delName })}
                     depth={0}
                     moving={moving}
+                    dragEnabled={dragEnabled}
                     forceExpanded={Boolean(search)}
                   />
                 ))}
