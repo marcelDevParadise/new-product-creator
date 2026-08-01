@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon, FileText, GitBranch, AlertTriangle, FlaskConical, X, CloudUpload, Truck, ScrollText } from 'lucide-react';
+import { Upload, Package, Download, Layers, Settings2, ClipboardList, SlidersHorizontal, LayoutDashboard, PanelLeftClose, PanelLeft, Activity, ShieldCheck, FolderTree, Search, Sun, Moon, FileText, GitBranch, AlertTriangle, FlaskConical, X, CloudUpload, Truck, ScrollText, KanbanSquare } from 'lucide-react';
 import { useTheme } from '../../lib/use-theme';
 import { APP_NAME, APP_VERSION } from '../../lib/app-version';
 
@@ -21,6 +21,7 @@ const sections: NavSection[] = [
     header: 'Übersicht',
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/workflow', label: 'Workflow', icon: KanbanSquare },
       { to: '/activity', label: 'Aktivitäten', icon: Activity },
       { to: '/quality', label: 'Datenqualität', icon: ShieldCheck },
     ],

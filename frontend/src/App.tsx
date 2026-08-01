@@ -25,6 +25,7 @@ import { IngredientsPage } from './pages/IngredientsPage';
 import { ArtikelwerkPage } from './pages/ArtikelwerkPage';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { ArtikelwerkLogsPage } from './pages/ArtikelwerkLogsPage';
+import { WorkflowPage } from './pages/WorkflowPage';
 import { APP_NAME, APP_VERSION } from './lib/app-version';
 
 function Layout() {
@@ -86,6 +87,7 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: '/', element: <DashboardPage /> },
+      { path: '/workflow', element: <WorkflowPage /> },
       { path: '/import', element: <ImportPage /> },
       { path: '/products', element: <ProductsPage /> },
       { path: '/products/:sku', element: <ProductDetailPage /> },

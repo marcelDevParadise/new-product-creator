@@ -404,6 +404,66 @@ export interface ProductHistoryEntry {
   created_at: string;
 }
 
+// Product workflow
+
+export type WorkflowStatus =
+  | 'draft'
+  | 'in_progress'
+  | 'review'
+  | 'approved'
+  | 'published'
+  | 'error'
+  | 'archived';
+
+export interface WorkflowColumn {
+  id: WorkflowStatus;
+  label: string;
+  description: string;
+}
+
+export interface WorkflowItem {
+  artikelnummer: string;
+  artikelname: string;
+  status: WorkflowStatus;
+  stored_status: WorkflowStatus;
+  assignee: string | null;
+  approved_at: string | null;
+  approval_stale: boolean;
+  updated_at: string | null;
+  comment_count: number;
+  quality_severity: 'ok' | 'warning' | 'error';
+  error_count: number;
+  warning_count: number;
+  hersteller: string | null;
+  kategorie: string | null;
+  bild: string | null;
+  preis: number | null;
+  is_parent: boolean;
+  parent_sku: string | null;
+}
+
+export interface WorkflowBoard {
+  columns: WorkflowColumn[];
+  items: WorkflowItem[];
+  assignees: string[];
+  statuses: WorkflowStatus[];
+}
+
+export interface WorkflowComment {
+  id: number;
+  artikelnummer: string;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+export interface WorkflowProductDetail {
+  item: WorkflowItem;
+  comments: WorkflowComment[];
+  history: ProductHistoryEntry[];
+  validation: ProductValidation | null;
+}
+
 // Categories
 
 export interface CategoryTree {

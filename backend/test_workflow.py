@@ -1,0 +1,135 @@
+"""Focused tests for product workflow persistence and approval snapshots."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import unittest
+
+
+TEST_DB = Path(__file__).with_name(".workflow-test.db")
+os.environ["DATABASE_URL"] = "sqlite:///.workflow-test.db"
+
+from fastapi import HTTPException  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from main import app  # noqa: E402
+from models.product import Product  # noqa: E402
+from routers.articlewerk import _require_current_workflow_approval  # noqa: E402
+from services import database  # noqa: E402
+from services.workflow import publication_fingerprint  # noqa: E402
+from state import state  # noqa: E402
+
+
+class WorkflowTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        state.clear_products()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if database._pool is not None:
+            database._pool.close()
+            database._pool = None
+        TEST_DB.unlink(missing_ok=True)
+        TEST_DB.with_name(f"{TEST_DB.name}-wal").unlink(missing_ok=True)
+        TEST_DB.with_name(f"{TEST_DB.name}-shm").unlink(missing_ok=True)
+
+    def setUp(self) -> None:
+        state.clear_products()
+        self.product = Product(
+            artikelnummer="WF-001",
+            artikelname="Workflow Testprodukt",
+            preis=19.99,
+        )
+        state.add_product(self.product)
+
+    def test_workflow_metadata_and_comments_are_persisted(self) -> None:
+        self.assertEqual(database.get_product_workflow("WF-001")["status"], "draft")
+
+        saved = database.save_product_workflow(
+            "WF-001",
+            status="in_progress",
+            assignee="Marcel",
+            approved_hash=None,
+            approved_at=None,
+        )
+        self.assertEqual(saved["assignee"], "Marcel")
+
+        comment = database.add_workflow_comment("WF-001", "Marcel", "Bitte prüfen")
+        self.assertEqual(comment["body"], "Bitte prüfen")
+        self.assertEqual(database.list_product_workflows()["WF-001"]["comment_count"], 1)
+
+    def test_workflow_api_exposes_board_updates_and_comments(self) -> None:
+        with TestClient(app) as client:
+            board = client.get("/api/workflow/board")
+            self.assertEqual(board.status_code, 200)
+            self.assertEqual(board.json()["items"][0]["artikelnummer"], "WF-001")
+
+            updated = client.patch(
+                "/api/workflow/products/WF-001",
+                json={"status": "in_progress", "assignee": "Marcel"},
+            )
+            self.assertEqual(updated.status_code, 200)
+            self.assertEqual(updated.json()["status"], "in_progress")
+
+            comment = client.post(
+                "/api/workflow/products/WF-001/comments",
+                json={"author": "Marcel", "body": "Bereit zur Prüfung"},
+            )
+            self.assertEqual(comment.status_code, 201)
+
+            detail = client.get("/api/workflow/products/WF-001")
+            self.assertEqual(detail.status_code, 200)
+            self.assertEqual(detail.json()["comments"][0]["body"], "Bereit zur Prüfung")
+
+    def test_approval_is_bound_to_exact_product_and_variant_data(self) -> None:
+        child_a = Product(artikelnummer="WF-001-A", artikelname="Variante A", parent_sku="WF-001")
+        child_b = Product(artikelnummer="WF-001-B", artikelname="Variante B", parent_sku="WF-001")
+
+        fingerprint = publication_fingerprint(self.product, [child_a, child_b])
+        self.assertEqual(
+            fingerprint,
+            publication_fingerprint(self.product, [child_b, child_a]),
+        )
+        child_b.artikelname = "Geänderte Variante"
+        self.assertNotEqual(
+            fingerprint,
+            publication_fingerprint(self.product, [child_a, child_b]),
+        )
+
+    def test_publish_gate_rejects_missing_and_stale_approval(self) -> None:
+        with self.assertRaises(HTTPException) as missing:
+            _require_current_workflow_approval("WF-001")
+        self.assertEqual(missing.exception.status_code, 409)
+
+        database.approve_product_workflow(
+            "WF-001",
+            publication_fingerprint(self.product),
+            "Marcel",
+        )
+        _require_current_workflow_approval("WF-001")
+
+        self.product.artikelname = "Nach Freigabe geändert"
+        state.save_product_changes(self.product)
+        with self.assertRaises(HTTPException) as stale:
+            _require_current_workflow_approval("WF-001")
+        self.assertEqual(stale.exception.status_code, 409)
+
+        with TestClient(app) as client:
+            assigned = client.patch(
+                "/api/workflow/products/WF-001",
+                json={"assignee": "Neue Verantwortung"},
+            )
+        self.assertEqual(assigned.status_code, 200)
+        self.assertTrue(assigned.json()["approval_stale"])
+        self.assertEqual(database.get_product_workflow("WF-001")["approved_hash"],
+                         publication_fingerprint(Product(
+                             artikelnummer="WF-001",
+                             artikelname="Workflow Testprodukt",
+                             preis=19.99,
+                         )))
+
+
+if __name__ == "__main__":
+    unittest.main()

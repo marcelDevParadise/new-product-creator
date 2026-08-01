@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker, Link } from 'react-router-dom';
-import { Save, ArrowRight, ChevronLeft, GitBranch, ArrowDownFromLine, X, Copy, CloudUpload, Package, CircleCheckBig, Banknote } from 'lucide-react';
+import { Save, ArrowRight, ChevronLeft, GitBranch, ArrowDownFromLine, X, Copy, CloudUpload, Package, CircleCheckBig, Banknote, KanbanSquare } from 'lucide-react';
 import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -14,12 +14,22 @@ import { api } from '../api/client';
 import { VariantMatrix } from '../components/products/VariantMatrix';
 import { SeoCheckPanel } from '../components/products/SeoCheckPanel';
 import { slugify } from '../lib/utils';
-import type { Product, CategoryTree, Supplier, VariantenSettings, ArtikelwerkPreview } from '../types';
+import type { Product, CategoryTree, Supplier, VariantenSettings, ArtikelwerkPreview, WorkflowProductDetail, WorkflowStatus } from '../types';
 
 const EINHEITEN_FALLBACK = ['ml', 'l', 'g', 'kg', 'cm', 'm', 'mm', 'Stück', 'm²', 'm³'];
 
 const inputCls = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40';
 const selectCls = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40';
+
+const WORKFLOW_LABELS: Record<WorkflowStatus, string> = {
+  draft: 'Entwurf',
+  in_progress: 'In Bearbeitung',
+  review: 'Prüfung',
+  approved: 'Freigegeben',
+  published: 'Veröffentlicht',
+  error: 'Fehlerhaft',
+  archived: 'Archiviert',
+};
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -117,6 +127,7 @@ export function StammdatenEditPage() {
   const [seoKeywordsText, setSeoKeywordsText] = useState('');
   const [artikelwerkPreview, setArtikelwerkPreview] = useState<ArtikelwerkPreview | null>(null);
   const [artikelwerkLoading, setArtikelwerkLoading] = useState(false);
+  const [workflowDetail, setWorkflowDetail] = useState<WorkflowProductDetail | null>(null);
 
   const markDirty = () => setDirty(true);
 
@@ -175,6 +186,7 @@ export function StammdatenEditPage() {
         setF(initForm(p));
         setSeoKeywords(p.seo_keywords ? p.seo_keywords.split(',').map(k => k.trim()).filter(Boolean) : []);
         setSeoKeywordsText(p.seo_keywords ?? '');
+        api.getWorkflowProduct(p.artikelnummer).then(setWorkflowDetail).catch(() => {});
         // Load variant context
         if (p.parent_sku) {
           api.getProduct(p.parent_sku).then(setParentProduct).catch(() => {});
@@ -270,6 +282,7 @@ export function StammdatenEditPage() {
         stammdaten_complete: true,
       };
       await api.updateStammdaten(product.artikelnummer, payload);
+      api.getWorkflowProduct(product.artikelnummer).then(setWorkflowDetail).catch(() => {});
       setDirty(false);
       toast('Stammdaten gespeichert', 'success');
       if (andContinue) {
@@ -299,6 +312,11 @@ export function StammdatenEditPage() {
     return <LoadingSpinner className="h-full" />;
   }
 
+  const workflowReady = !!workflowDetail
+    && ['approved', 'published'].includes(workflowDetail.item.status)
+    && !workflowDetail.item.approval_stale;
+  const workflowLabel = workflowDetail ? WORKFLOW_LABELS[workflowDetail.item.status] : 'Wird geladen';
+
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.09),transparent_32rem)]">
       {/* Blocker dialog for unsaved changes */}
@@ -320,20 +338,25 @@ export function StammdatenEditPage() {
           description="Produktinformationen, Verkaufstexte, Bilder und Kategorisierung bearbeiten."
           icon={Package}
           stats={[
-            { label: 'Status', value: dirty ? 'Geändert' : 'Gespeichert', icon: CircleCheckBig, tone: dirty ? 'amber' : 'emerald' },
+            { label: 'Speicherstatus', value: dirty ? 'Geändert' : 'Gespeichert', icon: CircleCheckBig, tone: dirty ? 'amber' : 'emerald' },
+            { label: 'Workflow', value: workflowLabel, icon: KanbanSquare, tone: workflowReady ? 'emerald' : 'amber' },
             { label: 'EK-Preis', value: f.ek ? `${f.ek} €` : '–', icon: Banknote, tone: 'sky' },
             { label: 'VK-Preis', value: f.preis ? `${f.preis} €` : '–', icon: Banknote, tone: 'violet' },
-            { label: 'Produktart', value: product.is_parent ? 'Parent' : product.parent_sku ? 'Variante' : 'Einzelartikel', icon: GitBranch, tone: 'indigo' },
           ]}
           actions={
             <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" className="bg-background/70" onClick={() => navigate('/stammdaten')}><ChevronLeft className="mr-2 h-4 w-4" />Stammdaten</Button>
+            <Button variant="outline" className="bg-background/70" onClick={() => navigate('/workflow')}><KanbanSquare className="mr-2 h-4 w-4" />Workflow</Button>
             {!product.parent_sku && (
               <Button
                 variant="outline"
                 onClick={handleArtikelwerkPreview}
                 disabled={artikelwerkLoading || dirty}
-                title={dirty ? 'Bitte zuerst die Stammdaten speichern' : 'Über Artikelwerk an JTL-Wawi veröffentlichen'}
+                title={dirty
+                  ? 'Bitte zuerst die Stammdaten speichern'
+                  : !workflowReady
+                    ? 'Vorschau prüfen; die Veröffentlichung erfordert anschließend eine aktuelle Freigabe'
+                    : 'Über Artikelwerk an JTL-Wawi veröffentlichen'}
                 className="bg-background/70 text-indigo-600"
               >
                 <CloudUpload className="mr-2 h-4 w-4" />
@@ -709,6 +732,11 @@ export function StammdatenEditPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {!workflowReady && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                Die Veröffentlichung ist gesperrt. Gib das Produkt im Workflow frei; Änderungen an Produkt oder Varianten heben die Freigabe automatisch auf.
+              </p>
+            )}
             {artikelwerkPreview?.issues.length === 0 && (
               <p className="text-sm text-green-700 bg-green-50 rounded-lg p-3">Keine Mapping-Probleme gefunden.</p>
             )}
@@ -726,7 +754,7 @@ export function StammdatenEditPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setArtikelwerkPreview(null)}>Abbrechen</Button>
-            <Button onClick={handleArtikelwerkPublish} disabled={!artikelwerkPreview?.valid || artikelwerkLoading}>
+            <Button onClick={handleArtikelwerkPublish} disabled={!artikelwerkPreview?.valid || artikelwerkLoading || !workflowReady}>
               <CloudUpload className="w-4 h-4" />
               {artikelwerkLoading ? 'Startet…' : 'Veröffentlichen'}
             </Button>

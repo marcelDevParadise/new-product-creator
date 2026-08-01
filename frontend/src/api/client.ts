@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult, WorkflowBoard, WorkflowItem, WorkflowProductDetail, WorkflowComment, WorkflowStatus } from '../types';
 
 const BASE = '/api';
 
@@ -112,6 +112,23 @@ export const api = {
     request<ProductHistoryEntry[]>(`/products/${encodeURIComponent(sku)}/history?limit=${limit}`),
   cloneProduct: (sku: string) =>
     request<Product>(`/products/${encodeURIComponent(sku)}/clone`, { method: 'POST' }),
+
+  // Product workflow
+  getWorkflowBoard: () => request<WorkflowBoard>('/workflow/board'),
+  getWorkflowProduct: (sku: string) =>
+    request<WorkflowProductDetail>(`/workflow/products/${encodeURIComponent(sku)}`),
+  updateWorkflowProduct: (sku: string, data: { status?: WorkflowStatus; assignee?: string | null }) =>
+    request<WorkflowItem>(`/workflow/products/${encodeURIComponent(sku)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  addWorkflowComment: (sku: string, data: { author: string; body: string }) =>
+    request<WorkflowComment>(`/workflow/products/${encodeURIComponent(sku)}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
 
   // Attributes
   getAttributeConfig: () => request<AttributeConfig>('/attributes/config'),

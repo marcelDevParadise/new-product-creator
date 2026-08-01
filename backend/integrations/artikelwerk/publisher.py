@@ -20,6 +20,7 @@ from services.database import (
     get_articlewerk_publication,
     reset_deleted_articlewerk_publication,
     save_articlewerk_operation,
+    set_workflow_publication_status,
     update_articlewerk_job,
     upsert_articlewerk_publication,
 )
@@ -654,6 +655,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
 
         upsert_articlewerk_publication(preview.sku, status="published")
         update_articlewerk_job(job_id, status="published", phase="complete", progress=len(preview.steps))
+        set_workflow_publication_status(preview.sku, "published")
     except ArtikelwerkError as exc:
         status = "partial" if remote_article_id else "failed"
         error_text = _artikelwerk_error_text(exc)
@@ -665,6 +667,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
             job_id, status=status, phase=active_operation, progress=completed,
             last_error=error_text,
         )
+        set_workflow_publication_status(preview.sku, "error")
     except Exception as exc:
         # Keep unexpected mapper/database/runtime failures visible instead of
         # leaving the job permanently in "publishing".
@@ -677,3 +680,4 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
             job_id, status=status, phase=active_operation, progress=completed,
             last_error=f"INTERNAL_ERROR in {active_operation}: {message}",
         )
+        set_workflow_publication_status(preview.sku, "error")

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import products, attributes, export, templates, settings, stats, validation, categories, variants, bundles, warnings, ingredients, images, articlewerk, suppliers
+from routers import products, attributes, export, templates, settings, stats, validation, categories, variants, bundles, warnings, ingredients, images, articlewerk, suppliers, workflow
 from state import state
 from services.database import list_resumable_articlewerk_jobs
 from integrations.artikelwerk.publisher import run_publication
@@ -62,6 +62,7 @@ app.include_router(ingredients.router)
 app.include_router(images.router)
 app.include_router(articlewerk.router)
 app.include_router(suppliers.router)
+app.include_router(workflow.router)
 
 
 @app.get("/api/health")

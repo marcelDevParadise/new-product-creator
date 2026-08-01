@@ -125,6 +125,31 @@ def init_db() -> None:
             ON product_history (artikelnummer, created_at DESC)
         """)
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS product_workflow (
+                artikelnummer TEXT PRIMARY KEY,
+                status TEXT NOT NULL DEFAULT 'draft',
+                assignee TEXT,
+                approved_hash TEXT,
+                approved_at TEXT,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (artikelnummer) REFERENCES products(artikelnummer) ON DELETE CASCADE
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS workflow_comments (
+                id BIGSERIAL PRIMARY KEY,
+                artikelnummer TEXT NOT NULL,
+                author TEXT NOT NULL,
+                body TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (artikelnummer) REFERENCES products(artikelnummer) ON DELETE CASCADE
+            )
+        """)
+        cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_workflow_comments_sku
+            ON workflow_comments (artikelnummer, created_at DESC)
+        """)
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS export_history (
                 id BIGSERIAL PRIMARY KEY,
                 export_type TEXT NOT NULL,
@@ -1130,4 +1155,157 @@ def get_product_history(artikelnummer: str, limit: int = 100) -> list[dict]:
         {"id": r[0], "artikelnummer": r[1], "event_type": r[2], "field": r[3],
          "old_value": r[4], "new_value": r[5], "detail": r[6], "created_at": r[7]}
         for r in rows
+    ]
+
+
+# --- Product workflow ---
+
+def get_product_workflow(artikelnummer: str) -> dict:
+    """Return workflow metadata, using a virtual draft record when none exists."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT status, assignee, approved_hash, approved_at, updated_at "
+            "FROM product_workflow WHERE artikelnummer = %s",
+            (artikelnummer,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return {
+            "artikelnummer": artikelnummer,
+            "status": "draft",
+            "assignee": None,
+            "approved_hash": None,
+            "approved_at": None,
+            "updated_at": None,
+        }
+    return {
+        "artikelnummer": artikelnummer,
+        "status": row[0],
+        "assignee": row[1],
+        "approved_hash": row[2],
+        "approved_at": row[3],
+        "updated_at": row[4],
+    }
+
+
+def list_product_workflows() -> dict[str, dict]:
+    """Return persisted workflow records with their comment counts."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT w.artikelnummer, w.status, w.assignee, w.approved_hash, "
+            "w.approved_at, w.updated_at, COUNT(c.id) "
+            "FROM product_workflow w "
+            "LEFT JOIN workflow_comments c ON c.artikelnummer = w.artikelnummer "
+            "GROUP BY w.artikelnummer, w.status, w.assignee, w.approved_hash, w.approved_at, w.updated_at"
+        )
+        rows = cur.fetchall()
+    return {
+        row[0]: {
+            "artikelnummer": row[0],
+            "status": row[1],
+            "assignee": row[2],
+            "approved_hash": row[3],
+            "approved_at": row[4],
+            "updated_at": row[5],
+            "comment_count": row[6],
+        }
+        for row in rows
+    }
+
+
+def save_product_workflow(
+    artikelnummer: str,
+    *,
+    status: str,
+    assignee: str | None,
+    approved_hash: str | None,
+    approved_at: str | None,
+) -> dict:
+    """Create or replace the mutable workflow state for a product."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO product_workflow "
+            f"(artikelnummer, status, assignee, approved_hash, approved_at, updated_at) "
+            f"VALUES (%s, %s, %s, %s, %s, {_NOW_SQL}) "
+            f"ON CONFLICT (artikelnummer) DO UPDATE SET "
+            f"status=excluded.status, assignee=excluded.assignee, "
+            f"approved_hash=excluded.approved_hash, approved_at=excluded.approved_at, "
+            f"updated_at={_NOW_SQL}",
+            (artikelnummer, status, assignee, approved_hash, approved_at),
+        )
+    return get_product_workflow(artikelnummer)
+
+
+def approve_product_workflow(artikelnummer: str, fingerprint: str, assignee: str | None) -> dict:
+    """Persist an approval snapshot against the exact publishable product data."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO product_workflow "
+            f"(artikelnummer, status, assignee, approved_hash, approved_at, updated_at) "
+            f"VALUES (%s, 'approved', %s, %s, {_NOW_SQL}, {_NOW_SQL}) "
+            f"ON CONFLICT (artikelnummer) DO UPDATE SET "
+            f"status='approved', assignee=excluded.assignee, approved_hash=excluded.approved_hash, "
+            f"approved_at={_NOW_SQL}, updated_at={_NOW_SQL}",
+            (artikelnummer, assignee, fingerprint),
+        )
+    return get_product_workflow(artikelnummer)
+
+
+def set_workflow_publication_status(artikelnummer: str, status: str) -> None:
+    """Update workflow state from the background publication worker."""
+    current = get_product_workflow(artikelnummer)
+    save_product_workflow(
+        artikelnummer,
+        status=status,
+        assignee=current.get("assignee"),
+        approved_hash=current.get("approved_hash"),
+        approved_at=current.get("approved_at"),
+    )
+    if current.get("status") != status:
+        log_product_history(
+            artikelnummer,
+            "workflow_status_changed",
+            field="workflow_status",
+            old_value=current.get("status"),
+            new_value=status,
+            detail="Status durch Artikelwerk-Veröffentlichung aktualisiert",
+        )
+
+
+def add_workflow_comment(artikelnummer: str, author: str, body: str) -> dict:
+    """Append a comment to a product workflow."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO workflow_comments (artikelnummer, author, body, created_at) "
+            f"VALUES (%s, %s, %s, {_NOW_SQL}) RETURNING id, created_at",
+            (artikelnummer, author, body),
+        )
+        row = cur.fetchone()
+    return {
+        "id": row[0],
+        "artikelnummer": artikelnummer,
+        "author": author,
+        "body": body,
+        "created_at": row[1],
+    }
+
+
+def list_workflow_comments(artikelnummer: str, limit: int = 100) -> list[dict]:
+    """Return the newest workflow comments for a product."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, artikelnummer, author, body, created_at "
+            "FROM workflow_comments WHERE artikelnummer = %s ORDER BY id DESC LIMIT %s",
+            (artikelnummer, limit),
+        )
+        rows = cur.fetchall()
+    return [
+        {
+            "id": row[0],
+            "artikelnummer": row[1],
+            "author": row[2],
+            "body": row[3],
+            "created_at": row[4],
+        }
+        for row in rows
     ]

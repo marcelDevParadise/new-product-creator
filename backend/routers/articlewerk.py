@@ -16,11 +16,13 @@ from services.database import (
     get_articlewerk_managed_attribute_ids,
     get_articlewerk_job,
     get_articlewerk_publication,
+    get_product_workflow,
     list_articlewerk_logs,
     list_articlewerk_jobs,
     reset_deleted_articlewerk_publication,
     upsert_articlewerk_publication,
 )
+from services.workflow import publication_fingerprint
 from state import state
 
 
@@ -180,6 +182,25 @@ async def _preview(sku: str) -> PublicationPreview:
     )
 
 
+def _require_current_workflow_approval(sku: str) -> None:
+    product = state.get_product(sku)
+    if not product:
+        raise HTTPException(404, "Produkt nicht gefunden.")
+    children = state.get_variants(sku) if product.is_parent else []
+    workflow = get_product_workflow(sku)
+    current_hash = publication_fingerprint(product, children)
+    if workflow.get("status") not in {"approved", "published"}:
+        raise HTTPException(
+            409,
+            "Produkt ist noch nicht freigegeben. Verschiebe es im Workflow nach 'Freigegeben'.",
+        )
+    if workflow.get("approved_hash") != current_hash:
+        raise HTTPException(
+            409,
+            "Produkt wurde seit der Freigabe verändert und muss erneut geprüft und freigegeben werden.",
+        )
+
+
 @router.get("/connection", response_model=ConnectionStatus)
 async def connection_status():
     config = get_artikelwerk_config()
@@ -222,6 +243,7 @@ async def preview_product(sku: str):
 
 @router.post("/products/{sku}/publish", status_code=202)
 async def publish_product(sku: str, background_tasks: BackgroundTasks):
+    _require_current_workflow_approval(sku)
     preview = await _preview(sku)
     if not preview.valid:
         raise HTTPException(422, {"message": "Die Veröffentlichungsvorschau enthält Fehler.", "issues": [i.model_dump() for i in preview.issues]})
