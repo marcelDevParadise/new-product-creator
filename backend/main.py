@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import products, attributes, export, templates, settings, stats, validation, categories, variants, bundles, warnings, ingredients, images, articlewerk, suppliers, workflow
 from state import state
 from services.database import list_resumable_articlewerk_jobs
-from integrations.artikelwerk.publisher import run_publication
+from integrations.artikelwerk.publisher import run_publication_queue
 from integrations.artikelwerk.schemas import PublicationPreview
 
 
@@ -19,9 +19,12 @@ async def lifespan(app: FastAPI):
     # Startup: reload state from DB so hot-reloads pick up latest data
     state.reload_from_db()
     resumed_tasks: set[asyncio.Task] = set()
-    for pending in list_resumable_articlewerk_jobs():
-        preview = PublicationPreview.model_validate(pending["preview"])
-        task = asyncio.create_task(run_publication(pending["job_id"], preview))
+    pending_publications = [
+        (pending["job_id"], PublicationPreview.model_validate(pending["preview"]))
+        for pending in list_resumable_articlewerk_jobs()
+    ]
+    if pending_publications:
+        task = asyncio.create_task(run_publication_queue(pending_publications))
         resumed_tasks.add(task)
         task.add_done_callback(resumed_tasks.discard)
     app.state.articlewerk_tasks = resumed_tasks

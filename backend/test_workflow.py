@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 import unittest
+from unittest.mock import AsyncMock, patch
 
 
 TEST_DB = Path(__file__).with_name(".workflow-test.db")
@@ -15,7 +17,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from main import app  # noqa: E402
 from models.product import Product  # noqa: E402
-from routers.articlewerk import _require_current_workflow_approval  # noqa: E402
+from integrations.artikelwerk.publisher import run_publication_queue  # noqa: E402
+from routers.articlewerk import _article_number_sort_key, _require_current_workflow_approval  # noqa: E402
 from services import database  # noqa: E402
 from services.workflow import publication_fingerprint  # noqa: E402
 from state import state  # noqa: E402
@@ -60,11 +63,31 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(comment["body"], "Bitte prüfen")
         self.assertEqual(database.list_product_workflows()["WF-001"]["comment_count"], 1)
 
+    def test_jtl_snapshot_and_revision_are_persisted(self) -> None:
+        snapshot = {"name": "Workflow Testprodukt", "revision": {"rowVersion": "0xA1"}}
+        database.upsert_articlewerk_publication(
+            "WF-001",
+            status="published",
+            remote_article_id="42",
+            synced_revision="0xA1",
+            synced_preview_hash="preview-hash",
+            synced_product_hash="product-hash",
+            synced_snapshot=snapshot,
+        )
+        publication = database.get_articlewerk_publication("WF-001")
+        self.assertEqual(publication["last_synced_revision"], "0xA1")
+        self.assertEqual(publication["last_synced_product_hash"], "product-hash")
+        self.assertEqual(publication["last_synced_snapshot"], snapshot)
+
     def test_workflow_api_exposes_board_updates_and_comments(self) -> None:
         with TestClient(app) as client:
             board = client.get("/api/workflow/board")
             self.assertEqual(board.status_code, 200)
             self.assertEqual(board.json()["items"][0]["artikelnummer"], "WF-001")
+
+            sync_overview = client.get("/api/articlewerk/sync")
+            self.assertEqual(sync_overview.status_code, 200)
+            self.assertEqual(sync_overview.json()["items"][0]["artikelnummer"], "WF-001")
 
             updated = client.patch(
                 "/api/workflow/products/WF-001",
@@ -96,6 +119,26 @@ class WorkflowTests(unittest.TestCase):
         self.assertNotEqual(
             fingerprint,
             publication_fingerprint(self.product, [child_a, child_b]),
+        )
+
+    def test_bulk_publication_uses_natural_article_number_order(self) -> None:
+        skus = ["CYL-10", "cyl-2", "CYL-001", "ABC-20", "ABC-3"]
+        self.assertEqual(
+            sorted(skus, key=_article_number_sort_key),
+            ["ABC-3", "ABC-20", "CYL-001", "cyl-2", "CYL-10"],
+        )
+
+    def test_bulk_publication_runner_preserves_queue_order(self) -> None:
+        publications = [("job-1", object()), ("job-2", object()), ("job-3", object())]
+        runner = AsyncMock(side_effect=[RuntimeError("Testfehler"), None, None])
+        with (
+            patch("integrations.artikelwerk.publisher._run_publication", runner),
+            patch("integrations.artikelwerk.publisher.logger"),
+        ):
+            asyncio.run(run_publication_queue(publications))  # type: ignore[arg-type]
+        self.assertEqual(
+            [call.args[0] for call in runner.await_args_list],
+            ["job-1", "job-2", "job-3"],
         )
 
     def test_publish_gate_rejects_missing_and_stale_approval(self) -> None:

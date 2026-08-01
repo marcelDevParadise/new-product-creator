@@ -228,6 +228,11 @@ def init_db() -> None:
                 remote_article_id TEXT,
                 status TEXT NOT NULL DEFAULT 'not_published',
                 payload_hash TEXT,
+                last_synced_revision TEXT,
+                last_synced_preview_hash TEXT,
+                last_synced_product_hash TEXT,
+                last_synced_snapshot TEXT,
+                last_synced_at TEXT,
                 last_error_code TEXT,
                 last_error_message TEXT,
                 last_request_id TEXT,
@@ -245,6 +250,7 @@ def init_db() -> None:
                 progress_total INTEGER NOT NULL DEFAULT 0,
                 preview_json TEXT NOT NULL DEFAULT '{}',
                 last_error TEXT,
+                queue_position BIGINT NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 started_at TEXT,
                 finished_at TEXT
@@ -497,6 +503,12 @@ def _migrate_template_columns(cur: psycopg.Cursor) -> None:
 
 def _migrate_articlewerk_columns(cur: psycopg.Cursor) -> None:
     cur.execute("ALTER TABLE articlewerk_jobs ADD COLUMN IF NOT EXISTS preview_json TEXT NOT NULL DEFAULT '{}'")
+    cur.execute("ALTER TABLE articlewerk_jobs ADD COLUMN IF NOT EXISTS queue_position BIGINT NOT NULL DEFAULT 0")
+    cur.execute("ALTER TABLE articlewerk_publications ADD COLUMN IF NOT EXISTS last_synced_revision TEXT")
+    cur.execute("ALTER TABLE articlewerk_publications ADD COLUMN IF NOT EXISTS last_synced_preview_hash TEXT")
+    cur.execute("ALTER TABLE articlewerk_publications ADD COLUMN IF NOT EXISTS last_synced_product_hash TEXT")
+    cur.execute("ALTER TABLE articlewerk_publications ADD COLUMN IF NOT EXISTS last_synced_snapshot TEXT")
+    cur.execute("ALTER TABLE articlewerk_publications ADD COLUMN IF NOT EXISTS last_synced_at TEXT")
 
 
 def _migrate_supplier_columns(cur: psycopg.Cursor) -> None:
@@ -526,11 +538,13 @@ def _migrate_supplier_columns(cur: psycopg.Cursor) -> None:
 
 def create_articlewerk_job(job_id: str, root_sku: str, total: int, preview: dict) -> None:
     with _conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT COALESCE(MAX(queue_position), 0) + 1 FROM articlewerk_jobs")
+        queue_position = int(cur.fetchone()[0])
         cur.execute(
             f"INSERT INTO articlewerk_jobs "
-            f"(job_id, root_sku, status, current_phase, progress_current, progress_total, preview_json, created_at) "
-            f"VALUES (%s, %s, 'queued', 'queued', 0, %s, %s, {_NOW_SQL})",
-            (job_id, root_sku, total, json.dumps(preview, ensure_ascii=False)),
+            f"(job_id, root_sku, status, current_phase, progress_current, progress_total, preview_json, queue_position, created_at) "
+            f"VALUES (%s, %s, 'queued', 'queued', 0, %s, %s, %s, {_NOW_SQL})",
+            (job_id, root_sku, total, json.dumps(preview, ensure_ascii=False), queue_position),
         )
 
 
@@ -651,7 +665,8 @@ def list_resumable_articlewerk_jobs() -> list[dict]:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT job_id, preview_json FROM articlewerk_jobs "
-            "WHERE status IN ('queued', 'publishing') ORDER BY created_at"
+            "WHERE status IN ('queued', 'publishing') "
+            "ORDER BY CASE WHEN queue_position = 0 THEN 0 ELSE 1 END, queue_position, created_at"
         )
         rows = cur.fetchall()
     result = []
@@ -674,26 +689,43 @@ def upsert_articlewerk_publication(
     error_code: str | None = None,
     error_message: str | None = None,
     request_id: str | None = None,
+    synced_revision: str | None = None,
+    synced_preview_hash: str | None = None,
+    synced_product_hash: str | None = None,
+    synced_snapshot: dict | None = None,
 ) -> None:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
             f"INSERT INTO articlewerk_publications "
-            f"(artikelnummer, remote_article_id, status, payload_hash, last_error_code, "
+            f"(artikelnummer, remote_article_id, status, payload_hash, last_synced_revision, "
+            f"last_synced_preview_hash, last_synced_product_hash, last_synced_snapshot, last_synced_at, last_error_code, "
             f"last_error_message, last_request_id, created_at, updated_at) "
-            f"VALUES (%s,%s,%s,%s,%s,%s,%s,{_NOW_SQL},{_NOW_SQL}) "
+            f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,"
+            f"CASE WHEN %s IS NOT NULL THEN {_NOW_SQL} ELSE NULL END,%s,%s,%s,{_NOW_SQL},{_NOW_SQL}) "
             f"ON CONFLICT (artikelnummer) DO UPDATE SET "
             f"remote_article_id=COALESCE(excluded.remote_article_id, articlewerk_publications.remote_article_id), "
             f"status=excluded.status, payload_hash=COALESCE(excluded.payload_hash, articlewerk_publications.payload_hash), "
+            f"last_synced_revision=COALESCE(excluded.last_synced_revision, articlewerk_publications.last_synced_revision), "
+            f"last_synced_preview_hash=COALESCE(excluded.last_synced_preview_hash, articlewerk_publications.last_synced_preview_hash), "
+            f"last_synced_product_hash=COALESCE(excluded.last_synced_product_hash, articlewerk_publications.last_synced_product_hash), "
+            f"last_synced_snapshot=COALESCE(excluded.last_synced_snapshot, articlewerk_publications.last_synced_snapshot), "
+            f"last_synced_at=COALESCE(excluded.last_synced_at, articlewerk_publications.last_synced_at), "
             f"last_error_code=excluded.last_error_code, last_error_message=excluded.last_error_message, "
             f"last_request_id=excluded.last_request_id, updated_at={_NOW_SQL}",
-            (artikelnummer, remote_article_id, status, payload_hash, error_code, error_message, request_id),
+            (
+                artikelnummer, remote_article_id, status, payload_hash, synced_revision,
+                synced_preview_hash, synced_product_hash,
+                json.dumps(synced_snapshot, ensure_ascii=False) if synced_snapshot is not None else None,
+                synced_revision, error_code, error_message, request_id,
+            ),
         )
 
 
 def get_articlewerk_publication(artikelnummer: str) -> dict | None:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT artikelnummer, remote_article_id, status, payload_hash, last_error_code, "
+            "SELECT artikelnummer, remote_article_id, status, payload_hash, last_synced_revision, "
+            "last_synced_preview_hash, last_synced_product_hash, last_synced_snapshot, last_synced_at, last_error_code, "
             "last_error_message, last_request_id, created_at, updated_at "
             "FROM articlewerk_publications WHERE artikelnummer=%s",
             (artikelnummer,),
@@ -701,9 +733,32 @@ def get_articlewerk_publication(artikelnummer: str) -> dict | None:
         row = cur.fetchone()
     if not row:
         return None
-    keys = ("artikelnummer", "remote_article_id", "status", "payload_hash", "last_error_code",
-            "last_error_message", "last_request_id", "created_at", "updated_at")
-    return dict(zip(keys, row))
+    keys = (
+        "artikelnummer", "remote_article_id", "status", "payload_hash",
+        "last_synced_revision", "last_synced_preview_hash", "last_synced_product_hash", "last_synced_snapshot",
+        "last_synced_at", "last_error_code", "last_error_message", "last_request_id",
+        "created_at", "updated_at",
+    )
+    result = dict(zip(keys, row))
+    try:
+        result["last_synced_snapshot"] = json.loads(result["last_synced_snapshot"]) if result["last_synced_snapshot"] else None
+    except (TypeError, json.JSONDecodeError):
+        result["last_synced_snapshot"] = None
+    return result
+
+
+def list_articlewerk_publications() -> dict[str, dict]:
+    """Return publication state for the synchronization overview."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT artikelnummer FROM articlewerk_publications ORDER BY LOWER(artikelnummer)"
+        )
+        skus = [row[0] for row in cur.fetchall()]
+    return {
+        sku: publication
+        for sku in skus
+        if (publication := get_articlewerk_publication(sku)) is not None
+    }
 
 
 def reset_deleted_articlewerk_publication(artikelnummer: str) -> None:
@@ -711,7 +766,9 @@ def reset_deleted_articlewerk_publication(artikelnummer: str) -> None:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
             f"UPDATE articlewerk_publications SET remote_article_id=NULL, status='not_published', "
-            f"payload_hash=NULL, last_error_code=NULL, last_error_message=NULL, last_request_id=NULL, "
+            f"payload_hash=NULL, last_synced_revision=NULL, last_synced_preview_hash=NULL, "
+            f"last_synced_product_hash=NULL, last_synced_snapshot=NULL, last_synced_at=NULL, last_error_code=NULL, "
+            f"last_error_message=NULL, last_request_id=NULL, "
             f"updated_at={_NOW_SQL} WHERE artikelnummer=%s",
             (artikelnummer,),
         )

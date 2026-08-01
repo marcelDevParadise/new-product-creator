@@ -8,7 +8,7 @@ import { api } from '../api/client';
 import type { Product, WorkflowItem, WorkflowStatus } from '../types';
 import { BulkStammdatenModal } from '../components/products/BulkStammdatenModal';
 import { VariantGroupModal } from '../components/products/VariantGroupModal';
-import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUp, Plus, Trash2, Archive, ArchiveRestore, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy, Package } from 'lucide-react';
+import { Pencil, CheckCircle2, AlertCircle, Search, Upload, ArrowUp, Plus, Trash2, Archive, ArchiveRestore, X, ClipboardEdit, ChevronRight, ChevronDown, GitBranch, Unlink, Copy, Package, CloudUpload, LoaderCircle } from 'lucide-react';
 
 type EditingCell = { sku: string; field: string } | null;
 
@@ -65,6 +65,8 @@ export function StammdatenPage() {
   const [addError, setAddError] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [bulkPublishing, setBulkPublishing] = useState(false);
   const [showBulkStammdaten, setShowBulkStammdaten] = useState(false);
   const [showVariantGroupModal, setShowVariantGroupModal] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -239,6 +241,24 @@ export function StammdatenPage() {
     }
   };
 
+  const handlePublishSelected = async () => {
+    setShowPublishConfirm(false);
+    setBulkPublishing(true);
+    try {
+      const result = await api.publishArtikelwerkBulk(selectedPublishSkus);
+      setSelectedSkus(new Set());
+      toast(
+        `${result.count} Produkte wurden aufsteigend eingeplant: ${result.order.join(', ')}`,
+        'success',
+      );
+      navigate('/logs');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Mehrfachveröffentlichung fehlgeschlagen', 'error');
+    } finally {
+      setBulkPublishing(false);
+    }
+  };
+
   const handleUnarchive = async (sku: string) => {
     try {
       await api.unarchiveProduct(sku);
@@ -293,6 +313,20 @@ export function StammdatenPage() {
   };
 
   const allSelected = filteredProducts.length > 0 && selectedSkus.size === filteredProducts.length;
+  const selectedPublishSkus = products
+    .filter(product => selectedSkus.has(product.artikelnummer) && !product.parent_sku)
+    .sort(compareByArtikelnummer)
+    .map(product => product.artikelnummer);
+  const bulkPublishReady = selectedPublishSkus.length === selectedSkus.size
+    && selectedPublishSkus.every(sku => {
+      const workflow = workflowBySku.get(sku);
+      return !!workflow
+        && ['approved', 'published'].includes(workflow.status)
+        && !workflow.approval_stale;
+    });
+  const bulkPublishTitle = bulkPublishReady
+    ? `Aufsteigend veröffentlichen: ${selectedPublishSkus.join(', ')}`
+    : 'Nur freigegebene, unveränderte Parent- oder Einzelprodukte können veröffentlicht werden.';
   const allArchivedSelected = filteredArchived.length > 0 && filteredArchived.every((p) => selectedSkus.has(p.artikelnummer));
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -364,6 +398,17 @@ export function StammdatenPage() {
                 >
                   <ClipboardEdit className="w-4 h-4" />
                   {selectedSkus.size} Stammdaten
+                </button>
+                <button
+                  onClick={() => setShowPublishConfirm(true)}
+                  disabled={!bulkPublishReady || bulkPublishing}
+                  title={bulkPublishTitle}
+                  className="flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-500/30 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                >
+                  {bulkPublishing
+                    ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                    : <CloudUpload className="h-4 w-4" />}
+                  {selectedSkus.size} veröffentlichen
                 </button>
                 <button
                   onClick={handleArchiveSelected}
@@ -635,7 +680,7 @@ export function StammdatenPage() {
                     </span>
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400">Artikelname</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[130px]">Workflow</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[130px]">Status</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">EK (Netto)</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">VK (Brutto)</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 w-[100px]">Gewicht (g)</th>
@@ -939,6 +984,15 @@ export function StammdatenPage() {
           variant="danger"
           onConfirm={() => { setShowDeleteConfirm(false); handleDeleteSelected(); }}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+      {showPublishConfirm && (
+        <ConfirmDialog
+          title={`${selectedPublishSkus.length} Produkte veröffentlichen?`}
+          message={`Die Produkte werden serverseitig nacheinander in dieser Reihenfolge an JTL übertragen: ${selectedPublishSkus.join(', ')}. Fehler werden pro Produkt protokolliert und stoppen die folgenden Produkte nicht.`}
+          confirmLabel="Veröffentlichung starten"
+          onConfirm={handlePublishSelected}
+          onCancel={() => setShowPublishConfirm(false)}
         />
       )}
       {showBulkStammdaten && (

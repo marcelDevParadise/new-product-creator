@@ -46,7 +46,7 @@ const sections: NavSection[] = [
       { to: '/categories', label: 'Kategorien', icon: FolderTree },
       { to: '/suppliers', label: 'Lieferanten', icon: Truck },
       { to: '/export', label: 'Export', icon: Download },
-      { to: '/artikelwerk', label: 'Artikelwerk', icon: CloudUpload },
+      { to: '/artikelwerk', label: 'JTL-Synchronisation', icon: CloudUpload },
       { to: '/logs', label: 'Logs', icon: ScrollText },
       { to: '/settings', label: 'Einstellungen', icon: SlidersHorizontal },
     ],

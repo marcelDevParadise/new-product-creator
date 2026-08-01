@@ -683,3 +683,80 @@ export interface ArtikelwerkPublication {
   last_error_message?: string | null;
   last_request_id?: string | null;
 }
+
+export interface ArtikelwerkSyncItem {
+  artikelnummer: string;
+  artikelname: string;
+  is_group: boolean;
+  archived: boolean;
+  publication_status: string;
+  remote_article_id: string | null;
+  last_synced_revision: string | null;
+  last_synced_at: string | null;
+  local_changed_since_sync: boolean;
+  last_error_code: string | null;
+  last_error_message: string | null;
+  latest_job: ArtikelwerkJob | null;
+}
+
+export interface ArtikelwerkSyncOverview {
+  items: ArtikelwerkSyncItem[];
+  counts: {
+    total: number;
+    published: number;
+    local_changes: number;
+    failed: number;
+    unchecked_remote_versions: number;
+  };
+}
+
+export interface ArtikelwerkBusinessDiff {
+  area: string;
+  field: string;
+  label: string;
+  local_value: unknown;
+  jtl_value: unknown;
+  last_synced_value: unknown;
+  equal: boolean;
+  direction: 'same' | 'local_to_jtl' | 'jtl_changed' | 'conflict' | 'jtl_only';
+}
+
+export interface ArtikelwerkSyncIssue extends ArtikelwerkPreviewIssue {
+  area: string;
+  cause: string;
+  recommended_action: string;
+}
+
+export interface ArtikelwerkPlannedChange {
+  order: number;
+  operation: string;
+  resource_key: string;
+  area: string;
+  label: string;
+  payload: Record<string, unknown>;
+}
+
+export interface ArtikelwerkSyncDetail {
+  artikelnummer: string;
+  artikelname: string;
+  sync_status: 'not_published' | 'remote_missing' | 'blocked' | 'conflict' | 'jtl_changed' | 'local_changed' | 'in_sync';
+  publication: (ArtikelwerkPublication & {
+    last_synced_revision?: string | null;
+    last_synced_at?: string | null;
+  }) | null;
+  latest_job: ArtikelwerkJob | null;
+  versions: {
+    last_synced: string | null;
+    current_jtl: string | null;
+    last_synced_at: string | null;
+    remote_changed_since_sync: boolean;
+    local_changed_since_sync: boolean;
+  };
+  remote_missing: boolean;
+  remote: Record<string, unknown> | null;
+  diff: ArtikelwerkBusinessDiff[];
+  planned_changes: ArtikelwerkPlannedChange[];
+  issues: ArtikelwerkSyncIssue[];
+  preview_valid: boolean;
+  unsupported_fields: string[];
+}

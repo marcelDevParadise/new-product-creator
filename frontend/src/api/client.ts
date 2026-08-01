@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult, WorkflowBoard, WorkflowItem, WorkflowProductDetail, WorkflowComment, WorkflowStatus } from '../types';
+import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult, ArtikelwerkSyncOverview, ArtikelwerkSyncDetail, WorkflowBoard, WorkflowItem, WorkflowProductDetail, WorkflowComment, WorkflowStatus } from '../types';
 
 const BASE = '/api';
 
@@ -41,8 +41,23 @@ export const api = {
     request<ArtikelwerkPreview>(`/articlewerk/products/${encodeURIComponent(sku)}/preview`, { method: 'POST' }),
   publishArtikelwerk: (sku: string) =>
     request<{ job_id: string; status: string; steps: number }>(`/articlewerk/products/${encodeURIComponent(sku)}/publish`, { method: 'POST' }),
+  publishArtikelwerkBulk: (skus: string[]) =>
+    request<{
+      status: string;
+      count: number;
+      order: string[];
+      jobs: { job_id: string; sku: string; status: string; steps: number }[];
+    }>('/articlewerk/products/publish-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skus }),
+    }),
   getArtikelwerkPublication: (sku: string) =>
     request<ArtikelwerkPublication>(`/articlewerk/products/${encodeURIComponent(sku)}/status`),
+  getArtikelwerkSyncOverview: () =>
+    request<ArtikelwerkSyncOverview>('/articlewerk/sync'),
+  getArtikelwerkSyncDetail: (sku: string) =>
+    request<ArtikelwerkSyncDetail>(`/articlewerk/sync/${encodeURIComponent(sku)}`),
   getArtikelwerkJobs: (limit = 50) => request<ArtikelwerkJob[]>(`/articlewerk/jobs?limit=${limit}`),
   getArtikelwerkLogs: (options: { limit?: number; status?: string; search?: string } = {}) => {
     const params = new URLSearchParams({ limit: String(options.limit ?? 100) });

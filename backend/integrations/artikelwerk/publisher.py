@@ -4,6 +4,7 @@ import base64
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import re
 import uuid
@@ -30,6 +31,7 @@ from services.database import (
 # image memory and Artikelwerk's per-token rate limit predictable. Jobs remain
 # queued in the database while another publication is active.
 _publication_lock = asyncio.Lock()
+logger = logging.getLogger(__name__)
 
 _SENSITIVE_ERROR_KEYS = {
     "authorization", "api_key", "apikey", "password", "secret", "token", "access_token", "refresh_token",
@@ -468,6 +470,18 @@ async def run_publication(job_id: str, preview: PublicationPreview) -> None:
         await _run_publication(job_id, preview)
 
 
+async def run_publication_queue(publications: list[tuple[str, PublicationPreview]]) -> None:
+    """Run a persisted batch in its exact order without interleaving other jobs."""
+    async with _publication_lock:
+        for job_id, preview in publications:
+            try:
+                await _run_publication(job_id, preview)
+            except Exception:
+                # _run_publication persists ordinary failures itself. Keep the
+                # remaining batch moving even if its failure bookkeeping fails.
+                logger.exception("Unerwarteter Folgefehler in Artikelwerk-Job %s", job_id)
+
+
 async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
     """Execute a validated preview while persisting every remote operation."""
     update_articlewerk_job(job_id, status="publishing", phase="connect", progress=0)
@@ -479,6 +493,9 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
     variation_ids: dict[str, dict[str, str]] = {}
     article_created_with_price = False
     article_preexisting = False
+    synced_revision: str | None = None
+    synced_snapshot: dict[str, Any] | None = None
+    synced_product_hash: str | None = None
 
     try:
         publication = get_articlewerk_publication(preview.sku)
@@ -653,7 +670,45 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                             )
                 completed += 1
 
-        upsert_articlewerk_publication(preview.sku, status="published")
+            if remote_article_id:
+                try:
+                    create_step = next(
+                        (step for step in preview.steps if step.operation == "create_article"),
+                        None,
+                    )
+                    tenant_ids = create_step.payload.get("tenantIds", []) if create_step else []
+                    if tenant_ids:
+                        current = await client.get_article(remote_article_id, int(tenant_ids[0]))
+                        synced_snapshot = current.data
+                        synced_revision = (
+                            (current.etag or "").strip('"')
+                            or str(current.data.get("revision", {}).get("rowVersion") or "")
+                            or None
+                        )
+                except ArtikelwerkError:
+                    # The writes succeeded. Missing read scope or a transient
+                    # snapshot read must not turn that into a failed publish.
+                    logger.warning(
+                        "JTL-Snapshot nach erfolgreichem Job %s konnte nicht gelesen werden.",
+                        job_id,
+                    )
+
+            from services.workflow import publication_fingerprint
+            from state import state
+
+            synced_product = state.get_product(preview.sku)
+            if synced_product:
+                synced_children = state.get_variants(preview.sku) if synced_product.is_parent else []
+                synced_product_hash = publication_fingerprint(synced_product, synced_children)
+
+        upsert_articlewerk_publication(
+            preview.sku,
+            status="published",
+            synced_revision=synced_revision,
+            synced_preview_hash=_payload_hash(preview.model_dump(mode="json")),
+            synced_product_hash=synced_product_hash,
+            synced_snapshot=synced_snapshot,
+        )
         update_articlewerk_job(job_id, status="published", phase="complete", progress=len(preview.steps))
         set_workflow_publication_status(preview.sku, "published")
     except ArtikelwerkError as exc:
