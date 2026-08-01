@@ -1,0 +1,12 @@
+[Unit]
+Description=Regelmäßig nach einem neuen Attribut-Generator-Release suchen
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=20s
+Persistent=true
+Unit=attribut-generator-update.service
+
+[Install]
+WantedBy=timers.target

@@ -7,6 +7,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="${REPO_DIR}/.venv"
 RUN_USER="$(id -un)"
+RUN_HOME="$(getent passwd "${RUN_USER}" | cut -d: -f6)"
 
 cd "${REPO_DIR}"
 
@@ -57,7 +58,32 @@ echo "==> systemd-Unit und Caddyfile aktualisieren"
 sed -e "s|__USER__|${RUN_USER}|g" -e "s|__REPO__|${REPO_DIR}|g" \
 	"${REPO_DIR}/deploy/attribut-generator.service" \
 	| sudo tee /etc/systemd/system/attribut-generator.service > /dev/null
+
+sed -e "s|__USER__|${RUN_USER}|g" -e "s|__HOME__|${RUN_HOME}|g" -e "s|__REPO__|${REPO_DIR}|g" \
+	"${REPO_DIR}/deploy/attribut-generator-update.service" \
+	| sudo tee /etc/systemd/system/attribut-generator-update.service > /dev/null
+sudo install -m 0644 \
+	"${REPO_DIR}/deploy/attribut-generator-update.timer" \
+	/etc/systemd/system/attribut-generator-update.timer
+
 sudo systemctl daemon-reload
+sudo systemctl enable --now attribut-generator-update.timer
+
+# Einen eventuell noch vorhandenen Cron-Eintrag exakt für dieses Update-Skript
+# entfernen. Andere Cronjobs des Benutzers bleiben unverändert.
+if command -v crontab >/dev/null 2>&1; then
+	LEGACY_CRONTAB="$(crontab -l 2>/dev/null || true)"
+	if printf '%s\n' "${LEGACY_CRONTAB}" | grep -Fq "${REPO_DIR}/deploy/auto-update.sh"; then
+		FILTERED_CRONTAB="$(printf '%s\n' "${LEGACY_CRONTAB}" \
+			| grep -Fv "${REPO_DIR}/deploy/auto-update.sh" || true)"
+		if [ -n "${FILTERED_CRONTAB}" ]; then
+			printf '%s\n' "${FILTERED_CRONTAB}" | crontab -
+		else
+			crontab -r || true
+		fi
+		echo "==> Alter Cron-Poller entfernt; systemd-Timer ist jetzt zuständig"
+	fi
+fi
 
 sed -e "s|__REPO__|${REPO_DIR}|g" "${REPO_DIR}/deploy/Caddyfile" \
 	| sudo tee /etc/caddy/Caddyfile > /dev/null
@@ -85,3 +111,4 @@ sudo systemctl reload caddy || sudo systemctl restart caddy
 
 echo "OK: Update fertig."
 sudo systemctl status attribut-generator.service --no-pager -l | head -n 12
+sudo systemctl status attribut-generator-update.timer --no-pager -l | head -n 8

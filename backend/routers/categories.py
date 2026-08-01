@@ -18,6 +18,46 @@ class RenamePayload(BaseModel):
     new_name: str
 
 
+class MovePayload(BaseModel):
+    source_path: list[str]
+    destination_path: list[str]
+
+
+def _get_node(tree: dict, path: list[str], label: str) -> dict:
+    node = tree
+    for segment in path:
+        if segment not in node:
+            raise HTTPException(404, f"{label} nicht gefunden: {segment}")
+        node = node[segment]
+    return node
+
+
+def _move_category_node(tree: dict, source_path: list[str], destination_path: list[str]) -> dict:
+    """Move a complete category branch below another category (or to the root)."""
+    if not source_path:
+        raise HTTPException(400, "Quellpfad darf nicht leer sein")
+    if destination_path[:len(source_path)] == source_path:
+        raise HTTPException(400, "Eine Kategorie kann nicht in sich selbst verschoben werden")
+
+    source_parent = _get_node(tree, source_path[:-1], "Quellpfad")
+    source_name = source_path[-1]
+    if source_name not in source_parent:
+        raise HTTPException(404, f"Kategorie '{source_name}' nicht gefunden")
+
+    destination = _get_node(tree, destination_path, "Zielkategorie")
+    if source_parent is destination:
+        return tree
+    if source_name in destination:
+        raise HTTPException(
+            409,
+            f"Kategorie '{source_name}' existiert in der Zielkategorie bereits",
+        )
+
+    branch = source_parent.pop(source_name)
+    destination[source_name] = branch
+    return tree
+
+
 @router.get("/tree")
 def get_tree() -> dict:
     """Return the full category tree."""
@@ -75,6 +115,15 @@ def rename_node(payload: RenamePayload) -> dict:
         raise HTTPException(409, f"Kategorie '{payload.new_name}' existiert bereits")
     # Preserve order and children
     node[payload.new_name] = node.pop(old_name)
+    state.save_category_tree(tree)
+    return state.get_category_tree()
+
+
+@router.post("/node/move")
+def move_node(payload: MovePayload) -> dict:
+    """Move a category and all of its children below a new parent."""
+    tree = state.get_category_tree()
+    _move_category_node(tree, payload.source_path, payload.destination_path)
     state.save_category_tree(tree)
     return state.get_category_tree()
 

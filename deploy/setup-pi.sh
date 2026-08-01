@@ -13,6 +13,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV_DIR="${REPO_DIR}/.venv"
 RUN_USER="$(id -un)"
+RUN_HOME="$(getent passwd "${RUN_USER}" | cut -d: -f6)"
 
 echo "==> Repo:  ${REPO_DIR}"
 echo "==> User:  ${RUN_USER}"
@@ -121,6 +122,16 @@ sudo systemctl enable caddy
 
 echo "==> Tailscale Serve aktivieren (HTTPS auf 443 → lokaler Caddy auf 8080)"
 sudo tailscale serve --bg --https 443 http://127.0.0.1:8080 || true
+
+echo "==> systemd-Timer fuer Tag-Releases installieren"
+sed -e "s|__USER__|${RUN_USER}|g" -e "s|__HOME__|${RUN_HOME}|g" -e "s|__REPO__|${REPO_DIR}|g" \
+	"${REPO_DIR}/deploy/attribut-generator-update.service" \
+	| sudo tee /etc/systemd/system/attribut-generator-update.service > /dev/null
+sudo install -m 0644 \
+	"${REPO_DIR}/deploy/attribut-generator-update.timer" \
+	/etc/systemd/system/attribut-generator-update.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now attribut-generator-update.timer
 
 echo ""
 echo "✓ Installation fertig."

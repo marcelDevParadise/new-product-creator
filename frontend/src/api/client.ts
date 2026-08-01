@@ -401,6 +401,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path, new_name: newName }),
     }),
+  moveCategoryNode: (sourcePath: string[], destinationPath: string[]) =>
+    request<CategoryTree>('/categories/node/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_path: sourcePath, destination_path: destinationPath }),
+    }),
   deleteCategoryNode: (path: string[], name: string) =>
     request<CategoryTree>('/categories/node', {
       method: 'DELETE',

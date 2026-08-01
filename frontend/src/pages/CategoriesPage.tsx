@@ -1,7 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
 import {
   Plus, Trash2, ChevronRight, ChevronDown, Pencil, Check, X, FolderTree,
-  Search, Layers3, Network, Sparkles, RotateCcw,
+  Search, Layers3, Network, Sparkles, RotateCcw, GripVertical, Undo2,
 } from 'lucide-react';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -19,10 +32,11 @@ interface TreeNodeProps {
   onRename: (path: string[], newName: string) => void;
   onDelete: (path: string[], name: string) => void;
   depth: number;
+  moving: boolean;
   forceExpanded?: boolean;
 }
 
-function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, forceExpanded = false }: TreeNodeProps) {
+function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, moving, forceExpanded = false }: TreeNodeProps) {
   const [expanded, setExpanded] = useState(depth < 2);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -32,6 +46,29 @@ function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, forc
   const hasChildren = childKeys.length > 0;
   const fullPath = [...path, name];
   const isExpanded = forceExpanded || expanded;
+  const dragId = `category:${JSON.stringify(fullPath)}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableRef,
+    isDragging,
+  } = useDraggable({
+    id: `drag:${dragId}`,
+    data: { path: fullPath, name },
+    disabled: editing || adding || moving,
+  });
+  const {
+    isOver,
+    setNodeRef: setDroppableRef,
+  } = useDroppable({
+    id: `drop:${dragId}`,
+    data: { path: fullPath, name },
+    disabled: isDragging || moving,
+  });
+  const setNodeRef = useCallback((node: HTMLDivElement | null) => {
+    setDraggableRef(node);
+    setDroppableRef(node);
+  }, [setDraggableRef, setDroppableRef]);
 
   const handleAdd = () => {
     if (newName.trim()) {
@@ -52,11 +89,25 @@ function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, forc
   return (
     <div>
       <div
-        className={`group flex min-h-11 items-center gap-2 rounded-xl border border-transparent px-2 py-2 transition-all hover:border-border hover:bg-accent/60 ${
+        ref={setNodeRef}
+        className={`group flex min-h-11 items-center gap-2 rounded-xl border px-2 py-2 transition-all ${
+          isOver ? 'border-indigo-500 bg-indigo-500/10 ring-2 ring-indigo-500/20' : 'border-transparent hover:border-border hover:bg-accent/60'
+        } ${isDragging ? 'opacity-30' : ''} ${
           depth === 0 ? 'bg-muted/35 font-medium' : ''
         }`}
         style={{ marginLeft: `${depth * 22}px` }}
       >
+        <button
+          type="button"
+          className="flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-background hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+          title="Kategorie verschieben"
+          aria-label={`${name} verschieben`}
+          disabled={editing || adding || moving}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-background hover:text-foreground"
@@ -136,6 +187,7 @@ function TreeNode({ name, children, path, onAdd, onRename, onDelete, depth, forc
               onRename={onRename}
               onDelete={onDelete}
               depth={depth + 1}
+              moving={moving}
               forceExpanded={forceExpanded}
             />
           ))}
@@ -176,15 +228,21 @@ export function CategoriesPage() {
   const [newRootName, setNewRootName] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ path: string[]; name: string } | null>(null);
   const [search, setSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<{ path: string[]; name: string } | null>(null);
+  const [moving, setMoving] = useState(false);
   const { toast } = useToast();
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor),
+  );
 
-  const loadTree = () => {
+  const loadTree = useCallback(() => {
     api.getCategoryTree()
       .then((t) => { setTree(t); setLoading(false); })
       .catch((e) => { toast(e.message, 'error'); setLoading(false); });
-  };
+  }, [toast]);
 
-  useEffect(loadTree, []);
+  useEffect(loadTree, [loadTree]);
 
   const handleAdd = async (path: string[], name: string) => {
     try {
@@ -229,6 +287,45 @@ export function CategoriesPage() {
       toast(e instanceof Error ? e.message : 'Fehler', 'error');
     }
   };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const path = event.active.data.current?.path as string[] | undefined;
+    const name = event.active.data.current?.name as string | undefined;
+    if (path && name) setActiveCategory({ path, name });
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveCategory(null);
+    const sourcePath = event.active.data.current?.path as string[] | undefined;
+    const destinationPath = event.over?.data.current?.path as string[] | undefined;
+    if (!sourcePath || !destinationPath) return;
+
+    const currentParentPath = sourcePath.slice(0, -1);
+    if (pathsEqual(currentParentPath, destinationPath)) return;
+    if (pathStartsWith(destinationPath, sourcePath)) {
+      toast('Eine Kategorie kann nicht in sich selbst verschoben werden.', 'error');
+      return;
+    }
+
+    setMoving(true);
+    try {
+      const updated = await api.moveCategoryNode(sourcePath, destinationPath);
+      setTree(updated);
+      const destinationName = destinationPath.at(-1);
+      toast(
+        destinationName
+          ? `Kategorie „${sourcePath.at(-1)}" wurde nach „${destinationName}" verschoben`
+          : `Kategorie „${sourcePath.at(-1)}" ist jetzt eine Hauptkategorie`,
+        'success',
+      );
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Kategorie konnte nicht verschoben werden', 'error');
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  const handleDragCancel = () => setActiveCategory(null);
 
   if (loading || !tree) {
     return <LoadingSpinner className="h-full" />;
@@ -285,7 +382,7 @@ export function CategoriesPage() {
           <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between md:p-5">
             <div>
               <h2 className="font-semibold">Kategoriebaum</h2>
-              <p className="text-xs text-muted-foreground">Kategorien aufklappen, ergänzen, umbenennen oder löschen.</p>
+              <p className="text-xs text-muted-foreground">Am Griff ziehen und auf einer Kategorie ablegen, um sie unterzuordnen.</p>
             </div>
             <div className="flex w-full gap-2 md:w-auto">
               <div className="relative min-w-0 flex-1 md:w-80">
@@ -303,6 +400,13 @@ export function CategoriesPage() {
             </div>
           </div>
 
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+          >
           <div className="p-3 md:p-4">
             {addingRoot && (
               <div className="mb-3 flex items-center gap-2 rounded-2xl border border-indigo-500/25 bg-indigo-500/5 p-3">
@@ -335,23 +439,60 @@ export function CategoriesPage() {
                 <Button className="mt-4" variant={search ? 'outline' : 'default'} onClick={() => search ? setSearch('') : setAddingRoot(true)}>{search ? 'Suche zurücksetzen' : 'Hauptkategorie anlegen'}</Button>
               </div>
             ) : (
-              visibleRootKeys.map((name) => (
-                <TreeNode
-                  key={name}
-                  name={name}
-                  children={filteredTree[name]}
-                  path={[]}
-                  onAdd={handleAdd}
-                  onRename={handleRename}
-                  onDelete={(path, delName) => setDeleteTarget({ path, name: delName })}
-                  depth={0}
-                  forceExpanded={Boolean(search)}
-                />
-              ))
+              <>
+                <RootDropZone active={Boolean(activeCategory)} moving={moving} />
+                {visibleRootKeys.map((name) => (
+                  <TreeNode
+                    key={name}
+                    name={name}
+                    children={filteredTree[name]}
+                    path={[]}
+                    onAdd={handleAdd}
+                    onRename={handleRename}
+                    onDelete={(path, delName) => setDeleteTarget({ path, name: delName })}
+                    depth={0}
+                    moving={moving}
+                    forceExpanded={Boolean(search)}
+                  />
+                ))}
+              </>
             )}
           </div>
+          <DragOverlay>
+            {activeCategory ? (
+              <div className="flex items-center gap-2 rounded-xl border border-indigo-500/30 bg-card px-3 py-2 text-sm font-medium shadow-xl">
+                <GripVertical className="h-4 w-4 text-indigo-500" />
+                <FolderTree className="h-4 w-4 text-indigo-500" />
+                {activeCategory.name}
+              </div>
+            ) : null}
+          </DragOverlay>
+          </DndContext>
         </section>
       </div>
+    </div>
+  );
+}
+
+function RootDropZone({ active, moving }: { active: boolean; moving: boolean }) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: 'category-root',
+    data: { path: [], name: null },
+    disabled: !active || moving,
+  });
+
+  if (!active) return null;
+  return (
+    <div
+      ref={setNodeRef}
+      className={`mb-2 flex min-h-12 items-center justify-center gap-2 rounded-xl border border-dashed px-3 text-xs font-medium transition-colors ${
+        isOver
+          ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300'
+          : 'border-border bg-muted/20 text-muted-foreground'
+      }`}
+    >
+      <Undo2 className="h-4 w-4" />
+      Hier ablegen, um daraus eine Hauptkategorie zu machen
     </div>
   );
 }
@@ -420,4 +561,12 @@ function filterCategoryTree(tree: CategoryTree, query: string): CategoryTree {
     }
   }
   return result;
+}
+
+function pathsEqual(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((segment, index) => segment === right[index]);
+}
+
+function pathStartsWith(path: string[], prefix: string[]): boolean {
+  return prefix.length <= path.length && prefix.every((segment, index) => segment === path[index]);
 }
