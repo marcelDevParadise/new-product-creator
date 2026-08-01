@@ -23,21 +23,25 @@ fi
 
 cd "${REPO_DIR}"
 
-# Den ursprünglichen Checkout bei Erfolg und bei jedem Fehler wiederherstellen.
-# So bleibt der Pi nach einem fehlgeschlagenen Build nicht im detached HEAD.
+# Bei einem Fehler den ursprünglichen Checkout wiederherstellen. Nach einem
+# erfolgreichen Deployment bleibt das Repo dagegen bewusst auf dem neuen Tag,
+# damit auch ein späterer Service- oder Pi-Neustart exakt diese Version lädt.
 ORIGINAL_BRANCH="$(git symbolic-ref --quiet --short HEAD || true)"
 ORIGINAL_COMMIT="$(git rev-parse HEAD)"
-restore_checkout() {
+restore_checkout_on_failure() {
 	local exit_code=$?
 	trap - EXIT
-	if [ -n "${ORIGINAL_BRANCH}" ]; then
-		git checkout --quiet "${ORIGINAL_BRANCH}" || true
-	else
-		git checkout --quiet --detach "${ORIGINAL_COMMIT}" || true
+	if [ "${exit_code}" -ne 0 ]; then
+		echo "!! Deployment fehlgeschlagen — vorherigen Checkout wiederherstellen."
+		if [ -n "${ORIGINAL_BRANCH}" ]; then
+			git checkout --quiet "${ORIGINAL_BRANCH}" || true
+		else
+			git checkout --quiet --detach "${ORIGINAL_COMMIT}" || true
+		fi
 	fi
 	exit "${exit_code}"
 }
-trap restore_checkout EXIT
+trap restore_checkout_on_failure EXIT
 
 git fetch --quiet --tags --prune origin
 
@@ -85,4 +89,4 @@ bash "${REPO_DIR}/deploy/update-pi.sh"
 printf '%s\n' "${LATEST_TAG}" > "${STATE_FILE}"
 echo "[$(date '+%F %T')] Deploy fertig (${LATEST_TAG})"
 
-# Der EXIT-Trap stellt den ursprünglichen Checkout wieder her.
+# Bei Erfolg bleibt HEAD absichtlich auf LATEST_TAG.

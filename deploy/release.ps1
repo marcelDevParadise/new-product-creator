@@ -45,6 +45,34 @@ function Get-NextDeployTag {
 	return "$base-$($highest + 1)"
 }
 
+function Invoke-SshCommand {
+	param(
+		[string]$HostName,
+		[string]$Command
+	)
+
+	$previousErrorActionPreference = $ErrorActionPreference
+	$ErrorActionPreference = "Continue"
+	try {
+		$output = @(
+			& ssh `
+				-o BatchMode=yes `
+				-o ConnectTimeout=10 `
+				-o ConnectionAttempts=1 `
+				$HostName `
+				$Command 2>&1
+		)
+		$sshExitCode = $LASTEXITCODE
+	} finally {
+		$ErrorActionPreference = $previousErrorActionPreference
+	}
+
+	return [pscustomobject]@{
+		ExitCode = $sshExitCode
+		Output = $output
+	}
+}
+
 function Wait-ForPiDeployment {
 	param(
 		[string]$Tag,
@@ -60,20 +88,47 @@ function Wait-ForPiDeployment {
 	$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 	$stateCommand = "test -f '$RepoPath/.last-deployed-tag' && cat '$RepoPath/.last-deployed-tag'"
 	$healthCommand = "curl -fsS http://127.0.0.1:8000/api/health"
+	$triggerCommand = "sudo -n systemctl start --no-block attribut-generator-update.service"
 
 	Write-Host ""
 	Write-Host "==> Warte auf Pi-Deployment von $Tag" -ForegroundColor Cyan
+	$triggerResult = Invoke-SshCommand -HostName $HostName -Command $triggerCommand
+	if ($triggerResult.ExitCode -eq 0) {
+		Write-Host "    Pi-Updater wurde direkt gestartet." -ForegroundColor DarkGray
+	} else {
+		Write-Warning "Pi-Updater konnte nicht direkt gestartet werden. Warte auf den systemd-Timer."
+	}
 
+	$lastStatus = ""
+	$nextStatusAt = Get-Date
 	while ((Get-Date) -lt $deadline) {
-		$deployedTag = (& ssh -o BatchMode=yes -o ConnectTimeout=10 $HostName $stateCommand 2>$null | Select-Object -First 1)
-		$sshExitCode = $LASTEXITCODE
+		$stateResult = Invoke-SshCommand -HostName $HostName -Command $stateCommand
+		$deployedTag = ""
+		if ($stateResult.ExitCode -eq 0 -and $stateResult.Output.Count -gt 0) {
+			$deployedTag = "$($stateResult.Output[0])".Trim()
+		}
 
-		if ($sshExitCode -eq 0 -and "$deployedTag".Trim() -eq $Tag) {
-			$health = & ssh -o BatchMode=yes -o ConnectTimeout=10 $HostName $healthCommand 2>$null
-			if ($LASTEXITCODE -eq 0 -and (($health -join "") -match '"status"\s*:\s*"ok"')) {
+		if ($deployedTag -eq $Tag) {
+			$healthResult = Invoke-SshCommand -HostName $HostName -Command $healthCommand
+			if ($healthResult.ExitCode -eq 0 -and (($healthResult.Output -join "") -match '"status"\s*:\s*"ok"')) {
 				Write-Host "Pi bestaetigt Tag '$Tag'; Backend-Healthcheck ist OK." -ForegroundColor Green
 				return
 			}
+			$currentStatus = "Tag ist deployed; Backend-Healthcheck wartet"
+		} elseif ($stateResult.ExitCode -ne 0) {
+			$currentStatus = "Pi ist per SSH noch nicht erreichbar"
+		} elseif ($deployedTag) {
+			$currentStatus = "Pi meldet noch $deployedTag"
+		} else {
+			$currentStatus = "Pi hat noch keinen Deployment-Marker"
+		}
+
+		$now = Get-Date
+		if ($currentStatus -ne $lastStatus -or $now -ge $nextStatusAt) {
+			$remaining = [Math]::Max(0, [int]($deadline - $now).TotalSeconds)
+			Write-Host "    $currentStatus; verbleibend: $remaining Sekunden" -ForegroundColor DarkGray
+			$lastStatus = $currentStatus
+			$nextStatusAt = $now.AddSeconds(30)
 		}
 
 		Start-Sleep -Seconds 10
