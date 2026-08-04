@@ -1,0 +1,1402 @@
+# Eigene selfhosted Obsidian-Alternative auf dem Raspberry Pi
+
+Stand: 4. August 2026
+
+## 1. Ziel
+
+Diese Anleitung beschreibt den Aufbau einer eigenen, webbasierten Wissens- und
+Notizanwendung. Die Anwendung läuft nativ auf einem Raspberry Pi, verwendet
+keinen Docker-Container und bleibt mit normalen Markdown-Dateien kompatibel.
+
+Der geplante Funktionsumfang:
+
+- Notizen und Ordner im Browser verwalten
+- Markdown-Editor mit Vorschau
+- interne Links im Format `[[Notizname]]`
+- Tags, Volltextsuche, Backlinks und Favoriten
+- Login ohne öffentliche Registrierung
+- Rollen `admin`, `editor` und `viewer`
+- Admin-Oberfläche für Benutzer, Einstellungen, Audit-Log und Backups
+- Dateianhänge und Bilder
+- responsive Oberfläche für Desktop, Tablet und Smartphone
+- optionaler Offline-/PWA-Betrieb
+- GitHub-Repository mit Tests, CI, Releases und nachvollziehbaren Updates
+- nativer Betrieb per `systemd`
+- HTTPS über Caddy
+- automatische, extern kopierbare Backups
+
+Die Anleitung ist ein technischer Bauplan. Sie vermeidet bewusst Funktionen wie
+Echtzeit-Kollaboration und Ende-zu-Ende-Verschlüsselung im ersten Release. Beide
+Themen erhöhen die Komplexität erheblich und sollten erst nach einem stabilen
+MVP ergänzt werden.
+
+## 2. Leitentscheidungen
+
+### 2.1 Markdown bleibt die Datenquelle
+
+Jede Notiz wird als `.md`-Datei gespeichert. Dadurch kann das gesamte
+Notizverzeichnis weiterhin mit Obsidian, VS Code oder einem Texteditor geöffnet
+werden.
+
+SQLite speichert nur:
+
+- Benutzer und Rollen
+- gehashte Sitzungen
+- Einstellungen
+- Audit-Ereignisse
+- einen aus den Markdown-Dateien neu aufbaubaren Suchindex
+- aufgelöste Links, Tags und Backlinks
+
+Die eigentlichen Notizen dürfen nicht ausschließlich in der Datenbank liegen.
+
+### 2.2 Ein Prozess für API und Produktions-Frontend
+
+Während der Entwicklung laufen Vite und die API getrennt. Im Produktivbetrieb
+liefert Fastify das kompilierte React-Frontend aus und stellt unter `/api` die
+API bereit. Caddy ist der einzige öffentlich erreichbare Prozess.
+
+```text
+Browser
+   |
+   | HTTPS
+   v
+Caddy :443
+   |
+   | HTTP nur auf 127.0.0.1
+   v
+Fastify :8787
+   |---- React-Build
+   |---- REST-API
+   |---- Markdown-Dateien und Uploads
+   `---- SQLite
+```
+
+### 2.3 Kein direkter Dateipfad aus dem Browser
+
+Die API arbeitet mit UUIDs und Eltern-IDs. Sie akzeptiert niemals einen freien
+absoluten Dateipfad vom Client. Der Server erzeugt und validiert Pfade selbst.
+Das verhindert unter anderem Zugriffe wie `../../etc/passwd`.
+
+### 2.4 Kein automatisches Deployment aus fremdem Code
+
+GitHub Actions führt Tests auf GitHub-gehosteten Runnern aus. Der Raspberry Pi
+zieht ein geprüftes Git-Tag über einen read-only Deploy-Key und installiert es
+lokal. Ein permanenter GitHub Self-hosted Runner auf demselben Pi wie die
+Produktivdaten ist nicht die Standardempfehlung: Workflow-Code würde direkt auf
+dem Produktivsystem ausgeführt.
+
+## 3. Empfohlener Stack
+
+| Bereich | Technik | Aufgabe |
+|---|---|---|
+| Frontend | React, TypeScript, Vite | Anwendung und Build |
+| Styling | Tailwind CSS | Layout, Themes und responsive UI |
+| Routing | React Router | Login, Notizen und Admin-Routen |
+| Datenabruf | TanStack Query | API-Cache und Mutationen |
+| Editor | CodeMirror 6 | Markdown-Eingabe |
+| Vorschau | `react-markdown`, `remark-gfm`, `rehype-sanitize` | sichere Markdown-Anzeige |
+| Icons | Lucide React | einheitliche Icons |
+| Backend | Fastify mit TypeScript | REST-API und statische Dateien |
+| Validierung | Zod | Request- und Response-Schemas |
+| Datenbank | SQLite mit `better-sqlite3` | Benutzer, Sessions und Index |
+| Passwörter | Argon2id | Passwort-Hashing |
+| Dateiüberwachung | Chokidar | externe Änderungen am Vault erkennen |
+| Tests | Vitest, Fastify Inject, Playwright | Unit-, API- und Browser-Tests |
+| Betrieb | Raspberry Pi OS Lite 64-bit, Node.js LTS, systemd | Laufzeit |
+| HTTPS | Caddy | TLS und Reverse Proxy |
+| Quellcode | GitHub | Reviews, CI, Releases und Issues |
+
+Für ein neues Produktionsprojekt sollte eine unterstützte Node.js-LTS-Linie
+verwendet und in `.nvmrc`, `package.json` und CI identisch festgelegt werden.
+Zum Zeitpunkt dieser Anleitung ist Node.js 24 eine LTS-Linie. Abhängigkeiten
+werden über `package-lock.json` reproduzierbar festgeschrieben.
+
+## 4. Funktionsumfang und Grenzen des MVP
+
+### 4.1 Im MVP enthalten
+
+- erster Admin wird per CLI angelegt
+- Login und Logout
+- Benutzerverwaltung durch Admins
+- Rollen und serverseitige Rechteprüfung
+- Notizen erstellen, lesen, bearbeiten, verschieben und löschen
+- Ordnerbaum
+- Autosave mit sichtbarem Speicherstatus
+- Markdown-Vorschau
+- `[[Wiki-Links]]`, Backlinks und Tags
+- Volltextsuche
+- Upload von Bildern und freigegebenen Dokumenttypen
+- Papierkorb statt sofortiger endgültiger Löschung
+- Admin-Dashboard
+- Audit-Log
+- Health-Endpunkt
+- Backup und Restore
+
+### 4.2 Bewusst später
+
+- Echtzeit-Kollaboration mehrerer Personen
+- Ende-zu-Ende-Verschlüsselung im Browser
+- Plugin-Ausführung mit beliebigem JavaScript
+- öffentlicher Marketplace
+- beliebige HTML-Ausführung in Markdown
+- mobile Native Apps
+
+Ein Web-Plugin-System sollte nicht einfach fremden JavaScript-Code laden. Das
+wäre im Kontext persönlicher Notizen praktisch eine Remote-Code-Ausführung im
+Browser. Für eine erste Erweiterbarkeit sind deklarative Themes, Markdown-
+Erweiterungen und serverseitig geprüfte Integrationen die sicherere Grenze.
+
+## 5. Repository anlegen
+
+Empfohlener Name: `pi-note-vault`
+
+```bash
+mkdir pi-note-vault
+cd pi-note-vault
+git init
+npm init -y
+npm create vite@latest apps/web -- --template react-ts
+mkdir -p apps/api/src packages/contracts/src
+mkdir -p data/vault data/uploads data/trash
+```
+
+Die Root-`package.json` wird als npm-Workspace geführt:
+
+```json
+{
+  "name": "pi-note-vault",
+  "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm:dev -w @notevault/api\" \"npm:dev -w @notevault/web\"",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  }
+}
+```
+
+Benötigte Pakete:
+
+```bash
+npm install -D concurrently typescript
+
+npm install -w apps/web react-router-dom @tanstack/react-query
+npm install -w apps/web @codemirror/state @codemirror/view
+npm install -w apps/web @codemirror/lang-markdown
+npm install -w apps/web react-markdown remark-gfm rehype-sanitize
+npm install -w apps/web lucide-react clsx tailwind-merge
+npm install -D -w apps/web tailwindcss @tailwindcss/vite vitest
+
+npm install -w apps/api fastify @fastify/cookie @fastify/rate-limit
+npm install -w apps/api @fastify/static @fastify/multipart @fastify/helmet
+npm install -w apps/api zod fastify-type-provider-zod
+npm install -w apps/api better-sqlite3 argon2 gray-matter chokidar
+npm install -D -w apps/api typescript tsx vitest
+npm install -D -w apps/api @types/node @types/better-sqlite3
+```
+
+Vor dem ersten Commit:
+
+```bash
+npm run typecheck
+npm run test
+npm run build
+git add .
+git commit -m "chore: initialize note vault"
+```
+
+### 5.1 Verzeichnisstruktur
+
+```text
+pi-note-vault/
+|-- .github/
+|   |-- workflows/
+|   |   `-- ci.yml
+|   |-- ISSUE_TEMPLATE/
+|   `-- pull_request_template.md
+|-- apps/
+|   |-- api/
+|   |   |-- migrations/
+|   |   |-- src/
+|   |   |   |-- auth/
+|   |   |   |-- db/
+|   |   |   |-- notes/
+|   |   |   |-- routes/
+|   |   |   |-- services/
+|   |   |   |-- app.ts
+|   |   |   `-- server.ts
+|   |   `-- package.json
+|   `-- web/
+|       |-- src/
+|       |   |-- api/
+|       |   |-- components/
+|       |   |-- features/
+|       |   |   |-- admin/
+|       |   |   |-- auth/
+|       |   |   `-- notes/
+|       |   |-- layouts/
+|       |   |-- routes/
+|       |   `-- main.tsx
+|       `-- package.json
+|-- packages/
+|   `-- contracts/
+|       `-- src/
+|-- deploy/
+|   |-- Caddyfile.example
+|   |-- notevault.service
+|   |-- release.sh
+|   `-- backup.sh
+|-- docs/
+|   |-- architecture.md
+|   |-- api.md
+|   |-- backup-restore.md
+|   `-- threat-model.md
+|-- data/                    # nur lokal, nicht in Git
+|-- package-lock.json
+`-- package.json
+```
+
+### 5.2 `.gitignore`
+
+```gitignore
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+.env
+.env.*
+!.env.example
+
+data/*
+!data/.gitkeep
+
+*.db
+*.db-shm
+*.db-wal
+*.log
+backups/
+```
+
+Nie in Git einchecken:
+
+- echte Notizen
+- Datenbank
+- Uploads
+- Backups
+- Passwörter
+- Cookie-Secrets
+- SSH-Schlüssel
+- GitHub-Tokens
+
+## 6. Frontend einrichten
+
+### 6.1 Tailwind CSS mit Vite
+
+`apps/web/vite.config.ts`:
+
+```ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      "/api": "http://127.0.0.1:8787"
+    }
+  }
+});
+```
+
+`apps/web/src/index.css`:
+
+```css
+@import "tailwindcss";
+
+@theme {
+  --color-brand-500: oklch(0.63 0.16 255);
+  --color-brand-600: oklch(0.55 0.16 255);
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+```
+
+### 6.2 Routen
+
+```text
+/login
+/app
+/app/note/:noteId
+/app/search
+/app/trash
+/admin
+/admin/users
+/admin/settings
+/admin/audit
+/admin/backups
+```
+
+Die Route `/admin/*` wird im Frontend ausgeblendet, wenn der Benutzer kein
+Admin ist. Das ist nur Bedienkomfort. Jede Admin-API muss die Rolle zusätzlich
+auf dem Server prüfen.
+
+### 6.3 Hauptlayout
+
+Desktop:
+
+```text
++----------------+--------------------------------------+----------------+
+| Vault/Ordner   | Editor                               | Kontext        |
+| Suche          |                                      | Backlinks      |
+| Favoriten      | Markdown oder Split-View             | Eigenschaften  |
+| Tags           |                                      | Historie       |
++----------------+--------------------------------------+----------------+
+```
+
+Mobil:
+
+- Editor als Hauptansicht
+- Ordnerbaum in einem seitlichen Drawer
+- Vorschau als umschaltbarer Tab
+- Kontextinformationen in einem Bottom Sheet
+- alle Aktionen per Tastatur und Touch erreichbar
+
+### 6.4 Editor-Regeln
+
+- CodeMirror bleibt die Eingabekomponente.
+- Vorschau rendert Markdown getrennt.
+- Rohes HTML wird standardmäßig nicht ausgeführt.
+- `rehype-sanitize` bleibt aktiv.
+- Externe Links erhalten `rel="noopener noreferrer"`.
+- Autosave wartet nach der letzten Eingabe etwa 600 bis 1.000 ms.
+- Der Client sendet die zuletzt bekannte Revision mit.
+- Bei einem Konflikt wird keine Version still überschrieben.
+
+Ein sinnvoller Status in der Kopfzeile:
+
+```text
+Gespeichert | Speichert ... | Offline | Konflikt erkannt
+```
+
+## 7. Backend und API
+
+### 7.1 Minimale Serverstruktur
+
+`apps/api/src/server.ts`:
+
+```ts
+import { buildApp } from "./app.js";
+
+const host = process.env.HOST ?? "127.0.0.1";
+const port = Number(process.env.PORT ?? 8787);
+
+const app = await buildApp();
+
+try {
+  await app.listen({ host, port });
+} catch (error) {
+  app.log.error(error);
+  process.exit(1);
+}
+```
+
+Wichtig: Der Standardwert ist `127.0.0.1`, nicht `0.0.0.0`. Nur Caddy soll die
+API erreichen.
+
+`apps/api/src/app.ts` übernimmt:
+
+1. Konfiguration validieren
+2. Logger mit Secret-Redaction starten
+3. Datenverzeichnisse prüfen
+4. SQLite öffnen und Migrationen ausführen
+5. Security-, Cookie- und Rate-Limit-Plugins registrieren
+6. Auth- und Rollen-Hooks registrieren
+7. API-Routen registrieren
+8. React-Build ausliefern
+9. globalen Fehlerhandler registrieren
+
+### 7.2 REST-Endpunkte
+
+| Methode | Route | Recht | Zweck |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | öffentlich | anmelden |
+| `POST` | `/api/auth/logout` | angemeldet | Sitzung beenden |
+| `GET` | `/api/auth/me` | angemeldet | eigenes Profil |
+| `GET` | `/api/notes` | viewer | Baum oder Liste |
+| `POST` | `/api/notes` | editor | Notiz erstellen |
+| `GET` | `/api/notes/:id` | viewer | Notiz laden |
+| `PUT` | `/api/notes/:id` | editor | Inhalt speichern |
+| `PATCH` | `/api/notes/:id/move` | editor | verschieben/umbenennen |
+| `DELETE` | `/api/notes/:id` | editor | in Papierkorb verschieben |
+| `POST` | `/api/notes/:id/restore` | editor | wiederherstellen |
+| `GET` | `/api/search?q=` | viewer | Volltextsuche |
+| `GET` | `/api/notes/:id/backlinks` | viewer | Backlinks |
+| `POST` | `/api/uploads` | editor | Datei hochladen |
+| `GET` | `/api/admin/users` | admin | Benutzer auflisten |
+| `POST` | `/api/admin/users` | admin | Benutzer anlegen |
+| `PATCH` | `/api/admin/users/:id` | admin | Rolle/Status ändern |
+| `POST` | `/api/admin/users/:id/reset-password` | admin | Passwort setzen |
+| `GET` | `/api/admin/audit` | admin | Audit-Log |
+| `POST` | `/api/admin/backups` | admin | Backup anfordern |
+| `GET` | `/api/health` | lokal/Monitoring | Prozessstatus |
+| `GET` | `/api/ready` | lokal/Monitoring | DB und Vault bereit |
+
+Für jede schreibende Route wird ein Zod-Schema definiert. Unbekannte Felder
+werden nicht ungeprüft übernommen.
+
+## 8. Dateiformat und Vault
+
+Eine Notiz bleibt normales Markdown mit YAML-Frontmatter:
+
+```md
+---
+id: 89eaa954-5f6e-4622-9cf4-7e18618d41e7
+title: Projektideen
+created: 2026-08-04T09:30:00.000Z
+updated: 2026-08-04T10:45:00.000Z
+tags:
+  - ideen
+  - privat
+---
+
+# Projektideen
+
+Verknüpft mit [[Raspberry Pi]].
+```
+
+Regeln:
+
+- `id` bleibt auch beim Umbenennen stabil.
+- Der sichtbare Dateiname wird aus dem Titel erzeugt.
+- unbekannte Frontmatter-Felder bleiben beim Speichern erhalten.
+- UTF-8 und Unix-Zeilenenden sind der Standard.
+- Bilder liegen relativ im Vault oder in einem klaren `attachments/`-Ordner.
+- doppelte IDs werden beim Indexieren als Fehler gemeldet.
+- eine fehlende ID wird bei einem kontrollierten Import ergänzt.
+
+### 8.1 Sichere Pfadauflösung
+
+```ts
+import path from "node:path";
+
+export function resolveInsideVault(vaultRoot: string, relativePath: string) {
+  const root = path.resolve(vaultRoot);
+  const target = path.resolve(root, relativePath);
+
+  if (target !== root && !target.startsWith(root + path.sep)) {
+    throw new Error("Path escapes vault");
+  }
+
+  return target;
+}
+```
+
+Zusätzlich:
+
+- keine symbolischen Links innerhalb des Vaults verfolgen
+- Steuerzeichen und reservierte Namen ablehnen
+- Dateiendungen serverseitig erlauben
+- Groß-/Kleinschreibung bei Kollisionsprüfung berücksichtigen
+- Upload-Größe begrenzen
+- MIME-Typ nicht nur aus dem Dateinamen ableiten
+
+### 8.2 Atomar speichern
+
+Eine Notiz wird zuerst in eine temporäre Datei im selben Verzeichnis
+geschrieben und dann per `rename` ersetzt. So entsteht bei Stromausfall nicht
+leicht eine halb geschriebene Datei.
+
+Vor dem Schreiben:
+
+1. aktuelle Revision aus dem Inhalt berechnen
+2. `If-Match` beziehungsweise die Client-Revision vergleichen
+3. bei Abweichung `409 Conflict` zurückgeben
+4. temporäre Datei schreiben und synchronisieren
+5. atomar umbenennen
+6. Index in einer DB-Transaktion aktualisieren
+7. Audit-Ereignis schreiben
+
+Für wichtige Daten ist eine SSD robuster als eine stark beanspruchte
+microSD-Karte. Ein Backup bleibt trotzdem zwingend.
+
+## 9. SQLite-Schema
+
+Die Migrationen liegen nummeriert im Repository, zum Beispiel
+`apps/api/migrations/001_initial.sql`.
+
+```sql
+PRAGMA journal_mode = WAL;
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE schema_migrations (
+  version INTEGER PRIMARY KEY,
+  applied_at TEXT NOT NULL
+);
+
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'editor', 'viewer')),
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_login_at TEXT
+);
+
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  ip_prefix TEXT,
+  user_agent TEXT
+);
+
+CREATE TABLE note_index (
+  id TEXT PRIMARY KEY,
+  relative_path TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  revision TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  indexed_at TEXT NOT NULL
+);
+
+CREATE TABLE note_links (
+  source_id TEXT NOT NULL REFERENCES note_index(id) ON DELETE CASCADE,
+  target_id TEXT REFERENCES note_index(id) ON DELETE CASCADE,
+  unresolved_target TEXT,
+  PRIMARY KEY (source_id, target_id, unresolved_target)
+);
+
+CREATE TABLE note_tags (
+  note_id TEXT NOT NULL REFERENCES note_index(id) ON DELETE CASCADE,
+  tag TEXT NOT NULL,
+  PRIMARY KEY (note_id, tag)
+);
+
+CREATE VIRTUAL TABLE note_search USING fts5(
+  note_id UNINDEXED,
+  title,
+  body,
+  tokenize = 'unicode61'
+);
+
+CREATE TABLE settings (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT REFERENCES users(id)
+);
+
+CREATE TABLE audit_events (
+  id TEXT PRIMARY KEY,
+  actor_user_id TEXT REFERENCES users(id),
+  action TEXT NOT NULL,
+  target_type TEXT,
+  target_id TEXT,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL
+);
+```
+
+Der Suchindex muss vollständig aus dem Vault neu erstellt werden können:
+
+```bash
+npm run cli -- reindex
+```
+
+## 10. Login, Sessions und Rechte
+
+### 10.1 Bootstrap-Admin
+
+Es gibt keine öffentliche Registrierung. Nach der ersten Installation:
+
+```bash
+sudo -u notevault \
+  /usr/local/bin/node /opt/notevault/current/apps/api/dist/cli.js \
+  create-admin
+```
+
+Das CLI fragt Benutzername und Passwort interaktiv ab. Ein Passwort darf nicht
+als Kommandozeilenargument übergeben werden, da es sonst in Shell-Historie oder
+Prozesslisten auftauchen kann.
+
+### 10.2 Passwortspeicherung
+
+- Argon2id verwenden
+- pro Passwort einen zufälligen Salt verwenden
+- niemals Klartext oder schnell gehashte Passwörter speichern
+- Hash-Parameter zentral konfigurieren und testweise auf dem Pi messen
+- eine Anmeldung darf den Pi nicht durch zu hohe Parallelität lahmlegen
+- bei später erhöhten Parametern den Hash nach erfolgreichem Login erneuern
+
+Als Mindestbasis nennt OWASP für Argon2id 19 MiB Speicher, zwei Iterationen und
+einen Parallelitätsgrad von eins. Auf dem konkreten Pi sollte ein höherer,
+praktikabler Wert gemessen werden.
+
+### 10.3 Serverseitige Sitzung
+
+Empfohlener Ablauf:
+
+1. Server erzeugt mindestens 32 zufällige Bytes.
+2. Nur der SHA-256-Hash des Tokens wird in `sessions` gespeichert.
+3. Das Originaltoken kommt in ein Cookie.
+4. Das Cookie ist `HttpOnly`, `Secure`, `SameSite=Lax` und hat einen engen
+   `Path`.
+5. Nach Login und Passwortwechsel werden Sitzungen rotiert.
+6. Logout löscht die Sitzung serverseitig.
+7. Abgelaufene Sitzungen werden regelmäßig entfernt.
+
+Keine Auth-Tokens in `localStorage` oder `sessionStorage` speichern.
+
+### 10.4 CSRF, Brute Force und Enumeration
+
+- für schreibende Requests den `Origin`-Header mit `APP_ORIGIN` vergleichen
+- ausschließlich JSON für API-Mutationen akzeptieren
+- Login pro IP und Benutzername begrenzen
+- generische Fehlermeldung: „Anmeldung fehlgeschlagen“
+- Antwortzeit für unbekannte und bekannte Benutzer ähnlich halten
+- nach mehreren Fehlern kurz sperren, aber kein dauerhaftes triviales
+  Denial-of-Service ermöglichen
+- Passwortänderung und Benutzerverwaltung auditieren
+
+### 10.5 Rollenmatrix
+
+| Aktion | viewer | editor | admin |
+|---|---:|---:|---:|
+| Notizen lesen/suchen | ja | ja | ja |
+| Notizen ändern | nein | ja | ja |
+| Papierkorb verwalten | nein | ja | ja |
+| Dateien hochladen | nein | ja | ja |
+| Benutzer verwalten | nein | nein | ja |
+| globale Einstellungen | nein | nein | ja |
+| Backups auslösen | nein | nein | ja |
+| Audit-Log lesen | nein | nein | ja |
+
+Die Rechteprüfung lebt in der API, nicht nur in React.
+
+## 11. Admin-Oberfläche
+
+### 11.1 Dashboard
+
+Anzeigen:
+
+- Anzahl Notizen, Benutzer und Uploads
+- freier Speicherplatz
+- Größe von Vault, Uploads und Datenbank
+- Zeitpunkt und Ergebnis des letzten Backups
+- Zeitpunkt der letzten erfolgreichen Indexierung
+- aktuelle App-Version und Git-Commit
+- fehlgeschlagene Logins der letzten 24 Stunden
+- erkannte Index- oder Dateifehler
+
+### 11.2 Benutzerverwaltung
+
+- Benutzer anlegen
+- Rolle ändern
+- Benutzer sperren/entsperren
+- Passwort zurücksetzen
+- alle Sitzungen eines Benutzers widerrufen
+- letzten Login anzeigen
+- letzten Admin nicht löschen oder herabstufen
+
+### 11.3 Einstellungen
+
+- Name des Vaults
+- Standardsprache und Zeitzone
+- erlaubte Upload-Typen und Maximalgröße
+- Papierkorb-Aufbewahrung
+- Session-Laufzeit
+- optionale Nur-Lese-Wartung
+- PWA-/Offline-Einstellungen
+
+Secrets gehören nicht in die Settings-Tabelle. Sie bleiben in einer
+root-geschützten Environment-Datei.
+
+### 11.4 Audit-Log
+
+Mindestens protokollieren:
+
+- Login erfolgreich/fehlgeschlagen
+- Logout
+- Benutzer angelegt, geändert oder gesperrt
+- Rolle oder Passwort geändert
+- Notiz gelöscht oder wiederhergestellt
+- Backup gestartet und beendet
+- globale Einstellung geändert
+
+Nicht protokollieren:
+
+- Passwörter
+- Session-Tokens
+- vollständige Notizinhalte
+- Cookie-Header
+
+## 12. Suche, Links und externe Änderungen
+
+Beim Speichern oder Import:
+
+1. Frontmatter und Markdown parsen
+2. Titel und Tags extrahieren
+3. `[[Wiki-Links]]` extrahieren
+4. Links soweit möglich auf IDs auflösen
+5. FTS5-Eintrag ersetzen
+6. Backlinks neu berechnen
+
+Ein Chokidar-Watcher erkennt Änderungen, die beispielsweise per SFTP, Git oder
+Obsidian direkt im Vault durchgeführt wurden. Events werden entprellt. Nach
+einem Neustart erfolgt zusätzlich ein vollständiger Abgleich, damit kein
+verpasstes Dateisystemereignis zu einem dauerhaft falschen Index führt.
+
+Konfliktstrategie:
+
+- keine automatische inhaltliche Zusammenführung im MVP
+- Server liefert bei veralteter Revision `409`
+- UI zeigt Server- und Client-Version
+- Benutzer kann kopieren, vergleichen oder bewusst überschreiben
+- konfliktbehaftete Inhalte niemals still verwerfen
+
+## 13. Obsidian-Vault importieren
+
+1. vollständiges Backup des bisherigen Vaults anlegen
+2. Anwendung in Wartungsmodus setzen
+3. `.md`-Dateien und Attachments in ein temporäres Importverzeichnis kopieren
+4. problematische oder doppelte Dateinamen melden
+5. Frontmatter erhalten und nur fehlende IDs ergänzen
+6. interne Links analysieren
+7. unbekannte Obsidian-spezifische Syntax unverändert lassen
+8. Index aufbauen
+9. Stichproben für Links, Bilder, Tags und Umlaute durchführen
+10. erst dann den importierten Vault aktiv schalten
+
+Nicht automatisch behaupten, dass jedes Obsidian-Plugin unterstützt wird.
+Dataview-Abfragen, Canvas-Dateien und Plugin-spezifische Codeblöcke benötigen
+eigene Implementierungen.
+
+## 14. GitHub-Workflow
+
+### 14.1 Repository-Einstellungen
+
+- Repository nach Bedarf privat halten
+- `main` schützen
+- Pull Request vor Merge verlangen
+- CI als erforderlichen Check einrichten
+- keine Secrets in Fork-Workflows freigeben
+- Dependabot oder Renovate für kontrollierte Updates verwenden
+- Releases aus signierten oder mindestens eindeutig geprüften Git-Tags bauen
+- `CODEOWNERS` für Auth-, Deployment- und Migrationsdateien erwägen
+
+### 14.2 Branches und Commits
+
+```text
+main
+feature/editor-split-view
+feature/admin-users
+fix/session-expiry
+chore/update-dependencies
+```
+
+Beispiel-Commits:
+
+```text
+feat(notes): add revision conflict handling
+feat(admin): add user session revocation
+fix(auth): reject mismatching origin
+chore(ci): add arm-compatible release checks
+```
+
+### 14.3 CI mit GitHub Actions
+
+`.github/workflows/ci.yml`:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+```
+
+Vite transpiliert TypeScript, führt aber nicht automatisch eine vollständige
+Typprüfung durch. Deshalb bleibt `npm run typecheck` ein eigener Pflichtschritt.
+
+### 14.4 Releases
+
+Empfohlener Ablauf:
+
+1. Pull Request mergen
+2. CI auf `main` erfolgreich
+3. Changelog aktualisieren
+4. Tag erzeugen, zum Beispiel `v0.1.0`
+5. GitHub Release aus diesem Tag anlegen
+6. Pi zieht exakt diesen Tag
+7. Backup
+8. Installation in neues Release-Verzeichnis
+9. Migration
+10. Symlink `current` umschalten
+11. Dienst neu starten
+12. Health- und Login-Test
+
+Da `better-sqlite3` und Argon2 native Bestandteile enthalten können, wird
+`npm ci` auf dem ARM64-Pi ausgeführt. Ein auf einem normalen x64-GitHub-Runner
+erzeugtes `node_modules`-Verzeichnis wird nicht auf den Pi kopiert.
+
+## 15. Raspberry Pi vorbereiten
+
+### 15.1 Hardware und Betriebssystem
+
+Empfehlung:
+
+- Raspberry Pi 4 oder 5
+- mindestens 4 GB RAM
+- Raspberry Pi OS Lite 64-bit
+- SSD über USB statt produktiv stark belasteter microSD
+- stabile Stromversorgung
+- feste DHCP-Zuordnung
+- funktionierende Zeitsynchronisation
+
+System aktualisieren:
+
+```bash
+sudo apt update
+sudo apt full-upgrade
+sudo reboot
+```
+
+Hilfspakete:
+
+```bash
+sudo apt install -y git build-essential python3 sqlite3 rsync curl ufw
+```
+
+Node.js als unterstützte LTS-Version für ARM64 installieren. Anschließend:
+
+```bash
+node --version
+npm --version
+node -p "process.arch"
+```
+
+Erwartet wird `arm64`. Die verwendete Node-Version muss die in `package.json`
+definierte Engine erfüllen.
+
+### 15.2 Dienstkonto und Verzeichnisse
+
+```bash
+sudo adduser --system --group --home /var/lib/notevault notevault
+
+sudo mkdir -p /opt/notevault/releases
+sudo mkdir -p /var/lib/notevault/vault
+sudo mkdir -p /var/lib/notevault/uploads
+sudo mkdir -p /var/lib/notevault/trash
+sudo mkdir -p /var/backups/notevault
+sudo mkdir -p /etc/notevault
+
+sudo chown -R notevault:notevault /var/lib/notevault
+sudo chown -R notevault:notevault /var/backups/notevault
+```
+
+Code, Laufzeitdaten und Konfiguration bleiben getrennt:
+
+```text
+/opt/notevault/releases/<tag>/   Anwendung
+/opt/notevault/current          Symlink auf aktives Release
+/var/lib/notevault/             Vault, DB, Uploads und Papierkorb
+/var/backups/notevault/         lokale Backups
+/etc/notevault/notevault.env    Secrets und Laufzeitkonfiguration
+```
+
+### 15.3 Environment-Datei
+
+`/etc/notevault/notevault.env`:
+
+```dotenv
+NODE_ENV=production
+HOST=127.0.0.1
+PORT=8787
+APP_ORIGIN=https://notes.example.com
+DATA_DIR=/var/lib/notevault
+COOKIE_NAME=notevault_session
+COOKIE_SECRET=HIER_EIN_LANGES_ZUFAELLIGES_SECRET_EINTRAGEN
+SESSION_TTL_HOURS=168
+LOG_LEVEL=info
+```
+
+Secret erzeugen:
+
+```bash
+openssl rand -base64 48
+```
+
+Berechtigungen:
+
+```bash
+sudo chown root:notevault /etc/notevault/notevault.env
+sudo chmod 640 /etc/notevault/notevault.env
+```
+
+### 15.4 Native Erstinstallation
+
+Der folgende Ablauf wird als normaler Deployment-Benutzer ausgeführt; der
+Service selbst läuft weiterhin als `notevault`:
+
+```bash
+git clone git@github.com:ORGANISATION/pi-note-vault.git /tmp/pi-note-vault
+cd /tmp/pi-note-vault
+git fetch --tags
+git checkout --detach v0.1.0
+npm ci
+npm run typecheck
+npm run test
+npm run build
+```
+
+Anschließend wird der geprüfte Stand nach
+`/opt/notevault/releases/v0.1.0/` kopiert. Laufzeitdaten werden dabei niemals
+aus `/var/lib/notevault` entfernt oder überschrieben.
+
+Das endgültige `deploy/release.sh` sollte:
+
+- genau ein Tag als Argument akzeptieren
+- einen sauberen Checkout erzwingen
+- den Commit des Tags protokollieren
+- in ein neues Release-Verzeichnis installieren
+- vor Migrationen ein Backup erzeugen
+- Tests und Build abbrechen lassen, bevor `current` geändert wird
+- Migrationen nur einmal ausführen
+- `current` atomar umschalten
+- Dienst neu starten
+- `/api/health` und `/api/ready` prüfen
+- bei einem fehlgeschlagenen Start den vorherigen Code aktivieren
+- Datenbankmigrationen nicht blind rückwärts ausführen
+
+## 16. systemd-Dienst
+
+`/etc/systemd/system/notevault.service`:
+
+```ini
+[Unit]
+Description=Pi Note Vault
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=notevault
+Group=notevault
+WorkingDirectory=/opt/notevault/current
+EnvironmentFile=/etc/notevault/notevault.env
+ExecStart=/usr/bin/node /opt/notevault/current/apps/api/dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/notevault
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Falls `command -v node` einen anderen Pfad ausgibt, muss `ExecStart` diesen
+absoluten Pfad verwenden.
+
+Aktivieren:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now notevault
+sudo systemctl status notevault
+sudo journalctl -u notevault -n 100 --no-pager
+curl --fail http://127.0.0.1:8787/api/health
+```
+
+Die App darf nur auf `127.0.0.1:8787` lauschen:
+
+```bash
+sudo ss -ltnp
+```
+
+## 17. HTTPS mit Caddy
+
+Für eine öffentlich erreichbare Domain:
+
+1. DNS-A-/AAAA-Eintrag auf den Anschluss beziehungsweise Server zeigen lassen.
+2. Ports 80 und 443 gezielt zum Pi weiterleiten.
+3. Caddy aus dem offiziellen Debian-/Raspbian-Repository installieren.
+4. Die App selbst nicht direkt freigeben.
+
+`/etc/caddy/Caddyfile`:
+
+```caddyfile
+notes.example.com {
+	encode zstd gzip
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	reverse_proxy 127.0.0.1:8787
+}
+```
+
+Prüfen und laden:
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+sudo systemctl status caddy
+curl --fail https://notes.example.com/api/health
+```
+
+Für rein privaten Zugriff ist ein VPN wie Tailscale meist einfacher und sicherer
+als eine Portfreigabe. Auch dann muss die Browser-Verbindung per HTTPS erfolgen.
+
+## 18. Firewall und SSH
+
+SSH-Schlüssel statt Passwort verwenden. Vor dem Aktivieren der Firewall zuerst
+den SSH-Zugriff erlauben:
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+sudo ufw status verbose
+```
+
+Wenn ausschließlich ein VPN verwendet wird, sind die Regeln enger an das
+VPN-Interface beziehungsweise das lokale Netz anzupassen. Port `8787` wird
+niemals in UFW geöffnet.
+
+Regelmäßig:
+
+```bash
+sudo apt update
+sudo apt full-upgrade
+npm audit
+```
+
+`npm audit fix --force` nicht ungeprüft auf Produktion anwenden. Änderungen
+werden als Pull Request getestet.
+
+## 19. Backups und Restore
+
+### 19.1 Was gesichert wird
+
+- `/var/lib/notevault/vault`
+- `/var/lib/notevault/uploads`
+- `/var/lib/notevault/trash`
+- konsistenter SQLite-Snapshot
+- redigierte, nicht geheime Konfigurationsübersicht
+- aktive App-Version und Git-Commit
+
+Nicht nur die Datenbank sichern: Die Markdown-Dateien sind die eigentlichen
+Notizen.
+
+### 19.2 3-2-1-Regel
+
+- mindestens drei Kopien
+- auf zwei unterschiedlichen Medien
+- mindestens eine Kopie außerhalb des Raspberry Pi
+
+Beispiel:
+
+- Live-Daten auf SSD
+- tägliches verschlüsseltes Backup auf NAS
+- zusätzlich verschlüsseltes Offsite-Backup
+
+### 19.3 Backup-Ablauf
+
+Das produktive Backup-Skript verwendet `flock`, legt zuerst einen konsistenten
+SQLite-Snapshot an und archiviert anschließend Vault und Uploads. Alternativ
+kann der Dienst für ein kleines persönliches Vault kurz gestoppt werden. Das
+Skript muss den Dienst auch bei einem Fehler zuverlässig wieder starten.
+
+Aufbewahrung als Ausgangspunkt:
+
+- 7 tägliche Backups
+- 4 wöchentliche Backups
+- 12 monatliche Backups
+
+### 19.4 Restore-Test
+
+Mindestens vierteljährlich:
+
+1. neue temporäre Datenpfade verwenden
+2. Backup entpacken
+3. SQLite-Integrität mit `PRAGMA integrity_check;` prüfen
+4. App gegen die Kopie starten
+5. Login, Suche, Bilder und mehrere Notizen testen
+6. Ergebnis dokumentieren
+
+Ein Backup gilt erst als belastbar, wenn ein Restore nachweislich funktioniert.
+
+## 20. Updates und Rollback
+
+Update:
+
+```bash
+sudo /opt/notevault/current/deploy/release.sh v0.2.0
+sudo systemctl status notevault
+curl --fail http://127.0.0.1:8787/api/ready
+```
+
+Nach jedem Update prüfen:
+
+- exakter Tag und Commit
+- Migration erfolgreich
+- Dienst aktiv
+- Health und Readiness erfolgreich
+- Login möglich
+- Notiz lesen und Testnotiz speichern
+- Backup-Marker aktuell
+- keine neuen Fehler im Journal
+
+Rollback trennt zwei Fälle:
+
+- **Codefehler ohne inkompatible Migration:** vorherigen `current`-Symlink
+  aktivieren und neu starten.
+- **inkompatible Datenbankmigration:** Dienst stoppen und das vor dem Update
+  angelegte Backup wiederherstellen.
+
+Eine Migration bekommt immer eine Vorwärtsstrategie. Automatische
+Down-Migrationen sind für persönliche Daten zu riskant, wenn sie Inhalte
+verlieren könnten.
+
+## 21. Tests
+
+### 21.1 Unit-Tests
+
+- Slug- und Pfadvalidierung
+- Verhindern von Directory Traversal
+- Frontmatter-Erhalt
+- Wiki-Link-Parser
+- Tag-Parser
+- Revisionsberechnung
+- Rollenmatrix
+- Session-Ablauf
+- Upload-Allowlist
+
+### 21.2 API-Integrationstests
+
+Fastify `inject()` verwenden:
+
+- Login korrekt/falsch
+- gesperrter Benutzer
+- viewer darf nicht schreiben
+- editor darf keine Benutzer verwalten
+- Admin kann Sitzungen widerrufen
+- veraltete Revision ergibt `409`
+- falscher Origin wird abgelehnt
+- Rate Limit greift
+- gelöschte Notiz landet im Papierkorb
+
+### 21.3 Browser-Tests
+
+Mit Playwright:
+
+- Login und Logout
+- Notiz erstellen und nach Reload wiederfinden
+- Autosave
+- Split-View
+- Suche
+- mobile Navigation
+- Admin legt Benutzer an
+- Konfliktdialog
+
+### 21.4 Pi-Abnahmetest
+
+- Neustart des Pi
+- Dienst startet automatisch
+- App ist über HTTPS erreichbar
+- API-Port ist extern geschlossen
+- Schreiben und Lesen auf SSD funktioniert
+- Backup läuft
+- Restore wurde auf einer Kopie getestet
+- Speicherverbrauch bleibt unter Last vertretbar
+
+## 22. Implementierungsplan
+
+### Phase 1: Fundament
+
+- Monorepo und CI
+- Fastify-Health-Endpunkt
+- React-Layout und Routing
+- SQLite-Migrationen
+- Konfigurationsvalidierung
+- systemd-Test auf einem Pi
+
+**Fertig, wenn:** Build und Tests laufen in GitHub und die leere App startet
+nach einem Pi-Neustart automatisch.
+
+### Phase 2: Authentifizierung
+
+- Bootstrap-Admin
+- Argon2id
+- Sessions und Cookies
+- Login/Logout/Me
+- Rollen-Hooks
+- Rate Limit, Origin-Prüfung und Audit
+
+**Fertig, wenn:** Nicht angemeldete Benutzer keine Notizen sehen und jede Rolle
+serverseitig korrekt begrenzt ist.
+
+### Phase 3: Notizen
+
+- Markdown-Dateien
+- sichere Pfade
+- atomare Writes
+- Baum, CRUD und Papierkorb
+- Revisionen und Konflikte
+- Dateiwatcher und Reindex
+
+**Fertig, wenn:** Notizen auch außerhalb der App bearbeitet und anschließend
+korrekt neu indexiert werden.
+
+### Phase 4: Editor und Wissen
+
+- CodeMirror
+- sichere Vorschau
+- Autosave
+- Wiki-Links
+- Tags, FTS5 und Backlinks
+- Uploads
+
+**Fertig, wenn:** tägliche Notizarbeit auf Desktop und Smartphone praktikabel
+ist.
+
+### Phase 5: Admin und Betrieb
+
+- Benutzerverwaltung
+- Settings
+- Audit-Ansicht
+- Backup-Status
+- Health/Readiness
+- Caddy, Firewall und Release-Skript
+
+**Fertig, wenn:** Installation, Update, Backup und Restore dokumentiert und
+getestet sind.
+
+### Phase 6: Komfort
+
+- PWA und definierter Offline-Modus
+- Tastaturbefehle
+- Command Palette
+- Themes
+- Import-Assistent
+- Notizvorlagen
+
+Offline-Synchronisation benötigt eine eigene Konfliktstrategie. Ein Service
+Worker allein macht die Anwendung noch nicht zuverlässig offlinefähig.
+
+## 23. Definition of Done für Version 1.0
+
+- alle MVP-Funktionen implementiert
+- keine öffentliche Registrierung
+- Admin-, Editor- und Viewer-Rechte durch API-Tests abgedeckt
+- keine Klartextpasswörter oder Tokens in Logs/DB
+- App bindet nur an Loopback
+- HTTPS aktiv
+- Markdown bleibt ohne App lesbar
+- Index ist vollständig neu aufbaubar
+- Pfad- und Upload-Angriffe getestet
+- Konflikte überschreiben keine Inhalte still
+- CI auf `main` erfolgreich
+- exaktes Release-Tag auf dem Pi nachvollziehbar
+- automatisches Backup aktiv
+- Restore erfolgreich getestet
+- Update und Rollback getestet
+- Sicherheits- und Architekturentscheidungen dokumentiert
+
+## 24. Offizielle Referenzen
+
+- [React-Dokumentation](https://react.dev/)
+- [Vite: Getting Started](https://vite.dev/guide/)
+- [Vite: TypeScript und Typechecking](https://vite.dev/guide/features.html#typescript)
+- [Tailwind CSS mit Vite](https://tailwindcss.com/docs/installation/using-vite)
+- [Fastify-Dokumentation](https://fastify.dev/docs/latest/)
+- [Fastify und TypeScript](https://fastify.dev/docs/latest/Reference/TypeScript/)
+- [CodeMirror-Dokumentation](https://codemirror.net/docs/)
+- [Node.js Release-Übersicht](https://nodejs.org/en/about/previous-releases)
+- [GitHub Actions: Node.js bauen und testen](https://docs.github.com/en/actions/tutorials/build-and-test-code/nodejs)
+- [GitHub: sicherer Einsatz von Actions](https://docs.github.com/en/actions/reference/security/secure-use)
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+- [Caddy installieren](https://caddyserver.com/docs/install)
+- [Caddy Reverse Proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
+- [Raspberry Pi: Betriebssicherheit](https://www.raspberrypi.com/documentation/configuration/computers/raspberry-pi.html#operational-security)
+
