@@ -1,0 +1,2 @@
+codex mcp remove notevault
+codex mcp add notevault -- ssh -T marcel@100.87.118.91 sudo -n -u notevault /usr/local/bin/notevault-mcp
