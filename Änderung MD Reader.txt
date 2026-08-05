@@ -1,2 +1,0 @@
-Port soll direkt 9444 sein. Ich möchte Github Repos hinterlegen können. Die Anwendung soll die .md Dateien ordentlich strukturiert anzeigen. Überlege dir direkt auch Erwiterungsmöglichkeiten im Stil von Obsidian. 
-Eine Art Marketplace vielleicht wo kostenfreie Erweiterungen hinterlegt werden können. Diese können selbst installiert werden. 
