@@ -217,14 +217,74 @@ class MapperTests(unittest.TestCase):
         self.assertEqual(len(descriptions), 1)
         self.assertEqual(descriptions[0].payload["tenantId"], 0)
 
-    def test_unknown_attribute_is_skipped_without_blocking_publication(self):
+    def test_unknown_attribute_definition_is_created_before_value_assignment(self):
         product = Product(artikelnummer="CYL-TEST", artikelname="Test", attributes={"missing": "x"})
         preview = build_preview(
-            product, children=[], attribute_config={}, context=CONTEXT,
+            product, children=[],
+            attribute_config={
+                "missing": AttributeDefinition(
+                    id="missing:custom:single_line_text_field",
+                    category="Test", name="Fehlendes Attribut",
+                ),
+            },
+            context=CONTEXT,
             capabilities=CAPABILITIES, settings=ArtikelwerkSettings(tenant_ids=[4]),
         )
         self.assertTrue(preview.valid)
-        self.assertIn("SKIPPED_ATTRIBUTE", {issue.code for issue in preview.issues})
+        attribute_steps = [
+            step for step in preview.steps
+            if step.operation in {"create_attribute", "set_attribute"}
+        ]
+        self.assertEqual(
+            [step.operation for step in attribute_steps],
+            ["create_attribute", "set_attribute"],
+        )
+        self.assertEqual(attribute_steps[0].payload["dataType"], "text")
+        self.assertEqual(attribute_steps[1].payload["attributeId"], "missing")
+
+    def test_serializes_duration_as_shopify_json(self):
+        product = Product(
+            artikelnummer="CYL-DURATION", artikelname="Test",
+            attributes={"effect_duration": {"value": 30, "unit": "seconds"}},
+        )
+        definition = AttributeDefinition(
+            id="effect_duration:custom:duration", category="Wirkung",
+            name="Wirkungsdauer", shopify_type="duration", unit="seconds",
+        )
+        context = {
+            **CONTEXT,
+            "attributes": [
+                *CONTEXT["attributes"],
+                {"id": "effect_duration", "name": "effect_duration", "allowsCustomValue": True},
+            ],
+        }
+        preview = build_preview(
+            product, children=[], attribute_config={"effect_duration": definition},
+            context=context, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        step = next(item for item in preview.steps if item.operation == "set_attribute")
+        self.assertEqual(step.payload["value"], '{"value":30.0,"unit":"seconds"}')
+
+    def test_metaobject_reference_is_not_sent_to_jtl(self):
+        product = Product(
+            artikelnummer="CYL-REF", artikelname="Test",
+            attributes={"manufacturer_reference": "gid://shopify/Metaobject/123"},
+        )
+        definition = AttributeDefinition(
+            id="manufacturer_reference:custom:metaobject_reference",
+            category="GPSR", name="Hersteller",
+            shopify_type="metaobject_reference", management="shopify",
+        )
+        preview = build_preview(
+            product, children=[],
+            attribute_config={"manufacturer_reference": definition},
+            context=CONTEXT, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        self.assertIn("SHOPIFY_MANAGED_ATTRIBUTE", {issue.code for issue in preview.issues})
         self.assertNotIn("set_attribute", {step.operation for step in preview.steps})
 
     def test_deletes_only_previously_managed_missing_attributes(self):

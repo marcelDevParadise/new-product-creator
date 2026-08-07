@@ -57,6 +57,7 @@ vorlagen/ausgabe/
 
 *.md
 !deploy/ARTIKELWERK-UPDATE-DIAGNOSE.md
+!docs/shopify-attributmodell.md
 *.html
 
 attribute/*.json

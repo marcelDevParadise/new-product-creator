@@ -1,3 +1,10 @@
+export type AttributeValue =
+  | string
+  | number
+  | boolean
+  | AttributeValue[]
+  | { [key: string]: AttributeValue };
+
 export interface Product {
   artikelnummer: string;
   artikelname: string;
@@ -51,14 +58,14 @@ export interface Product {
   is_parent: boolean;
   variant_attributes: Record<string, string>;
   //
-  attributes: Record<string, string | number | boolean>;
+  attributes: Record<string, AttributeValue>;
   exported: boolean;
   stammdaten_complete: boolean;
 }
 
 export interface SmartDefault {
   title_contains: string;
-  value: string;
+  value: AttributeValue;
 }
 
 export interface AttributeDefinition {
@@ -71,6 +78,9 @@ export interface AttributeDefinition {
   default_value?: string;
   suggested_values?: string[];
   smart_defaults?: SmartDefault[];
+  shopify_type?: string;
+  unit?: string;
+  management?: 'jtl' | 'shopify';
 }
 
 export type AttributeConfig = Record<string, AttributeDefinition>;
@@ -86,6 +96,9 @@ export interface AttributeDefinitionCreatePayload {
   default_value?: string;
   suggested_values?: string[];
   smart_defaults?: SmartDefault[];
+  shopify_type?: string;
+  unit?: string;
+  management?: 'jtl' | 'shopify';
 }
 
 export interface AttributeDefinitionUpdatePayload {
@@ -98,6 +111,9 @@ export interface AttributeDefinitionUpdatePayload {
   default_value?: string;
   suggested_values?: string[];
   smart_defaults?: SmartDefault[];
+  shopify_type?: string;
+  unit?: string;
+  management?: 'jtl' | 'shopify';
 }
 
 export interface ExportRow {
@@ -117,7 +133,7 @@ export interface ExportPreview {
 
 export interface Template {
   name: string;
-  attributes: Record<string, string | number | boolean>;
+  attributes: Record<string, AttributeValue>;
   category: string;
   description: string;
 }

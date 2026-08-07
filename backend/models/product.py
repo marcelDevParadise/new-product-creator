@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -54,6 +56,6 @@ class Product(BaseModel):
     is_parent: bool = False
     variant_attributes: dict[str, str] = {}
     #
-    attributes: dict[str, str | int | bool] = {}
+    attributes: dict[str, str | int | float | bool | list[Any] | dict[str, Any]] = {}
     exported: bool = False
     stammdaten_complete: bool = False

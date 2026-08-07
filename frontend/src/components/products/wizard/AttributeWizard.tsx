@@ -14,9 +14,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { TagPicker } from '@/components/ui/TagPicker';
 import { getFieldType } from '@/lib/attribute-utils';
 import { cn } from '@/lib/utils';
-import type { AttributeConfig, AttributeDefinition } from '../../../types';
+import type { AttributeConfig, AttributeDefinition, AttributeValue } from '../../../types';
 
-type AttrValue = string | number | boolean;
+type AttrValue = AttributeValue;
 type Values = Record<string, AttrValue>;
 
 export type WizardMode = 'product' | 'template' | 'bulk';
@@ -60,7 +60,7 @@ export function AttributeWizard({
   }, [initialValues]);
 
   const isEmpty = (v: AttrValue | undefined) =>
-    v === undefined || v === '' || v === null;
+    v === undefined || v === '' || v === null || (Array.isArray(v) && v.length === 0);
 
   // Group attributes by category, in definition order
   const grouped = useMemo(() => {
@@ -165,7 +165,7 @@ export function AttributeWizard({
     if (!productTitle || !activeCategory) return [];
     const entries = grouped.get(activeCategory) ?? [];
     const title = productTitle.toLowerCase();
-    const suggestions: { key: string; def: AttributeDefinition; value: string }[] = [];
+    const suggestions: { key: string; def: AttributeDefinition; value: AttrValue }[] = [];
     for (const { key, def } of entries) {
       if (!isEmpty(values[key])) continue;
       if (!def.smart_defaults || def.smart_defaults.length === 0) continue;
@@ -527,8 +527,65 @@ function FieldInput({ def, fieldType, value, isInherited, onChange }: FieldInput
   const hasSuggestions = (def.suggested_values?.length ?? 0) > 0;
   const placeholder = def.default_value ?? '';
   const wrapperClass = isInherited ? 'opacity-70' : '';
+  const shopifyType = def.shopify_type ?? def.id.split(':').at(-1) ?? 'single_line_text_field';
+  const baseType = shopifyType.startsWith('list.') ? shopifyType.slice(5) : shopifyType;
+  const measurementUnits = SHOPIFY_MEASUREMENT_UNITS[baseType];
 
-  if (fieldType === 'boolean') {
+  if (measurementUnits) {
+    const current = typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? value as Record<string, AttributeValue>
+      : {};
+    const unit = String(current.unit ?? def.unit ?? measurementUnits[0]);
+    return (
+      <div className={cn('grid grid-cols-[minmax(0,1fr)_minmax(150px,auto)] gap-2', wrapperClass)}>
+        <Input
+          type="number"
+          step="any"
+          value={current.value !== undefined ? String(current.value) : ''}
+          onChange={e => onChange({ value: e.target.value === '' ? '' : Number(e.target.value), unit })}
+          placeholder="Wert"
+          className="h-8 text-sm"
+        />
+        <Select
+          value={unit}
+          onValueChange={nextUnit => {
+            if (nextUnit) onChange({ value: current.value ?? '', unit: nextUnit });
+          }}
+        >
+          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {measurementUnits.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  if (shopifyType.startsWith('list.')) {
+    const listValue = Array.isArray(value) ? value.map(item => String(item)).join('\n') : '';
+    return (
+      <Textarea
+        value={listValue}
+        onChange={e => onChange(e.target.value.split('\n').map(item => item.trim()).filter(Boolean))}
+        rows={3}
+        placeholder="Ein Wert pro Zeile"
+        className={cn('font-mono text-xs resize-y', wrapperClass)}
+      />
+    );
+  }
+
+  if (SHOPIFY_REFERENCE_TYPES.has(baseType)) {
+    return (
+      <Input
+        value={typeof value === 'string' ? value : ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder="gid://shopify/Metaobject/…"
+        className={cn('h-8 font-mono text-xs', wrapperClass)}
+      />
+    );
+  }
+
+  if (baseType === 'boolean' || fieldType === 'boolean') {
     return (
       <div className={cn('flex items-center gap-2', wrapperClass)}>
         <Switch
@@ -546,7 +603,7 @@ function FieldInput({ def, fieldType, value, isInherited, onChange }: FieldInput
     return (
       <div className={wrapperClass}>
         <TagPicker
-          value={value}
+          value={typeof value === 'string' || typeof value === 'number' ? value : ''}
           suggestions={def.suggested_values!}
           onChange={onChange}
         />
@@ -572,12 +629,17 @@ function FieldInput({ def, fieldType, value, isInherited, onChange }: FieldInput
     );
   }
 
-  if (fieldType === 'number') {
+  if (baseType === 'number_integer' || baseType === 'number_decimal' || fieldType === 'number') {
     return (
       <Input
         type="number"
         value={value !== undefined ? String(value) : ''}
-        onChange={e => onChange(e.target.value ? parseInt(e.target.value, 10) : '')}
+        step={baseType === 'number_integer' ? 1 : 'any'}
+        onChange={e => onChange(
+          e.target.value
+            ? (baseType === 'number_integer' ? parseInt(e.target.value, 10) : Number(e.target.value))
+            : ''
+        )}
         placeholder={placeholder}
         className={cn('h-8 text-sm', wrapperClass)}
       />
@@ -605,3 +667,28 @@ function FieldInput({ def, fieldType, value, isInherited, onChange }: FieldInput
     />
   );
 }
+
+const SHOPIFY_REFERENCE_TYPES = new Set([
+  'article_reference', 'collection_reference', 'company_reference', 'customer_reference',
+  'file_reference', 'metaobject_reference', 'mixed_reference', 'order_reference',
+  'page_reference', 'product_reference', 'product_taxonomy_value_reference', 'variant_reference',
+]);
+
+const SHOPIFY_MEASUREMENT_UNITS: Record<string, string[]> = {
+  area: ['square_centimeters', 'square_feet', 'square_inches', 'square_meters', 'square_yards'],
+  battery_charge_capacity: ['milliamp_hours'],
+  battery_energy_capacity: ['watt_hours'],
+  concentration: ['milligrams_per_gram', 'milligrams_per_milliliter'],
+  dimension: ['millimeters', 'centimeters', 'meters', 'inches', 'feet', 'yards'],
+  distance: ['kilometers', 'miles'],
+  duration: ['seconds', 'minutes', 'hours', 'days', 'months', 'years', 'milliseconds', 'microseconds', 'nanoseconds'],
+  frequency: ['hertz', 'kilohertz', 'megahertz', 'gigahertz'],
+  power: ['milliwatts', 'watts', 'kilowatts', 'horsepower'],
+  pressure: ['bars', 'pounds_per_square_inch'],
+  rotational_speed: ['revolutions_per_minute'],
+  sound_level: ['decibels'],
+  temperature: ['celsius', 'fahrenheit', 'kelvin'],
+  voltage: ['volts'],
+  volume: ['milliliters', 'centiliters', 'liters', 'cubic_meters', 'us_fluid_ounces', 'imperial_fluid_ounces'],
+  weight: ['grams', 'kilograms', 'ounces', 'pounds'],
+};

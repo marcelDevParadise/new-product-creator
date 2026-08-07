@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 from models.product import Product
 from models.attribute import AttributeDefinition
@@ -249,7 +250,7 @@ class AppState:
     def set_template(
         self,
         name: str,
-        attributes: dict[str, str | int | bool],
+        attributes: dict[str, str | int | float | bool | list[Any] | dict[str, Any]],
         category: str = "",
         description: str = "",
     ) -> None:

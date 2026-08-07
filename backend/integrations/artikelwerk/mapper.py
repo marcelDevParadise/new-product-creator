@@ -13,12 +13,12 @@ from integrations.artikelwerk.schemas import (
     PublicationStep,
 )
 from models.product import Product
-
-
-def _value_as_string(value: str | int | bool) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return str(value)
+from services.shopify_metafields import (
+    MetafieldValueError,
+    jtl_data_type,
+    requires_shopify_reference,
+    serialize_for_jtl,
+)
 
 
 def _present(value: Any) -> bool:
@@ -237,18 +237,66 @@ def build_preview(
         desired_attribute_ids: set[str] = set()
         for key, value in product.attributes.items():
             definition = attribute_config.get(key)
+            if definition is None:
+                issues.append(PreviewIssue(
+                    severity="error", code="UNKNOWN_LOCAL_ATTRIBUTE",
+                    message=f"Attribut '{key}' besitzt keine lokale Attributdefinition.",
+                    field=f"attributes.{key}",
+                ))
+                continue
+            shopify_type = str(getattr(definition, "shopify_type", "single_line_text_field"))
+            management = str(getattr(definition, "management", "jtl"))
+            if management == "shopify" or requires_shopify_reference(shopify_type):
+                issues.append(PreviewIssue(
+                    severity="warning", code="SHOPIFY_MANAGED_ATTRIBUTE",
+                    message=(
+                        f"Attribut '{key}' verwendet {shopify_type} und wird nicht über JTL "
+                        "veröffentlicht. Die stabile Shopify-Referenz bleibt in der Produktwerkstatt."
+                    ),
+                    field=f"attributes.{key}",
+                ))
+                continue
             stable_id = key.casefold()
             configured_id = str(getattr(definition, "id", key))
             remote_id = stable_id if stable_id in remote_attributes else configured_id
             if remote_id not in remote_attributes:
+                if not features.get("attributeWrite", False):
+                    issues.append(PreviewIssue(
+                        severity="error", code="MISSING_ATTRIBUTE_DEFINITION",
+                        message=(
+                            f"Attribut '{key}' fehlt in JTL und Artikelwerk kann derzeit keine "
+                            "Attributdefinitionen anlegen."
+                        ),
+                        field=f"attributes.{key}",
+                    ))
+                    continue
+                remote_id = stable_id
+                steps.append(PublicationStep(
+                    operation="create_attribute",
+                    resource_key=f"attribute-definition:{stable_id}",
+                    payload={
+                        "id": configured_id,
+                        "name": stable_id,
+                        "displayName": str(getattr(definition, "name", key)),
+                        "description": str(getattr(definition, "description", "")),
+                        "dataType": jtl_data_type(shopify_type),
+                        "shopifyType": shopify_type,
+                    },
+                ))
+                remote_attributes[remote_id] = {
+                    "id": remote_id, "name": stable_id, "allowsCustomValue": True,
+                }
+            try:
+                text_value = serialize_for_jtl(
+                    value, shopify_type, getattr(definition, "unit", None),
+                )
+            except MetafieldValueError as exc:
                 issues.append(PreviewIssue(
-                    severity="warning", code="SKIPPED_ATTRIBUTE",
-                    message=(f"Attribut '{key}' ({remote_id}) gehört nicht zum schreibbaren "
-                             "Artikelwerk-Attributstamm und wird übersprungen."),
+                    severity="error", code="INVALID_SHOPIFY_VALUE",
+                    message=f"Attribut '{key}': {exc}",
                     field=f"attributes.{key}",
                 ))
                 continue
-            text_value = _value_as_string(value)
             if not text_value:
                 issues.append(PreviewIssue(severity="warning", code="EMPTY_ATTRIBUTE", message=f"Leeres Attribut '{key}' wird übersprungen."))
                 continue

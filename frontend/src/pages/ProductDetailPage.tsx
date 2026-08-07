@@ -7,7 +7,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
 import { AttributeWizard } from '../components/products/wizard/AttributeWizard';
 import { api } from '../api/client';
-import type { Product, AttributeConfig, ProductHistoryEntry, ArtikelwerkPreview, ArtikelwerkPublication } from '../types';
+import type { Product, AttributeValue, AttributeConfig, ProductHistoryEntry, ArtikelwerkPreview, ArtikelwerkPublication } from '../types';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 
@@ -16,7 +16,7 @@ export function ProductDetailPage() {
   const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [config, setConfig] = useState<AttributeConfig | null>(null);
-  const [parentAttributes, setParentAttributes] = useState<Record<string, string | number | boolean> | undefined>(undefined);
+  const [parentAttributes, setParentAttributes] = useState<Record<string, AttributeValue> | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'attributes' | 'history'>('attributes');
   const [history, setHistory] = useState<ProductHistoryEntry[]>([]);

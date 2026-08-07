@@ -184,6 +184,11 @@ class ArtikelwerkClient:
         result = await self.request("GET", f"context/attributes/{_segment(attribute_id)}/values")
         return result if isinstance(result, list) else []
 
+    async def create_attribute(self, payload: dict[str, Any], key: str) -> dict[str, Any]:
+        return await self.request(
+            "POST", "context/attributes", json=payload, idempotency_key=key,
+        )  # type: ignore[return-value]
+
     async def next_article_number(
         self, tenant_id: int, *, after_sequence: int | None = None,
     ) -> dict[str, Any]:

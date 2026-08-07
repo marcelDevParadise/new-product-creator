@@ -22,6 +22,15 @@ import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import type { AttributeConfig, AttributeDefinition, AttributeImportResult } from '../types';
 
+const SHOPIFY_TYPES = [
+  'single_line_text_field', 'multi_line_text_field', 'boolean', 'number_integer',
+  'number_decimal', 'date', 'date_time', 'url', 'json', 'dimension', 'duration',
+  'weight', 'volume', 'temperature', 'pressure', 'sound_level', 'frequency',
+  'battery_charge_capacity', 'battery_energy_capacity', 'list.single_line_text_field',
+  'product_reference', 'variant_reference', 'file_reference', 'metaobject_reference',
+  'list.product_reference', 'list.metaobject_reference',
+];
+
 export function AttributesPage() {
   const [config, setConfig] = useState<AttributeConfig>({});
   const [loading, setLoading] = useState(true);
@@ -728,6 +737,9 @@ function EditAttributeDialog({
     required: def.required ?? false,
     default_value: def.default_value ?? '',
     suggested_values: (def.suggested_values ?? []).join('\n'),
+    shopify_type: def.shopify_type ?? def.id.split(':').at(-1) ?? 'single_line_text_field',
+    unit: def.unit ?? '',
+    management: def.management ?? 'jtl',
   });
 
   const update = (field: string, value: unknown) =>
@@ -750,6 +762,9 @@ function EditAttributeDialog({
       required: form.required,
       default_value: form.default_value || undefined,
       suggested_values: sv.length > 0 ? sv : undefined,
+      shopify_type: form.shopify_type,
+      unit: form.unit || undefined,
+      management: form.management,
     });
   };
 
@@ -819,6 +834,34 @@ function EditAttributeDialog({
                   onChange={e => update('default_value', e.target.value)}
                   placeholder="(optional)"
                 />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Shopify-Datentyp</Label>
+                <Select value={form.shopify_type} onValueChange={v => update('shopify_type', v)}>
+                  <SelectTrigger className="font-mono text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SHOPIFY_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Standard-Einheit</Label>
+                <Input
+                  value={form.unit}
+                  onChange={e => update('unit', e.target.value)}
+                  placeholder="z.B. seconds"
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Verwaltung</Label>
+                <Select value={form.management} onValueChange={v => update('management', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="jtl">JTL / Artikelwerk</SelectItem>
+                    <SelectItem value="shopify">Direkt in Shopify</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </section>
@@ -920,23 +963,30 @@ function CreateAttributeDialog({
     required: false,
     default_value: '',
     suggested_values: '',
+    shopify_type: 'single_line_text_field',
+    unit: '',
+    management: 'jtl',
     newCategory: '',
   });
   const [useNewCategory, setUseNewCategory] = useState(false);
   const [idManuallyEdited, setIdManuallyEdited] = useState(false);
 
-  const buildMetafieldId = (key: string) => {
+  const buildMetafieldId = (key: string, shopifyType = form.shopify_type) => {
     const k = key.trim();
     if (!k) return '';
     const prefixed = k.startsWith('meta_') ? k : `meta_${k}`;
-    return `${prefixed}:custom:single_line_text_field`;
+    return `${prefixed}:custom:${shopifyType}`;
   };
 
   const update = (field: string, value: unknown) =>
     setForm(prev => {
       // Auto-build the Metafield ID from the key unless the user already typed one in manually.
       if (field === 'key' && !idManuallyEdited) {
-        return { ...prev, key: value as string, id: buildMetafieldId((value as string).trim()) };
+        return {
+          ...prev,
+          key: value as string,
+          id: buildMetafieldId((value as string).trim(), prev.shopify_type),
+        };
       }
       if (field === 'id') {
         setIdManuallyEdited(true);
@@ -976,6 +1026,9 @@ function CreateAttributeDialog({
         required: form.required,
         default_value: form.default_value.trim() || undefined,
         suggested_values: sv.length > 0 ? sv : undefined,
+        shopify_type: form.shopify_type,
+        unit: form.unit.trim() || undefined,
+        management: form.management as 'jtl' | 'shopify',
       });
       toast('Attribut erstellt', 'success');
       onCreated();
@@ -1056,6 +1109,38 @@ function CreateAttributeDialog({
                   value={form.name}
                   onChange={e => update('name', e.target.value)}
                 />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Shopify-Datentyp</Label>
+                <Select
+                  value={form.shopify_type}
+                  onValueChange={v => {
+                    if (!v) return;
+                    update('shopify_type', v);
+                    if (!idManuallyEdited) {
+                      setForm(prev => ({ ...prev, shopify_type: v, id: `${prev.key.startsWith('meta_') ? prev.key : `meta_${prev.key}`}:custom:${v}` }));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="font-mono text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SHOPIFY_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Standard-Einheit</Label>
+                <Input value={form.unit} onChange={e => update('unit', e.target.value)} placeholder="z.B. seconds" className="font-mono text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Verwaltung</Label>
+                <Select value={form.management} onValueChange={v => update('management', v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="jtl">JTL / Artikelwerk</SelectItem>
+                    <SelectItem value="shopify">Direkt in Shopify</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Standardwert</Label>

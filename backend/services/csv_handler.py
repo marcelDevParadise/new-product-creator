@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 from models.product import Product
+from services.shopify_metafields import serialize_for_jtl
 
 
 class ImportWarning:
@@ -132,7 +133,11 @@ def build_ameise_csv(
                 attributgruppe,
                 config.id,
                 config.id,
-                str(attr_value),
+                serialize_for_jtl(
+                    attr_value,
+                    getattr(config, "shopify_type", "single_line_text_field"),
+                    getattr(config, "unit", None),
+                ),
             ])
 
     return output.getvalue()

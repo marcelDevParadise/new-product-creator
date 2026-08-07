@@ -1,0 +1,138 @@
+--- a/apps/server/src/data/types.ts
++++ b/apps/server/src/data/types.ts
+@@ -71,4 +71,12 @@
+ 
+   getAttributes(): Promise<AttributeDefinition[]>;
++  createAttributeDefinition(input: {
++    id: string;
++    name: string;
++    displayName: string;
++    description: string;
++    dataType: "integer" | "decimal" | "text" | "date";
++    shopifyType: string;
++  }): Promise<AttributeDefinition>;
+   getAttributeValues(attributeId: string): Promise<AttributeValue[]>;
+   getCurrentAttribute(articleId: string, attributeId: string): Promise<CurrentAttribute | null>;
+--- a/apps/server/src/data/sqlserver-adapter.ts
++++ b/apps/server/src/data/sqlserver-adapter.ts
+@@ -273,4 +273,70 @@
+     return r.recordset.map((row) => {const name=textValue(row.cName),normalizedName=name.toLocaleLowerCase("de"),unique=counts.get(normalizedName)===1;return { id: unique?normalizedName:String(row.kAttribut), name, group:textValue(row.cGruppeName), dataType: this.dataType(Number(row.kFeldTyp)), allowsCustomValue: true };});
+   }
+ 
++  async createAttributeDefinition(input: {
++    id: string;
++    name: string;
++    displayName: string;
++    description: string;
++    dataType: "integer" | "decimal" | "text" | "date";
++    shopifyType: string;
++  }): Promise<AttributeDefinition> {
++    const normalizedName = input.name.trim().toLocaleLowerCase("de");
++    const fieldType = { integer: 1, decimal: 2, text: 3, date: 11 }[input.dataType];
++    const transaction = new sql.Transaction(this.pool);
++    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
++    try {
++      const request = new sql.Request(transaction)
++        .input("name", sql.NVarChar(510), normalizedName)
++        .input("externalId", sql.NVarChar(510), input.id.trim())
++        .input("description", sql.NVarChar(2000), input.description.trim() || null)
++        .input("group", sql.NVarChar(300), this.mapping.contexts.attributeGroup)
++        .input("language", sql.Int, this.mapping.contexts.attributeLanguageKey)
++        .input("fieldType", sql.Int, fieldType);
++      const lock = await request.query(`
++        DECLARE @lockResult int;
++        EXEC @lockResult = sys.sp_getapplock
++          @Resource=N'Artikelwerk:AttributeDefinition:'+LOWER(@name),
++          @LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=10000;
++        SELECT @lockResult AS lockResult;
++        SELECT TOP 2 a.kAttribut,a.cAttributId,a.cGruppeName,a.kFeldTyp
++        FROM ${this.table("attributes")} a WITH (UPDLOCK,HOLDLOCK)
++        JOIN ${this.table("attributeNames")} s WITH (UPDLOCK,HOLDLOCK)
++          ON s.kAttribut=a.kAttribut AND s.kSprache=@language
++        WHERE LOWER(LTRIM(RTRIM(s.cName)))=LOWER(LTRIM(RTRIM(@name)))
++           OR LOWER(LTRIM(RTRIM(a.cAttributId)))=LOWER(LTRIM(RTRIM(@externalId)));`);
++      const recordsets = lock.recordsets as sql.IRecordSet<Row>[];
++      if (Number(recordsets[0]?.[0]?.lockResult) < 0) throw new Error("JTL-Attributsperre konnte nicht erworben werden.");
++      const existing = recordsets[1] ?? [];
++      if (existing.length) {
++        const exact = existing.find((row: Row) =>
++          textValue(row.cAttributId).toLocaleLowerCase("de") === input.id.trim().toLocaleLowerCase("de")
++          && textValue(row.cGruppeName) === this.mapping.contexts.attributeGroup
++          && Number(row.kFeldTyp) === fieldType);
++        if (!exact || existing.length > 1) throw new Error("Attributname oder Funktionsattribut-ID kollidiert mit einer abweichenden JTL-Definition.");
++        await transaction.commit();
++        return { id: normalizedName, name: normalizedName, group: this.mapping.contexts.attributeGroup, dataType: input.dataType, allowsCustomValue: true };
++      }
++      const inserted = await request.query(`
++        DECLARE @ids TABLE(kAttribut int);
++        INSERT INTO ${this.table("attributes")}
++          (nIstMehrsprachig,nIstFreifeld,nSortierung,cBeschreibung,nBezugstyp,nAusgabeweg,
++           nIstStandard,kFeldTyp,cRegEx,cGruppeName,nReadOnly,
++           nAktivFuerArtikelOhneWarengruppe,nIstPflichtfeld,cAttributId,nIstUnsichtbar)
++        OUTPUT INSERTED.kAttribut INTO @ids
++        VALUES (0,0,(SELECT COALESCE(MAX(nSortierung),0)+1 FROM ${this.table("attributes")}),
++          @description,0,0,0,@fieldType,NULL,@group,0,1,0,@externalId,0);
++        SELECT kAttribut FROM @ids;`);
++      const attributeId = Number(inserted.recordset[0]?.kAttribut);
++      if (!attributeId) throw new Error("JTL lieferte keine ID für das neue Attribut.");
++      await new sql.Request(transaction)
++        .input("attribute", sql.Int, attributeId)
++        .input("language", sql.Int, this.mapping.contexts.attributeLanguageKey)
++        .input("name", sql.NVarChar(510), normalizedName)
++        .query(`INSERT INTO ${this.table("attributeNames")} (kAttribut,kSprache,cName,cWertListe) VALUES (@attribute,@language,@name,NULL)`);
++      await transaction.commit();
++      return { id: normalizedName, name: normalizedName, group: this.mapping.contexts.attributeGroup, dataType: input.dataType, allowsCustomValue: true };
++    } catch (error) { await transaction.rollback(); throw error; }
++  }
++
+   async getAttributeValues(attributeId: string): Promise<AttributeValue[]> {
+--- a/apps/server/src/data/mock-adapter.ts
++++ b/apps/server/src/data/mock-adapter.ts
+@@ -372,5 +372,21 @@
+   async getAttributes() {
+     return this.attributes.map((attribute) => ({ ...attribute }));
+   }
++
++  async createAttributeDefinition(input: {
++    id: string;
++    name: string;
++    displayName: string;
++    description: string;
++    dataType: "integer" | "decimal" | "text" | "date";
++    shopifyType: string;
++  }): Promise<AttributeDefinition> {
++    const id = input.name.trim().toLocaleLowerCase("de");
++    const existing = this.attributes.find((attribute) => attribute.id === id);
++    if (existing) return { ...existing };
++    const definition: AttributeDefinition = { id, name: id, group: "Shopify-Attribute", dataType: input.dataType, allowsCustomValue: true };
++    this.attributes.push(definition);
++    return { ...definition };
++  }
+ 
+   async getAttributeValues(attributeId: string) {
+--- a/apps/server/src/app.ts
++++ b/apps/server/src/app.ts
+@@ -55,4 +55,12 @@
+ const tokenCreateSchema = z.object({ name: z.string().trim().min(2).max(100), scopes: tokenScopesSchema, expiresAt: z.string().datetime().nullable().default(null) });
+ const tokenScopeUpdateSchema = z.object({ scopes: tokenScopesSchema }).strict();
+ const integrationAttributeSchema = z.object({ attributeId: z.string().min(1).max(100), value: z.string().trim().min(1).max(4000) });
++const integrationAttributeDefinitionSchema = z.object({
++  id: z.string().trim().min(1).max(510),
++  name: z.string().trim().regex(/^[a-z0-9_]+$/).max(100),
++  displayName: z.string().trim().min(1).max(255),
++  description: z.string().max(2000).default(""),
++  dataType: z.enum(["integer", "decimal", "text", "date"]),
++  shopifyType: z.string().trim().min(1).max(100),
++}).strict();
+ const previewPayloadSchema = z.object({
+@@ -229,1 +237,10 @@
++  app.post("/api/integrations/v1/context/attributes", { preHandler: integrationPreHandler }, async (request, reply) => {
++    if (requireScope(request, reply, "attributes:write") !== true) return;
++    const input = integrationAttributeDefinitionSchema.parse(request.body);
++    const before = (await adapter.getAttributes()).find((attribute) => attribute.id === input.name);
++    const attribute = await adapter.createAttributeDefinition(input);
++    await audit.append({ timestamp: new Date().toISOString(), operationId: randomUUID(), admin: "integration-api", articleId: "context", articleNumber: "context", attributeId: attribute.id, previousValueId: before?.id ?? null, newValueId: attribute.id, result: "success", message: before ? "Vorhandene Attributdefinition wiederverwendet." : "Attributdefinition über Integrations-API angelegt." });
++    return reply.code(before ? 200 : 201).send({ attribute, created: !before });
++  });
++
+   app.delete("/api/integrations/v1/articles/:id/attributes/:attributeId",{preHandler:integrationPreHandler},async(request,reply)=>{if(requireScope(request,reply,"attributes:write")!==true)return;const revision=ifMatch(request,reply);if(!revision)return;const{id,attributeId}=z.object({id:z.string().min(1).max(200),attributeId:z.string().min(1).max(200)}).parse(request.params),result=await adapter.deleteArticleAttribute(id,attributeId,revision),operationId=randomUUID();await auditMutation(request,"attribute",result,operationId);return reply.header("etag",`"${result.revision}"`).send({operationId,revision:result.revision,changedFields:result.changedFields});});

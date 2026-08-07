@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Any, Iterator
 
 import psycopg
 from psycopg_pool import ConnectionPool
@@ -90,9 +90,15 @@ def init_db() -> None:
                 default_value TEXT,
                 suggested_values TEXT NOT NULL DEFAULT '[]',
                 smart_defaults TEXT NOT NULL DEFAULT '[]',
+                shopify_type TEXT NOT NULL DEFAULT 'single_line_text_field',
+                unit TEXT,
+                management TEXT NOT NULL DEFAULT 'jtl',
                 sort_order INTEGER NOT NULL DEFAULT 0
             )
         """)
+        cur.execute("ALTER TABLE attribute_definitions ADD COLUMN IF NOT EXISTS shopify_type TEXT NOT NULL DEFAULT 'single_line_text_field'")
+        cur.execute("ALTER TABLE attribute_definitions ADD COLUMN IF NOT EXISTS unit TEXT")
+        cur.execute("ALTER TABLE attribute_definitions ADD COLUMN IF NOT EXISTS management TEXT NOT NULL DEFAULT 'jtl'")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS app_metadata (
                 key TEXT PRIMARY KEY,
@@ -999,7 +1005,7 @@ def load_all_templates() -> dict[str, dict]:
 
 def save_template(
     name: str,
-    attributes: dict[str, str | int | bool],
+    attributes: dict[str, Any],
     category: str = "",
     description: str = "",
 ) -> None:
@@ -1028,13 +1034,18 @@ def load_all_attribute_definitions() -> dict[str, AttributeDefinition]:
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
             "SELECT key, id, category, name, description, required, "
-            "required_for_types, default_value, suggested_values, smart_defaults, sort_order "
+            "required_for_types, default_value, suggested_values, smart_defaults, "
+            "shopify_type, unit, management, sort_order "
             "FROM attribute_definitions ORDER BY sort_order, key"
         )
         rows = cur.fetchall()
     result: dict[str, AttributeDefinition] = {}
     for row in rows:
-        key, attr_id, category, name, description, required, rft_json, default_value, sv_json, sd_json, _sort = row
+        (key, attr_id, category, name, description, required, rft_json, default_value,
+         sv_json, sd_json, shopify_type, unit, management, _sort) = row
+        inferred_shopify_type = shopify_type or "single_line_text_field"
+        if inferred_shopify_type == "single_line_text_field" and ":" in attr_id:
+            inferred_shopify_type = attr_id.rsplit(":", 1)[-1] or inferred_shopify_type
         result[key] = AttributeDefinition(
             id=attr_id,
             category=category,
@@ -1045,6 +1056,9 @@ def load_all_attribute_definitions() -> dict[str, AttributeDefinition]:
             default_value=default_value,
             suggested_values=json.loads(sv_json),
             smart_defaults=json.loads(sd_json),
+            shopify_type=inferred_shopify_type,
+            unit=unit,
+            management=management or "jtl",
         )
     return result
 
@@ -1055,8 +1069,9 @@ def save_attribute_definition(key: str, attr: AttributeDefinition, sort_order: i
         cur.execute(
             """INSERT INTO attribute_definitions
                (key, id, category, name, description, required, required_for_types,
-                default_value, suggested_values, smart_defaults, sort_order)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                default_value, suggested_values, smart_defaults, shopify_type, unit,
+                management, sort_order)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (key) DO UPDATE SET
                  id=excluded.id, category=excluded.category, name=excluded.name,
                  description=excluded.description, required=excluded.required,
@@ -1064,6 +1079,9 @@ def save_attribute_definition(key: str, attr: AttributeDefinition, sort_order: i
                  default_value=excluded.default_value,
                  suggested_values=excluded.suggested_values,
                  smart_defaults=excluded.smart_defaults,
+                 shopify_type=excluded.shopify_type,
+                 unit=excluded.unit,
+                 management=excluded.management,
                  sort_order=excluded.sort_order""",
             (
                 key,
@@ -1076,6 +1094,9 @@ def save_attribute_definition(key: str, attr: AttributeDefinition, sort_order: i
                 attr.default_value,
                 json.dumps(attr.suggested_values),
                 json.dumps([sd.model_dump() for sd in attr.smart_defaults]),
+                attr.shopify_type,
+                attr.unit,
+                attr.management,
                 sort_order,
             ),
         )

@@ -569,6 +569,12 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                             invoke=lambda _key: client.set_attribute(remote_article_id or "", payload),
                             reuse_success=False,
                         )
+                    elif step.operation == "create_attribute":
+                        await _execute_operation(
+                            client=client, job_id=job_id, sku=preview.sku, step=step,
+                            payload=payload, idempotent=True,
+                            invoke=lambda key: client.create_attribute(payload, key or ""),
+                        )
                     elif step.operation == "delete_attribute":
                         await _execute_operation(
                             client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=False,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Play, FileText, Search, ChevronRight, Folder, ExternalLink, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import type { Template, AttributeConfig } from '../../types';
+import type { Template, AttributeConfig, AttributeValue } from '../../types';
 import { api } from '../../api/client';
 import { useToast } from '../ui/Toast';
 
@@ -115,8 +115,8 @@ export function TemplateModal({ selectedSkus, attributeConfig, totalActiveProduc
   // Group active template's attributes by attribute-category (read-only preview)
   const activeGrouped = useMemo(() => {
     const tpl = activeTemplate ? templates[activeTemplate] : null;
-    if (!tpl) return {} as Record<string, { key: string; value: string | number | boolean }[]>;
-    const result: Record<string, { key: string; value: string | number | boolean }[]> = {};
+    if (!tpl) return {} as Record<string, { key: string; value: AttributeValue }[]>;
+    const result: Record<string, { key: string; value: AttributeValue }[]> = {};
     for (const [key, val] of Object.entries(tpl.attributes)) {
       const def = attributeConfig[key];
       const cat = def?.category || 'Sonstige';
@@ -293,7 +293,9 @@ export function TemplateModal({ selectedSkus, attributeConfig, totalActiveProduc
                               if (!def) return null;
                               const displayValue = value === '' || value === undefined
                                 ? <span className="italic text-gray-300">nicht gesetzt</span>
-                                : String(value);
+                                : typeof value === 'object'
+                                  ? JSON.stringify(value)
+                                  : String(value);
                               return (
                                 <div key={key} className="flex items-center gap-3 px-4 py-2.5">
                                   <div className="flex-1 min-w-0">

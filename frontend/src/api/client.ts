@@ -1,4 +1,4 @@
-import type { Product, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult, ArtikelwerkSyncOverview, ArtikelwerkSyncDetail, WorkflowBoard, WorkflowItem, WorkflowProductDetail, WorkflowComment, WorkflowStatus } from '../types';
+import type { Product, AttributeValue, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult, ArtikelwerkSyncOverview, ArtikelwerkSyncDetail, WorkflowBoard, WorkflowItem, WorkflowProductDetail, WorkflowComment, WorkflowStatus } from '../types';
 
 const BASE = '/api';
 
@@ -217,7 +217,7 @@ export const api = {
     a.click();
     URL.revokeObjectURL(url);
   },
-  updateAttributes: (sku: string, attributes: Record<string, string | number | boolean>) =>
+  updateAttributes: (sku: string, attributes: Record<string, AttributeValue>) =>
     request<Product>(`/attributes/products/${encodeURIComponent(sku)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -227,7 +227,7 @@ export const api = {
     request<Product>(`/attributes/products/${encodeURIComponent(sku)}/${attrKey}`, {
       method: 'DELETE',
     }),
-  bulkUpdateAttributes: (skus: string[], attributes: Record<string, string | number | boolean>) =>
+  bulkUpdateAttributes: (skus: string[], attributes: Record<string, AttributeValue>) =>
     request<{ updated: number }>('/attributes/products/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -298,7 +298,7 @@ export const api = {
   getTemplateCategories: () => request<string[]>('/templates/categories'),
   createTemplate: (
     name: string,
-    attributes: Record<string, string | number | boolean>,
+    attributes: Record<string, AttributeValue>,
     category = '',
     description = '',
   ) =>
@@ -309,7 +309,7 @@ export const api = {
     }),
   updateTemplate: (
     name: string,
-    attributes: Record<string, string | number | boolean>,
+    attributes: Record<string, AttributeValue>,
     category = '',
     description = '',
   ) =>

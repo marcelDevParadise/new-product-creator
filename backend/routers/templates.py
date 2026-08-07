@@ -1,6 +1,6 @@
 """Templates router — reusable attribute presets with category & description."""
 
-from typing import List
+from typing import Any, List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -13,13 +13,13 @@ router = APIRouter(prefix="/api/templates", tags=["templates"])
 
 class TemplateBody(BaseModel):
     name: str
-    attributes: dict[str, str | int | bool]
+    attributes: dict[str, str | int | float | bool | list[Any] | dict[str, Any]]
     category: str = ""
     description: str = ""
 
 
 class TemplateUpdateBody(BaseModel):
-    attributes: dict[str, str | int | bool]
+    attributes: dict[str, str | int | float | bool | list[Any] | dict[str, Any]]
     category: str = ""
     description: str = ""
 

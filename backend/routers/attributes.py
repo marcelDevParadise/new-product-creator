@@ -48,6 +48,9 @@ IMPORT_COLUMN_ALIASES = {
     "default_value": {"default_value", "standardwert"},
     "suggested_values": {"suggested_values", "vorgeschlagene_werte", "werte"},
     "smart_defaults": {"smart_defaults", "intelligente_standardwerte", "titelregeln"},
+    "shopify_type": {"shopify_type", "metafield_type", "shopify_datentyp"},
+    "unit": {"unit", "einheit", "shopify_einheit"},
+    "management": {"management", "verwaltung", "verwaltungsmodus"},
 }
 
 
@@ -204,6 +207,7 @@ def download_attribute_import_template():
     columns = [
         "key", "id", "category", "name", "description", "required",
         "required_for_types", "default_value", "suggested_values", "smart_defaults",
+        "shopify_type", "unit", "management",
     ]
     examples = [
         [
@@ -217,6 +221,9 @@ def download_attribute_import_template():
             "",
             "Baumwolle|Polyester|Silikon",
             "",
+            "single_line_text_field",
+            "",
+            "jtl",
         ],
         [
             "meta_color",
@@ -229,6 +236,9 @@ def download_attribute_import_template():
             "",
             "Schwarz|Weiß|Rot|Blau",
             "XL=>Schwarz|White Edition=>Weiß",
+            "single_line_text_field",
+            "",
+            "jtl",
         ],
     ]
 
@@ -317,6 +327,9 @@ async def import_attribute_definitions(file: UploadFile):
             "default_value": None,
             "suggested_values": [],
             "smart_defaults": [],
+            "shopify_type": "single_line_text_field",
+            "unit": None,
+            "management": "jtl",
         }
 
         data.update({
@@ -343,6 +356,12 @@ async def import_attribute_definitions(file: UploadFile):
             data["smart_defaults"] = _parse_smart_defaults(
                 normalized_row.get("smart_defaults", ""), row_idx, warnings
             )
+        if "shopify_type" in present_columns:
+            data["shopify_type"] = normalized_row.get("shopify_type") or "single_line_text_field"
+        if "unit" in present_columns:
+            data["unit"] = normalized_row.get("unit") or None
+        if "management" in present_columns:
+            data["management"] = normalized_row.get("management") or "jtl"
 
         attr = AttributeDefinition(**data)
         if existing:
@@ -383,6 +402,9 @@ def create_attribute_definition(body: AttributeDefinitionCreate):
         default_value=body.default_value,
         suggested_values=body.suggested_values,
         smart_defaults=body.smart_defaults,
+        shopify_type=body.shopify_type,
+        unit=body.unit,
+        management=body.management,
     )
     state.add_attribute_definition(body.key, attr)
     return {"key": body.key, **attr.model_dump()}
