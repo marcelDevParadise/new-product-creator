@@ -22,14 +22,163 @@ import { useToast } from '../components/ui/Toast';
 import { api } from '../api/client';
 import type { AttributeConfig, AttributeDefinition, AttributeImportResult } from '../types';
 
-const SHOPIFY_TYPES = [
-  'single_line_text_field', 'multi_line_text_field', 'boolean', 'number_integer',
-  'number_decimal', 'date', 'date_time', 'url', 'json', 'dimension', 'duration',
-  'weight', 'volume', 'temperature', 'pressure', 'sound_level', 'frequency',
-  'battery_charge_capacity', 'battery_energy_capacity', 'list.single_line_text_field',
-  'product_reference', 'variant_reference', 'file_reference', 'metaobject_reference',
-  'list.product_reference', 'list.metaobject_reference',
-];
+const SHOPIFY_TYPE_DETAILS: Record<string, { label: string; description: string; example: string }> = {
+  single_line_text_field: {
+    label: 'Einzeiliger Text',
+    description: 'Kurzer Text ohne Zeilenumbrüche.',
+    example: 'Schwarz',
+  },
+  multi_line_text_field: {
+    label: 'Mehrzeiliger Text',
+    description: 'Längerer Klartext, der Zeilenumbrüche enthalten darf.',
+    example: 'Pflegehinweis mit mehreren Zeilen',
+  },
+  boolean: {
+    label: 'Ja/Nein-Wert',
+    description: 'Boolescher Schalter. Akzeptiert ausschließlich true oder false.',
+    example: 'true',
+  },
+  number_integer: {
+    label: 'Ganze Zahl',
+    description: 'Zahl ohne Nachkommastellen und ohne Einheit.',
+    example: '30',
+  },
+  number_decimal: {
+    label: 'Dezimalzahl',
+    description: 'Zahl mit optionalen Nachkommastellen und ohne Einheit.',
+    example: '30.5',
+  },
+  date: {
+    label: 'Datum',
+    description: 'Kalenderdatum im ISO-Format.',
+    example: '2026-08-07',
+  },
+  date_time: {
+    label: 'Datum und Uhrzeit',
+    description: 'Zeitpunkt im ISO-8601-Format. Ohne angegebene Zeitzone verwendet Shopify GMT.',
+    example: '2026-08-07T14:30:00',
+  },
+  url: {
+    label: 'URL',
+    description: 'Vollständige Webadresse mit Protokoll.',
+    example: 'https://example.com',
+  },
+  json: {
+    label: 'JSON',
+    description: 'Beliebige strukturierte Daten. Der Wert muss gültiges JSON sein.',
+    example: '{"key":"value"}',
+  },
+  dimension: {
+    label: 'Abmessung',
+    description: 'Messwert und Shopify-kompatible Längeneinheit als JSON-Objekt.',
+    example: '{"value":12.5,"unit":"centimeters"}',
+  },
+  duration: {
+    label: 'Dauer',
+    description: 'Zeitwert und Shopify-kompatible Zeiteinheit als JSON-Objekt.',
+    example: '{"value":30.0,"unit":"seconds"}',
+  },
+  weight: {
+    label: 'Gewicht',
+    description: 'Messwert und Shopify-kompatible Gewichtseinheit als JSON-Objekt.',
+    example: '{"value":250.0,"unit":"grams"}',
+  },
+  volume: {
+    label: 'Volumen',
+    description: 'Messwert und Shopify-kompatible Volumeneinheit als JSON-Objekt.',
+    example: '{"value":100.0,"unit":"milliliters"}',
+  },
+  temperature: {
+    label: 'Temperatur',
+    description: 'Messwert und Shopify-kompatible Temperatureinheit als JSON-Objekt.',
+    example: '{"value":37.0,"unit":"celsius"}',
+  },
+  pressure: {
+    label: 'Druck',
+    description: 'Messwert und Shopify-kompatible Druckeinheit als JSON-Objekt.',
+    example: '{"value":1.0,"unit":"bars"}',
+  },
+  sound_level: {
+    label: 'Schallpegel',
+    description: 'Messwert und Shopify-kompatible Schallpegeleinheit als JSON-Objekt.',
+    example: '{"value":45.0,"unit":"decibels"}',
+  },
+  frequency: {
+    label: 'Frequenz',
+    description: 'Messwert und Shopify-kompatible Frequenzeinheit als JSON-Objekt.',
+    example: '{"value":60.0,"unit":"hertz"}',
+  },
+  battery_charge_capacity: {
+    label: 'Batterieladekapazität',
+    description: 'Kapazitätswert und passende Einheit als JSON-Objekt.',
+    example: '{"value":2000.0,"unit":"milliamp_hours"}',
+  },
+  battery_energy_capacity: {
+    label: 'Batterieenergiekapazität',
+    description: 'Energiewert und passende Einheit als JSON-Objekt.',
+    example: '{"value":12.0,"unit":"watt_hours"}',
+  },
+  'list.single_line_text_field': {
+    label: 'Textliste',
+    description: 'Mehrere einzeilige Texte als gültiges JSON-Array.',
+    example: '["Rot","Grün","Blau"]',
+  },
+  product_reference: {
+    label: 'Produktreferenz',
+    description: 'Verweis auf genau ein Shopify-Produkt über seine GraphQL-ID.',
+    example: 'gid://shopify/Product/123456789',
+  },
+  variant_reference: {
+    label: 'Variantenreferenz',
+    description: 'Verweis auf genau eine Shopify-Produktvariante über ihre GraphQL-ID.',
+    example: 'gid://shopify/ProductVariant/123456789',
+  },
+  file_reference: {
+    label: 'Dateireferenz',
+    description: 'Verweis auf eine in Shopify gespeicherte Datei über ihre GraphQL-ID.',
+    example: 'gid://shopify/MediaImage/123456789',
+  },
+  metaobject_reference: {
+    label: 'Metaobjekt-Referenz',
+    description: 'Verweis auf genau einen vorhandenen Metaobjekt-Eintrag über seine GraphQL-ID.',
+    example: 'gid://shopify/Metaobject/123456789',
+  },
+  'list.product_reference': {
+    label: 'Produktreferenz-Liste',
+    description: 'Mehrere Shopify-Produkt-IDs als gültiges JSON-Array.',
+    example: '["gid://shopify/Product/123","gid://shopify/Product/456"]',
+  },
+  'list.metaobject_reference': {
+    label: 'Metaobjekt-Referenz-Liste',
+    description: 'Mehrere Metaobjekt-IDs als gültiges JSON-Array.',
+    example: '["gid://shopify/Metaobject/123","gid://shopify/Metaobject/456"]',
+  },
+};
+
+const SHOPIFY_TYPES = Object.keys(SHOPIFY_TYPE_DETAILS);
+
+function ShopifyTypeDescription({ type }: { type: string }) {
+  const details = SHOPIFY_TYPE_DETAILS[type];
+  if (!details) return null;
+
+  return (
+    <div className="rounded-lg border border-indigo-100 dark:border-indigo-900/70 bg-indigo-50/60 dark:bg-indigo-950/20 px-3 py-2.5">
+      <div className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">
+        {details.label}
+      </div>
+      <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+        {details.description}
+      </p>
+      <div className="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+        Beispiel:
+        {' '}
+        <code className="break-all rounded bg-white/80 dark:bg-gray-900/80 px-1.5 py-0.5 font-mono text-gray-700 dark:text-gray-300">
+          {details.example}
+        </code>
+      </div>
+    </div>
+  );
+}
 
 export function AttributesPage() {
   const [config, setConfig] = useState<AttributeConfig>({});
@@ -773,18 +922,32 @@ function EditAttributeDialog({
       <DialogContent className="sm:max-w-3xl p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
-          <div className="flex items-center gap-2 mb-1">
-            <Pencil className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <DialogTitle className="text-base font-semibold">Attribut bearbeiten</DialogTitle>
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-300 font-mono text-xs">
-              <Hash className="w-3 h-3" />
-              {attrKey}
-            </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Key ist unveränderlich
-            </span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Pencil className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <DialogTitle className="text-base font-semibold">Attribut bearbeiten</DialogTitle>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-900 text-indigo-700 dark:text-indigo-300 font-mono text-xs">
+                  <Hash className="w-3 h-3" />
+                  {attrKey}
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Key ist unveränderlich
+                </span>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button variant="outline" onClick={onCancel}>
+                <X className="w-3.5 h-3.5 mr-1" />
+                Abbrechen
+              </Button>
+              <Button onClick={handleSubmit}>
+                <Check className="w-3.5 h-3.5 mr-1" />
+                Speichern
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -817,7 +980,7 @@ function EditAttributeDialog({
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Kategorie</Label>
                 <Select value={form.category} onValueChange={v => update('category', v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -835,14 +998,15 @@ function EditAttributeDialog({
                   placeholder="(optional)"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2 sm:col-span-2">
                 <Label className="text-xs font-medium">Shopify-Datentyp</Label>
                 <Select value={form.shopify_type} onValueChange={v => update('shopify_type', v)}>
-                  <SelectTrigger className="font-mono text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full font-mono text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SHOPIFY_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <ShopifyTypeDescription type={form.shopify_type} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Standard-Einheit</Label>
@@ -856,7 +1020,7 @@ function EditAttributeDialog({
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Verwaltung</Label>
                 <Select value={form.management} onValueChange={v => update('management', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="jtl">JTL / Artikelwerk</SelectItem>
                     <SelectItem value="shopify">Direkt in Shopify</SelectItem>
@@ -925,17 +1089,6 @@ function EditAttributeDialog({
           </section>
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
-          <Button variant="outline" onClick={onCancel}>
-            <X className="w-3.5 h-3.5 mr-1" />
-            Abbrechen
-          </Button>
-          <Button onClick={handleSubmit}>
-            <Check className="w-3.5 h-3.5 mr-1" />
-            Speichern
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1042,13 +1195,27 @@ function CreateAttributeDialog({
       <DialogContent className="sm:max-w-4xl p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
-          <div className="flex items-center gap-2">
-            <Plus className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <DialogTitle className="text-base font-semibold">Neues Attribut erstellen</DialogTitle>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:pr-8">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Plus className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <DialogTitle className="text-base font-semibold">Neues Attribut erstellen</DialogTitle>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+                Lege ein neues Attribut an. Key muss eindeutig sein. Die Metafield ID wird automatisch als <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">meta_&lt;key&gt;:custom:single_line_text_field</code> gebaut.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button variant="outline" onClick={onClose}>
+                <X className="w-3.5 h-3.5 mr-1" />
+                Abbrechen
+              </Button>
+              <Button onClick={handleCreate}>
+                <Check className="w-3.5 h-3.5 mr-1" />
+                Erstellen
+              </Button>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
-            Lege ein neues Attribut an. Key muss eindeutig sein. Die Metafield ID wird automatisch als <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">meta_&lt;key&gt;:custom:single_line_text_field</code> gebaut.
-          </p>
         </div>
 
         {/* Body */}
@@ -1110,7 +1277,7 @@ function CreateAttributeDialog({
                   onChange={e => update('name', e.target.value)}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-2 sm:col-span-2">
                 <Label className="text-xs font-medium">Shopify-Datentyp</Label>
                 <Select
                   value={form.shopify_type}
@@ -1122,11 +1289,12 @@ function CreateAttributeDialog({
                     }
                   }}
                 >
-                  <SelectTrigger className="font-mono text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full font-mono text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SHOPIFY_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <ShopifyTypeDescription type={form.shopify_type} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Standard-Einheit</Label>
@@ -1135,7 +1303,7 @@ function CreateAttributeDialog({
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Verwaltung</Label>
                 <Select value={form.management} onValueChange={v => update('management', v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="jtl">JTL / Artikelwerk</SelectItem>
                     <SelectItem value="shopify">Direkt in Shopify</SelectItem>
@@ -1170,8 +1338,8 @@ function CreateAttributeDialog({
                   />
                 ) : (
                   <Select value={form.category} onValueChange={v => update('category', v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Kategorie wählen…" />
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Kategorie wählen…" />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map(c => (
@@ -1243,17 +1411,6 @@ function CreateAttributeDialog({
           </section>
         </div>
 
-        {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-900/40">
-          <Button variant="outline" onClick={onClose}>
-            <X className="w-3.5 h-3.5 mr-1" />
-            Abbrechen
-          </Button>
-          <Button onClick={handleCreate}>
-            <Check className="w-3.5 h-3.5 mr-1" />
-            Erstellen
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
