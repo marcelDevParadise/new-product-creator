@@ -21,6 +21,25 @@ from services.shopify_metafields import (
 )
 
 
+UNPREFIXED_ATTRIBUTE_IDS = frozenset({
+    "barcode",
+    "barcode_type",
+    "product_type",
+    "sales_channels",
+    "sku",
+    "tags",
+    "template_suffix",
+})
+
+
+def configured_attribute_id(key: str, definition: Any) -> str:
+    """Return the normalized JTL ID, enforcing the Produktwerkstatt prefix contract."""
+    attribute_id = str(getattr(definition, "id", key)).strip().casefold()
+    if attribute_id.startswith("meta_") or attribute_id in UNPREFIXED_ATTRIBUTE_IDS:
+        return attribute_id
+    return f"meta_{attribute_id}"
+
+
 def _present(value: Any) -> bool:
     return value is not None and value != ""
 
@@ -41,7 +60,9 @@ def build_preview(
     features = capabilities.get("features", {})
     tenants = {int(t["id"]): t for t in context.get("tenants", [])}
     units = {str(u.get("code", "")).casefold(): int(u["id"]) for u in context.get("units", []) if u.get("code")}
-    remote_attributes = {str(a["id"]): a for a in context.get("attributes", [])}
+    remote_attributes = {
+        str(a["id"]).strip().casefold(): a for a in context.get("attributes", [])
+    }
 
     if not settings.tenant_ids:
         defaults = [int(t["id"]) for t in context.get("tenants", []) if t.get("isDefault")]
@@ -256,9 +277,7 @@ def build_preview(
                     field=f"attributes.{key}",
                 ))
                 continue
-            stable_id = key.casefold()
-            configured_id = str(getattr(definition, "id", key))
-            remote_id = stable_id if stable_id in remote_attributes else configured_id
+            remote_id = configured_attribute_id(key, definition)
             if remote_id not in remote_attributes:
                 if not features.get("attributeWrite", False):
                     issues.append(PreviewIssue(
@@ -270,13 +289,12 @@ def build_preview(
                         field=f"attributes.{key}",
                     ))
                     continue
-                remote_id = stable_id
                 steps.append(PublicationStep(
                     operation="create_attribute",
-                    resource_key=f"attribute-definition:{stable_id}",
+                    resource_key=f"attribute-definition:{remote_id}",
                     payload={
-                        "id": configured_id,
-                        "name": stable_id,
+                        "id": remote_id,
+                        "name": remote_id,
                         "displayName": str(getattr(definition, "name", key)),
                         "description": str(getattr(definition, "description", "")),
                         "dataType": jtl_data_type(shopify_type),
@@ -284,7 +302,7 @@ def build_preview(
                     },
                 ))
                 remote_attributes[remote_id] = {
-                    "id": remote_id, "name": stable_id, "allowsCustomValue": True,
+                    "id": remote_id, "name": remote_id, "allowsCustomValue": True,
                 }
             try:
                 text_value = serialize_for_jtl(
