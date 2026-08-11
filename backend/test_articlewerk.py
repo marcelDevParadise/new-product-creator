@@ -304,7 +304,7 @@ class MapperTests(unittest.TestCase):
         configured_id = "meta_ingredients:custom:list.single_line_text_field"
         product = Product(
             artikelnummer="CYL-INGREDIENTS", artikelname="Test",
-            attributes={"ingredients": ["Aqua", "Glycerin"]},
+            attributes={"ingredients": "Aqua, Glycerin"},
         )
         definition = AttributeDefinition(
             id=configured_id, category="Produkt", name="Inhaltsstoffe",
@@ -325,6 +325,7 @@ class MapperTests(unittest.TestCase):
         self.assertTrue(preview.valid, preview.issues)
         attribute_step = next(step for step in preview.steps if step.operation == "set_attribute")
         self.assertEqual(attribute_step.payload["attributeId"], configured_id)
+        self.assertEqual(attribute_step.payload["value"], '["Aqua","Glycerin"]')
 
     def test_serializes_duration_as_shopify_json(self):
         product = Product(

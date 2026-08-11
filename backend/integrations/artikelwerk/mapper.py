@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
@@ -38,6 +40,21 @@ def configured_attribute_id(key: str, definition: Any) -> str:
     if attribute_id.startswith("meta_") or attribute_id in UNPREFIXED_ATTRIBUTE_IDS:
         return attribute_id
     return f"meta_{attribute_id}"
+
+
+def _normalize_legacy_list_value(value: Any, shopify_type: str) -> Any:
+    """Coerce legacy text saved before an attribute became a Shopify list."""
+    if not shopify_type.startswith("list.") or not isinstance(value, str):
+        return value
+    text = value.strip()
+    if text.startswith("["):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list):
+            return parsed
+    return [item.strip() for item in re.split(r"[,\r\n]+", text) if item.strip()]
 
 
 def _present(value: Any) -> bool:
@@ -306,7 +323,9 @@ def build_preview(
                 }
             try:
                 text_value = serialize_for_jtl(
-                    value, shopify_type, getattr(definition, "unit", None),
+                    _normalize_legacy_list_value(value, shopify_type),
+                    shopify_type,
+                    getattr(definition, "unit", None),
                 )
             except MetafieldValueError as exc:
                 issues.append(PreviewIssue(
