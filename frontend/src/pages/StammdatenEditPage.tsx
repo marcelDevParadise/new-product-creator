@@ -472,7 +472,7 @@ export function StammdatenEditPage() {
           {/* ───── Grundpreis ───── */}
           <Section title="Grundpreis">
             <Field label="Verkaufseinheit">
-              <input className={inputCls} value={f.verkaufseinheit} onChange={set('verkaufseinheit')} placeholder="1" />
+              <input className={inputCls} value={f.verkaufseinheit} onChange={set('verkaufseinheit')} placeholder="Stk" />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Inhalt / Menge">
