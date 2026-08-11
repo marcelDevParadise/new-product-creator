@@ -84,7 +84,7 @@ function findParentTag(
 ): { tag: string; groupIndex: number } | undefined {
   if (!label) return undefined;
   const parentByLabel = categoryTags.get(categoryKey(label));
-  if (parentByLabel?.groupIndex !== groupIndex) return parentByLabel;
+  if (parentByLabel && parentByLabel.groupIndex !== groupIndex) return parentByLabel;
 
   const childTags = groupTags
     .filter(tag => /^cat[-_\s]/i.test(tag))
