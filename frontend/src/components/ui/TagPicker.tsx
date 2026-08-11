@@ -13,11 +13,27 @@ interface TagGroup {
   label: string | null;
   tags: string[];
   parentTag: string | null;
+  requiresParent: boolean;
+}
+
+const SUBCATEGORY_LABEL = /^(?:sub|unter)(?:[\s-]*kategor(?:ie|ien))\b\s*[:\-–—>]*\s*/i;
+
+function categoryKey(value: string): string {
+  return value
+    .trim()
+    .replace(SUBCATEGORY_LABEL, '')
+    .replace(/^cat[-_\s]+/i, '')
+    .toLocaleLowerCase('de-DE')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ß/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 function groupSuggestions(suggestions: string[]): TagGroup[] {
   const groups: TagGroup[] = [];
-  let current: TagGroup = { label: null, tags: [], parentTag: null };
+  let current: TagGroup = { label: null, tags: [], parentTag: null, requiresParent: false };
 
   for (const raw of suggestions) {
     const item = raw.trim();
@@ -30,6 +46,7 @@ function groupSuggestions(suggestions: string[]): TagGroup[] {
         label: item.replace(/^#\s*/, '').trim() || 'Sonstige',
         tags: [],
         parentTag: null,
+        requiresParent: false,
       };
     } else {
       current.tags.push(item);
@@ -38,34 +55,50 @@ function groupSuggestions(suggestions: string[]): TagGroup[] {
   if (current.tags.length > 0 || current.label !== null) {
     groups.push(current);
   }
-  const tagsByLowerCase = new Map(
-    groups.flatMap(group => group.tags).map(tag => [tag.toLocaleLowerCase('de-DE'), tag]),
-  );
+  const categoryTags = new Map<string, { tag: string; groupIndex: number }>();
+  groups.forEach((group, groupIndex) => {
+    group.tags.forEach(tag => {
+      if (/^cat[-_\s]/i.test(tag)) {
+        categoryTags.set(categoryKey(tag), { tag, groupIndex });
+      }
+    });
+  });
 
-  return groups.map(group => ({
-    ...group,
-    parentTag: findParentTag(group.label, tagsByLowerCase),
-  }));
+  return groups.map((group, groupIndex) => {
+    const explicitlyDependent = SUBCATEGORY_LABEL.test(group.label ?? '');
+    const parent = findParentTag(group.label, group.tags, groupIndex, categoryTags);
+
+    return {
+      ...group,
+      parentTag: parent?.groupIndex !== groupIndex ? parent?.tag ?? null : null,
+      requiresParent: explicitlyDependent || (parent !== undefined && parent.groupIndex !== groupIndex),
+    };
+  });
 }
 
-function findParentTag(label: string | null, tagsByLowerCase: Map<string, string>): string | null {
-  const categoryPath = label?.match(/^subkategorien\s+(.+)$/i)?.[1]?.trim();
-  if (!categoryPath) return null;
+function findParentTag(
+  label: string | null,
+  groupTags: string[],
+  groupIndex: number,
+  categoryTags: Map<string, { tag: string; groupIndex: number }>,
+): { tag: string; groupIndex: number } | undefined {
+  if (!label) return undefined;
+  const parentByLabel = categoryTags.get(categoryKey(label));
+  if (parentByLabel?.groupIndex !== groupIndex) return parentByLabel;
 
-  const slug = categoryPath
-    .toLocaleLowerCase('de-DE')
-    .replace(/[^a-z0-9äöüß]+/gi, '-')
-    .replace(/^-+|-+$/g, '');
-  const candidates = [
-    `cat-${slug}`,
-    `cat-${slug.replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')}`,
-  ];
+  const childTags = groupTags
+    .filter(tag => /^cat[-_\s]/i.test(tag))
+    .map(tag => tag.toLocaleLowerCase('de-DE'));
+  if (childTags.length === 0) return undefined;
 
-  for (const candidate of candidates) {
-    const tag = tagsByLowerCase.get(candidate.toLocaleLowerCase('de-DE'));
-    if (tag) return tag;
-  }
-  return null;
+  return [...categoryTags.values()]
+    .filter(candidate => (
+      candidate.groupIndex !== groupIndex
+      && childTags.every(childTag => (
+        childTag.startsWith(`${candidate.tag.toLocaleLowerCase('de-DE')}-`)
+      ))
+    ))
+    .sort((a, b) => b.tag.length - a.tag.length)[0];
 }
 
 export function TagPicker({ value, suggestions, onChange }: TagPickerProps) {
@@ -84,7 +117,8 @@ export function TagPicker({ value, suggestions, onChange }: TagPickerProps) {
 
   const isGroupVisible = (groupIndex: number, visited = new Set<number>()): boolean => {
     const group = groups[groupIndex];
-    if (!group?.parentTag) return true;
+    if (!group?.requiresParent) return true;
+    if (!group.parentTag) return false;
     if (!selectedSet.has(group.parentTag) || visited.has(groupIndex)) return false;
 
     const parentGroupIndex = tagGroupIndexes.get(group.parentTag);
