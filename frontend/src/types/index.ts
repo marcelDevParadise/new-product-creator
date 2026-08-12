@@ -465,6 +465,11 @@ export interface WorkflowBoard {
   statuses: WorkflowStatus[];
 }
 
+export interface WorkflowBulkStatusResult {
+  updated: number;
+  items: WorkflowItem[];
+}
+
 export interface WorkflowComment {
   id: number;
   artikelnummer: string;

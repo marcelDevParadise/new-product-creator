@@ -1,4 +1,4 @@
-import type { Product, AttributeValue, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult, ArtikelwerkSyncOverview, ArtikelwerkSyncDetail, WorkflowBoard, WorkflowItem, WorkflowProductDetail, WorkflowComment, WorkflowStatus } from '../types';
+import type { Product, AttributeValue, AttributeConfig, ExportPreview, StammdatenPreview, SeoPreview, ExportValidation, Template, AttributeDefinitionCreatePayload, AttributeDefinitionUpdatePayload, PricingSettings, ExportSettings, DefaultValues, AllSettings, DashboardStats, ActivityLog, ValidationResult, ProductValidation, ImportResult, AttributeImportResult, ProductHistoryEntry, CategoryTree, Supplier, SupplierPayload, GlobalSearchResult, VariantGroup, VariantSuggestion, VariantenSettings, ResolvedProduct, VariantDiff, ContentScoreResult, PriceStats, SystemHealth, ExportHistoryEntry, HeatmapData, Bundle, Warning, Ingredient, ArtikelwerkSettings, ArtikelwerkConnection, ArtikelwerkContext, ArtikelwerkPreview, ArtikelwerkJob, ArtikelwerkPublication, ArtikelwerkLogResult, ArtikelwerkSyncOverview, ArtikelwerkSyncDetail, WorkflowBoard, WorkflowItem, WorkflowProductDetail, WorkflowComment, WorkflowStatus, WorkflowBulkStatusResult } from '../types';
 
 const BASE = '/api';
 
@@ -137,6 +137,12 @@ export const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+  bulkUpdateWorkflowStatus: (skus: string[], status: WorkflowStatus) =>
+    request<WorkflowBulkStatusResult>('/workflow/products/bulk/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artikelnummern: skus, status }),
     }),
   addWorkflowComment: (sku: string, data: { author: string; body: string }) =>
     request<WorkflowComment>(`/workflow/products/${encodeURIComponent(sku)}/comments`, {

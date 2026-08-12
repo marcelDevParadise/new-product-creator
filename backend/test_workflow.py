@@ -106,6 +106,41 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(detail.status_code, 200)
             self.assertEqual(detail.json()["comments"][0]["body"], "Bereit zur Prüfung")
 
+    def test_bulk_workflow_status_update_moves_all_selected_products(self) -> None:
+        second = Product(
+            artikelnummer="WF-002",
+            artikelname="Zweites Workflow Testprodukt",
+            preis=24.99,
+        )
+        state.add_product(second)
+
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/workflow/products/bulk/status",
+                json={
+                    "artikelnummern": ["WF-001", "WF-002", "WF-001"],
+                    "status": "in_progress",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["updated"], 2)
+        self.assertEqual(
+            {item["artikelnummer"] for item in response.json()["items"]},
+            {"WF-001", "WF-002"},
+        )
+        self.assertEqual(database.get_product_workflow("WF-001")["status"], "in_progress")
+        self.assertEqual(database.get_product_workflow("WF-002")["status"], "in_progress")
+
+    def test_bulk_workflow_status_rejects_published(self) -> None:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/workflow/products/bulk/status",
+                json={"artikelnummern": ["WF-001"], "status": "published"},
+            )
+
+        self.assertEqual(response.status_code, 409)
+
     def test_approval_is_bound_to_exact_product_and_variant_data(self) -> None:
         child_a = Product(artikelnummer="WF-001-A", artikelname="Variante A", parent_sku="WF-001")
         child_b = Product(artikelnummer="WF-001-B", artikelname="Variante B", parent_sku="WF-001")

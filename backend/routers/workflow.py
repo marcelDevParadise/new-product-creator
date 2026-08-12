@@ -39,6 +39,11 @@ class WorkflowUpdate(BaseModel):
     assignee: str | None = Field(default=None, max_length=120)
 
 
+class WorkflowBulkStatusUpdate(BaseModel):
+    artikelnummern: list[str] = Field(min_length=1, max_length=500)
+    status: str
+
+
 class WorkflowCommentCreate(BaseModel):
     author: str = Field(min_length=1, max_length=120)
     body: str = Field(min_length=1, max_length=4000)
@@ -263,6 +268,51 @@ def update_workflow_product(sku: str, body: WorkflowUpdate):
     result["comment_count"] = len(list_workflow_comments(sku))
     validation_map = _validation_map()
     return _serialize_item(product, result, _validation_for_product(product, validation_map))
+
+
+@router.post("/products/bulk/status")
+def bulk_update_workflow_status(body: WorkflowBulkStatusUpdate):
+    """Move multiple products to one manually managed workflow status."""
+    if body.status not in MANUAL_WORKFLOW_STATUSES:
+        if body.status == "published":
+            raise HTTPException(409, "Der Status 'Veröffentlicht' wird ausschließlich durch einen erfolgreichen Artikelwerk-Job gesetzt.")
+        raise HTTPException(400, "Unbekannter Workflow-Status.")
+
+    skus = list(dict.fromkeys(sku.strip() for sku in body.artikelnummern if sku.strip()))
+    if not skus:
+        raise HTTPException(400, "Mindestens eine Artikelnummer ist erforderlich.")
+
+    missing = [sku for sku in skus if state.get_product(sku) is None]
+    if missing:
+        raise HTTPException(404, {
+            "message": "Mindestens ein Produkt wurde nicht gefunden.",
+            "artikelnummern": missing,
+        })
+
+    # Validate every selected product before changing anything so a bulk approval
+    # cannot leave the selection in a surprising partially updated state.
+    if body.status == "approved":
+        validation_map = _validation_map()
+        blocked = []
+        for sku in skus:
+            product = state.get_product(sku)
+            validation = _validation_for_product(product, validation_map)
+            if validation.get("error_count", 0) > 0:
+                blocked.append({
+                    "artikelnummer": sku,
+                    "issues": validation.get("issues", []),
+                })
+        if blocked:
+            raise HTTPException(422, {
+                "message": "Auswahl kann wegen Qualitätsfehlern nicht freigegeben werden.",
+                "products": blocked,
+            })
+
+    items = [
+        update_workflow_product(sku, WorkflowUpdate(status=body.status))
+        for sku in skus
+    ]
+    return {"updated": len(items), "items": items}
 
 
 @router.post("/products/{sku}/comments", status_code=201)

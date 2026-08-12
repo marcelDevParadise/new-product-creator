@@ -22,6 +22,14 @@ const WORKFLOW_BADGES: Record<WorkflowStatus, { label: string; className: string
   archived: { label: 'Archiviert', className: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-500/15 dark:text-zinc-300' },
 };
 
+const BULK_WORKFLOW_STATUSES: WorkflowStatus[] = [
+  'draft',
+  'in_progress',
+  'review',
+  'approved',
+  'error',
+];
+
 function WorkflowStatusBadge({ item }: { item?: WorkflowItem }) {
   const status = item?.status ?? 'draft';
   const badge = WORKFLOW_BADGES[status];
@@ -67,6 +75,8 @@ export function StammdatenPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [bulkPublishing, setBulkPublishing] = useState(false);
+  const [bulkWorkflowStatus, setBulkWorkflowStatus] = useState<WorkflowStatus>('in_progress');
+  const [bulkWorkflowUpdating, setBulkWorkflowUpdating] = useState(false);
   const [showBulkStammdaten, setShowBulkStammdaten] = useState(false);
   const [showVariantGroupModal, setShowVariantGroupModal] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -259,6 +269,25 @@ export function StammdatenPage() {
     }
   };
 
+  const handleBulkWorkflowStatus = async () => {
+    if (selectedSkus.size === 0) return;
+    setBulkWorkflowUpdating(true);
+    try {
+      const result = await api.bulkUpdateWorkflowStatus(Array.from(selectedSkus), bulkWorkflowStatus);
+      setSelectedSkus(new Set());
+      toast(
+        `${result.updated} Produkte wurden auf „${WORKFLOW_BADGES[bulkWorkflowStatus].label}“ gesetzt`,
+        'success',
+      );
+      await reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Workflow-Status konnte nicht geändert werden', 'error');
+      await reload();
+    } finally {
+      setBulkWorkflowUpdating(false);
+    }
+  };
+
   const handleUnarchive = async (sku: string) => {
     try {
       await api.unarchiveProduct(sku);
@@ -312,7 +341,8 @@ export function StammdatenPage() {
     }
   };
 
-  const allSelected = filteredProducts.length > 0 && selectedSkus.size === filteredProducts.length;
+  const allSelected = filteredProducts.length > 0
+    && filteredProducts.every(product => selectedSkus.has(product.artikelnummer));
   const selectedPublishSkus = products
     .filter(product => selectedSkus.has(product.artikelnummer) && !product.parent_sku)
     .sort(compareByArtikelnummer)
@@ -329,18 +359,20 @@ export function StammdatenPage() {
     : 'Nur freigegebene, unveränderte Parent- oder Einzelprodukte können veröffentlicht werden.';
   const allArchivedSelected = filteredArchived.length > 0 && filteredArchived.every((p) => selectedSkus.has(p.artikelnummer));
   const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedSkus(new Set());
-    } else {
-      setSelectedSkus(new Set(filteredProducts.map((p) => p.artikelnummer)));
-    }
+    setSelectedSkus(current => {
+      const next = new Set(current);
+      if (allSelected) filteredProducts.forEach(product => next.delete(product.artikelnummer));
+      else filteredProducts.forEach(product => next.add(product.artikelnummer));
+      return next;
+    });
   };
   const toggleSelectAllArchived = () => {
-    if (allArchivedSelected) {
-      setSelectedSkus(new Set());
-    } else {
-      setSelectedSkus(new Set(filteredArchived.map((p) => p.artikelnummer)));
-    }
+    setSelectedSkus(current => {
+      const next = new Set(current);
+      if (allArchivedSelected) filteredArchived.forEach(product => next.delete(product.artikelnummer));
+      else filteredArchived.forEach(product => next.add(product.artikelnummer));
+      return next;
+    });
   };
   const toggleSelect = (sku: string) => {
     setSelectedSkus((prev) => {
@@ -383,58 +415,6 @@ export function StammdatenPage() {
               <Plus className="w-4 h-4" />
               Artikel hinzufügen
             </button>
-            {selectedSkus.size > 0 && !showArchive && (
-              <>
-                <button
-                  onClick={() => setShowVariantGroupModal(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors"
-                >
-                  <GitBranch className="w-4 h-4" />
-                  Varianten gruppieren
-                </button>
-                <button
-                  onClick={() => setShowBulkStammdaten(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
-                >
-                  <ClipboardEdit className="w-4 h-4" />
-                  {selectedSkus.size} Stammdaten
-                </button>
-                <button
-                  onClick={() => setShowPublishConfirm(true)}
-                  disabled={!bulkPublishReady || bulkPublishing}
-                  title={bulkPublishTitle}
-                  className="flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-500/30 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
-                >
-                  {bulkPublishing
-                    ? <LoaderCircle className="h-4 w-4 animate-spin" />
-                    : <CloudUpload className="h-4 w-4" />}
-                  {selectedSkus.size} veröffentlichen
-                </button>
-                <button
-                  onClick={handleArchiveSelected}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-50 transition-colors"
-                >
-                  <Archive className="w-4 h-4" />
-                  {selectedSkus.size} archivieren
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  {selectedSkus.size} löschen
-                </button>
-              </>
-            )}
-            {selectedSkus.size > 0 && showArchive && (
-              <button
-                onClick={handleUnarchiveSelected}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
-              >
-                <ArchiveRestore className="w-4 h-4" />
-                {selectedSkus.size} reaktivieren
-              </button>
-            )}
             {products.length > 0 && (
               <button
                 onClick={() => setShowClearConfirm(true)}
@@ -484,6 +464,104 @@ export function StammdatenPage() {
           </button>
         </div>
       </section>
+
+      {selectedSkus.size > 0 && (
+        <section className="flex flex-col gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/90 p-3 shadow-sm dark:border-indigo-500/30 dark:bg-indigo-500/10 lg:flex-row lg:items-center">
+          <div className="flex items-center justify-between gap-3 lg:mr-auto">
+            <p className="font-medium text-indigo-950 dark:text-indigo-100">
+              {selectedSkus.size} Produkte ausgewählt
+            </p>
+            <button
+              onClick={() => setSelectedSkus(new Set())}
+              disabled={bulkPublishing || bulkWorkflowUpdating}
+              className="text-sm text-indigo-700 hover:underline disabled:opacity-50 dark:text-indigo-300 lg:hidden"
+            >
+              Auswahl aufheben
+            </button>
+          </div>
+
+          {!showArchive ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setShowVariantGroupModal(true)}
+                className="flex h-10 items-center gap-2 rounded-xl border border-purple-200 bg-background px-3 text-sm text-purple-700 transition-colors hover:bg-purple-50 dark:border-purple-500/30 dark:text-purple-300 dark:hover:bg-purple-500/10"
+              >
+                <GitBranch className="h-4 w-4" />
+                Varianten gruppieren
+              </button>
+              <button
+                onClick={() => setShowBulkStammdaten(true)}
+                className="flex h-10 items-center gap-2 rounded-xl border border-indigo-200 bg-background px-3 text-sm text-indigo-700 transition-colors hover:bg-indigo-50 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+              >
+                <ClipboardEdit className="h-4 w-4" />
+                Stammdaten bearbeiten
+              </button>
+              <div className="flex h-10 items-center overflow-hidden rounded-xl border border-sky-200 bg-background dark:border-sky-500/30">
+                <select
+                  value={bulkWorkflowStatus}
+                  onChange={(event) => setBulkWorkflowStatus(event.target.value as WorkflowStatus)}
+                  disabled={bulkWorkflowUpdating}
+                  aria-label="Neuer Workflow-Status für ausgewählte Produkte"
+                  className="h-full min-w-36 border-0 bg-transparent px-2.5 text-sm text-sky-700 outline-none disabled:opacity-50 dark:text-sky-300"
+                >
+                  {BULK_WORKFLOW_STATUSES.map(status => (
+                    <option key={status} value={status}>{WORKFLOW_BADGES[status].label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleBulkWorkflowStatus}
+                  disabled={bulkWorkflowUpdating}
+                  className="flex h-full items-center gap-1.5 border-l border-sky-200 px-3 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-500/30 dark:text-sky-300 dark:hover:bg-sky-500/10"
+                >
+                  {bulkWorkflowUpdating && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                  Status setzen
+                </button>
+              </div>
+              <button
+                onClick={() => setShowPublishConfirm(true)}
+                disabled={!bulkPublishReady || bulkPublishing}
+                title={bulkPublishTitle}
+                className="flex h-10 items-center gap-2 rounded-xl border border-emerald-200 bg-background px-3 text-sm text-emerald-700 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-emerald-500/30 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+              >
+                {bulkPublishing
+                  ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                  : <CloudUpload className="h-4 w-4" />}
+                Veröffentlichen
+              </button>
+              <button
+                onClick={handleArchiveSelected}
+                className="flex h-10 items-center gap-2 rounded-xl border border-amber-200 bg-background px-3 text-sm text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-300 dark:hover:bg-amber-500/10"
+              >
+                <Archive className="h-4 w-4" />
+                Archivieren
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-background px-3 text-sm text-red-700 transition-colors hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Löschen
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleUnarchiveSelected}
+              className="flex h-10 items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-background px-3 text-sm text-indigo-700 transition-colors hover:bg-indigo-50 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/10"
+            >
+              <ArchiveRestore className="h-4 w-4" />
+              Auswahl reaktivieren
+            </button>
+          )}
+
+          <button
+            onClick={() => setSelectedSkus(new Set())}
+            disabled={bulkPublishing || bulkWorkflowUpdating}
+            className="hidden text-sm text-indigo-700 hover:underline disabled:opacity-50 dark:text-indigo-300 lg:block"
+          >
+            Auswahl aufheben
+          </button>
+        </section>
+      )}
 
       {/* Inline Add Product Form */}
       {showAddForm && (

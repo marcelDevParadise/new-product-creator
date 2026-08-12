@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  CheckSquare2,
   CircleDot,
   ClipboardCheck,
   Clock3,
@@ -66,10 +67,14 @@ const statusStyles: Record<WorkflowStatus, { border: string; badge: string; icon
 function WorkflowCard({
   item,
   onOpen,
+  selected,
+  onToggleSelection,
   disabled,
 }: {
   item: WorkflowItem;
   onOpen: () => void;
+  selected: boolean;
+  onToggleSelection: () => void;
   disabled: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -83,9 +88,17 @@ function WorkflowCard({
       ref={setNodeRef}
       className={`group rounded-2xl border bg-card p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
         statusStyles[item.status].border
-      } ${isDragging ? 'opacity-30' : ''}`}
+      } ${selected ? 'ring-2 ring-indigo-500 ring-offset-1' : ''} ${isDragging ? 'opacity-30' : ''}`}
     >
       <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggleSelection}
+          disabled={disabled}
+          aria-label={`${item.artikelname} auswählen`}
+          className="mt-2 h-4 w-4 shrink-0 cursor-pointer accent-indigo-600 disabled:cursor-not-allowed"
+        />
         <button
           type="button"
           className="mt-0.5 flex h-7 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
@@ -136,11 +149,15 @@ function WorkflowLane({
   column,
   items,
   onOpen,
+  selectedSkus,
+  onToggleSelection,
   moving,
 }: {
   column: WorkflowColumn;
   items: WorkflowItem[];
   onOpen: (item: WorkflowItem) => void;
+  selectedSkus: Set<string>;
+  onToggleSelection: (sku: string) => void;
   moving: boolean;
 }) {
   const manualDropAllowed = column.id !== 'published';
@@ -183,6 +200,8 @@ function WorkflowLane({
             key={item.artikelnummer}
             item={item}
             onOpen={() => onOpen(item)}
+            selected={selectedSkus.has(item.artikelnummer)}
+            onToggleSelection={() => onToggleSelection(item.artikelnummer)}
             disabled={moving}
           />
         ))}
@@ -208,6 +227,8 @@ export function WorkflowPage() {
   const [moving, setMoving] = useState(false);
   const [search, setSearch] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [selectedSkus, setSelectedSkus] = useState<Set<string>>(() => new Set());
+  const [bulkStatus, setBulkStatus] = useState<WorkflowStatus>('in_progress');
   const [activeItem, setActiveItem] = useState<WorkflowItem | null>(null);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [detail, setDetail] = useState<WorkflowProductDetail | null>(null);
@@ -258,6 +279,44 @@ export function WorkflowPage() {
       return matchesSearch && matchesAssignee;
     });
   }, [assigneeFilter, board, search]);
+
+  const allVisibleSelected = filteredItems.length > 0
+    && filteredItems.every(item => selectedSkus.has(item.artikelnummer));
+
+  const toggleSelection = (sku: string) => {
+    setSelectedSkus(current => {
+      const next = new Set(current);
+      if (next.has(sku)) next.delete(sku);
+      else next.add(sku);
+      return next;
+    });
+  };
+
+  const toggleVisibleSelection = () => {
+    setSelectedSkus(current => {
+      const next = new Set(current);
+      if (allVisibleSelected) filteredItems.forEach(item => next.delete(item.artikelnummer));
+      else filteredItems.forEach(item => next.add(item.artikelnummer));
+      return next;
+    });
+  };
+
+  const applyBulkStatus = async () => {
+    if (selectedSkus.size === 0) return;
+    setMoving(true);
+    try {
+      const result = await api.bulkUpdateWorkflowStatus([...selectedSkus], bulkStatus);
+      const label = board?.columns.find(column => column.id === bulkStatus)?.label || bulkStatus;
+      toast(`${result.updated} Produkte wurden nach „${label}“ verschoben`, 'success');
+      setSelectedSkus(new Set());
+      await loadBoard();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Status konnte nicht für die Auswahl geändert werden', 'error');
+      await loadBoard();
+    } finally {
+      setMoving(false);
+    }
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     const item = event.active.data.current?.item as WorkflowItem | undefined;
@@ -350,7 +409,40 @@ export function WorkflowPage() {
             {board.assignees.map(value => <option key={value} value={value}>{value}</option>)}
           </select>
           <p className="shrink-0 text-xs text-muted-foreground">{filteredItems.length} sichtbar</p>
+          <Button
+            variant="outline"
+            onClick={toggleVisibleSelection}
+            disabled={moving || filteredItems.length === 0}
+          >
+            <CheckSquare2 className="h-4 w-4" />
+            {allVisibleSelected ? 'Sichtbare abwählen' : 'Alle sichtbaren auswählen'}
+          </Button>
         </section>
+
+        {selectedSkus.size > 0 && (
+          <section className="flex flex-col gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/90 p-3 shadow-sm sm:flex-row sm:items-center">
+            <p className="font-medium text-indigo-950">{selectedSkus.size} Produkte ausgewählt</p>
+            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:justify-end">
+              <select
+                className="h-10 rounded-xl border border-indigo-200 bg-background px-3 text-sm"
+                value={bulkStatus}
+                onChange={event => setBulkStatus(event.target.value as WorkflowStatus)}
+                disabled={moving}
+                aria-label="Neuer Workflow-Status"
+              >
+                {board.columns.filter(column => column.id !== 'published').map(column => (
+                  <option key={column.id} value={column.id}>{column.label}</option>
+                ))}
+              </select>
+              <Button onClick={applyBulkStatus} disabled={moving}>
+                {moving ? 'Status wird geändert …' : 'Status für Auswahl ändern'}
+              </Button>
+              <Button variant="ghost" onClick={() => setSelectedSkus(new Set())} disabled={moving}>
+                Auswahl aufheben
+              </Button>
+            </div>
+          </section>
+        )}
 
         <DndContext
           sensors={sensors}
@@ -366,6 +458,8 @@ export function WorkflowPage() {
                 column={column}
                 items={filteredItems.filter(item => item.status === column.id)}
                 onOpen={openDetail}
+                selectedSkus={selectedSkus}
+                onToggleSelection={toggleSelection}
                 moving={moving}
               />
             ))}
