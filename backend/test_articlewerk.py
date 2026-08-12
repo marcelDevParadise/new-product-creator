@@ -58,7 +58,7 @@ CAPABILITIES = {
 CONTEXT = {
     "tenants": [{"id": 4, "name": "CYL", "articleCount": 1, "isDefault": True}],
     "units": [{"id": 1, "name": "Milliliter", "code": "ml"}],
-    "attributes": [{"id": "material", "name": "Material", "allowsCustomValue": True}],
+    "attributes": [{"id": "meta_material", "name": "Material", "allowsCustomValue": True}],
 }
 
 
@@ -122,7 +122,7 @@ class MapperTests(unittest.TestCase):
         self.assertEqual([step.operation for step in preview.steps[:2]], ["create_manufacturer", "create_article"])
         self.assertEqual(preview.steps[0].payload, {"name": "Neue Marke"})
 
-    def test_uses_stable_context_attribute_id(self):
+    def test_uses_exact_configured_attribute_id_even_if_short_legacy_id_exists(self):
         product = Product(artikelnummer="CYL-ATTR", artikelname="Test", attributes={"meta_brand": "Acme"})
         definition = AttributeDefinition(
             id="meta_brand:custom:single_line_text_field", category="Shopify", name="Marke",
@@ -133,8 +133,10 @@ class MapperTests(unittest.TestCase):
             capabilities=CAPABILITIES, settings=ArtikelwerkSettings(tenant_ids=[4]),
         )
         self.assertTrue(preview.valid, preview.issues)
+        attribute_create = next(step for step in preview.steps if step.operation == "create_attribute")
         attribute_step = next(step for step in preview.steps if step.operation == "set_attribute")
-        self.assertEqual(attribute_step.payload["attributeId"], "meta_brand")
+        self.assertEqual(attribute_create.payload["name"], "meta_brand:custom:single_line_text_field")
+        self.assertEqual(attribute_step.payload["attributeId"], "meta_brand:custom:single_line_text_field")
 
     def test_maps_price_purchase_manufacturer_and_categories_into_create(self):
         product = Product(
@@ -179,7 +181,7 @@ class MapperTests(unittest.TestCase):
         )
         preview = build_preview(
             product, children=[],
-            attribute_config={"material": AttributeDefinition(id="material", category="Produkt", name="Material")},
+            attribute_config={"material": AttributeDefinition(id="meta_material", category="Produkt", name="Material")},
             context=CONTEXT, capabilities=CAPABILITIES,
             settings=ArtikelwerkSettings(tenant_ids=[4]),
         )
@@ -223,7 +225,7 @@ class MapperTests(unittest.TestCase):
             product, children=[],
             attribute_config={
                 "missing": AttributeDefinition(
-                    id="missing:custom:single_line_text_field",
+                    id="meta_missing:custom:single_line_text_field",
                     category="Test", name="Fehlendes Attribut",
                 ),
             },
@@ -240,7 +242,90 @@ class MapperTests(unittest.TestCase):
             ["create_attribute", "set_attribute"],
         )
         self.assertEqual(attribute_steps[0].payload["dataType"], "text")
-        self.assertEqual(attribute_steps[1].payload["attributeId"], "missing")
+        self.assertEqual(
+            attribute_steps[0].payload["name"],
+            "meta_missing:custom:single_line_text_field",
+        )
+        self.assertEqual(
+            attribute_steps[1].payload["attributeId"],
+            "meta_missing:custom:single_line_text_field",
+        )
+
+    def test_prefixes_unprefixed_attribute_outside_allowlist(self):
+        product = Product(
+            artikelnummer="CYL-PREFIX", artikelname="Test", attributes={"material": "Leder"},
+        )
+        preview = build_preview(
+            product, children=[],
+            attribute_config={
+                "material": AttributeDefinition(id="material", category="Produkt", name="Material"),
+            },
+            context=CONTEXT, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        attribute_step = next(step for step in preview.steps if step.operation == "set_attribute")
+        self.assertEqual(attribute_step.payload["attributeId"], "meta_material")
+
+    def test_allows_only_the_declared_unprefixed_attribute_ids(self):
+        allowed_ids = {
+            "barcode", "barcode_type", "product_type", "sales_channels",
+            "tags", "sku", "template_suffix",
+        }
+        product = Product(
+            artikelnummer="CYL-ALLOWLIST", artikelname="Test",
+            attributes={attribute_id: "x" for attribute_id in allowed_ids},
+        )
+        definitions = {
+            attribute_id: AttributeDefinition(
+                id=attribute_id, category="System", name=attribute_id,
+            )
+            for attribute_id in allowed_ids
+        }
+        context = {
+            **CONTEXT,
+            "attributes": [
+                {"id": attribute_id, "name": attribute_id, "allowsCustomValue": True}
+                for attribute_id in allowed_ids
+            ],
+        }
+        preview = build_preview(
+            product, children=[], attribute_config=definitions, context=context,
+            capabilities=CAPABILITIES, settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        transferred_ids = {
+            step.payload["attributeId"]
+            for step in preview.steps if step.operation == "set_attribute"
+        }
+        self.assertEqual(transferred_ids, allowed_ids)
+
+    def test_ingredients_uses_configured_meta_definition_not_legacy_short_id(self):
+        configured_id = "meta_ingredients:custom:list.single_line_text_field"
+        product = Product(
+            artikelnummer="CYL-INGREDIENTS", artikelname="Test",
+            attributes={"ingredients": "Aqua, Glycerin"},
+        )
+        definition = AttributeDefinition(
+            id=configured_id, category="Produkt", name="Inhaltsstoffe",
+            shopify_type="list.single_line_text_field",
+        )
+        context = {
+            **CONTEXT,
+            "attributes": [
+                {"id": "ingredients", "name": "ingredients", "allowsCustomValue": True},
+                {"id": configured_id, "name": configured_id, "allowsCustomValue": True},
+            ],
+        }
+        preview = build_preview(
+            product, children=[], attribute_config={"ingredients": definition},
+            context=context, capabilities=CAPABILITIES,
+            settings=ArtikelwerkSettings(tenant_ids=[4]),
+        )
+        self.assertTrue(preview.valid, preview.issues)
+        attribute_step = next(step for step in preview.steps if step.operation == "set_attribute")
+        self.assertEqual(attribute_step.payload["attributeId"], configured_id)
+        self.assertEqual(attribute_step.payload["value"], '["Aqua","Glycerin"]')
 
     def test_serializes_duration_as_shopify_json(self):
         product = Product(
@@ -248,14 +333,14 @@ class MapperTests(unittest.TestCase):
             attributes={"effect_duration": {"value": 30, "unit": "seconds"}},
         )
         definition = AttributeDefinition(
-            id="effect_duration:custom:duration", category="Wirkung",
+            id="meta_effect_duration:custom:duration", category="Wirkung",
             name="Wirkungsdauer", shopify_type="duration", unit="seconds",
         )
         context = {
             **CONTEXT,
             "attributes": [
                 *CONTEXT["attributes"],
-                {"id": "effect_duration", "name": "effect_duration", "allowsCustomValue": True},
+                {"id": "meta_effect_duration:custom:duration", "name": "effect_duration", "allowsCustomValue": True},
             ],
         }
         preview = build_preview(
@@ -295,22 +380,22 @@ class MapperTests(unittest.TestCase):
             **CONTEXT,
             "attributes": [
                 *CONTEXT["attributes"],
-                {"id": "color", "name": "Farbe", "allowsCustomValue": True},
-                {"id": "external", "name": "Extern", "allowsCustomValue": True},
+                {"id": "meta_color", "name": "Farbe", "allowsCustomValue": True},
+                {"id": "meta_external", "name": "Extern", "allowsCustomValue": True},
             ],
         }
         preview = build_preview(
             product, children=[],
             attribute_config={
-                "material": AttributeDefinition(id="material", category="Produkt", name="Material"),
+                "material": AttributeDefinition(id="meta_material", category="Produkt", name="Material"),
             },
             context=context, capabilities=CAPABILITIES,
             settings=ArtikelwerkSettings(tenant_ids=[4]),
-            managed_attribute_ids={"material", "color"},
+            managed_attribute_ids={"meta_material", "meta_color"},
         )
         deletes = [step for step in preview.steps if step.operation == "delete_attribute"]
-        self.assertEqual([step.payload["attributeId"] for step in deletes], ["color"])
-        self.assertNotIn("external", {step.payload["attributeId"] for step in deletes})
+        self.assertEqual([step.payload["attributeId"] for step in deletes], ["meta_color"])
+        self.assertNotIn("meta_external", {step.payload["attributeId"] for step in deletes})
 
 
 class ReferenceResolutionTests(unittest.IsolatedAsyncioTestCase):

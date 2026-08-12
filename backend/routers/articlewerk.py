@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from config import get_artikelwerk_config
 from integrations.artikelwerk.client import ArtikelwerkClient, ArtikelwerkError
-from integrations.artikelwerk.mapper import build_preview
+from integrations.artikelwerk.mapper import build_preview, configured_attribute_id
 from integrations.artikelwerk.normalization import normalized_reference_name, searchable_reference_name
 from integrations.artikelwerk.publisher import run_publication, run_publication_queue
 from integrations.artikelwerk.schemas import ArtikelwerkSettings, ConnectionStatus, PublicationPreview
@@ -183,13 +183,14 @@ async def _preview(sku: str) -> PublicationPreview:
     try:
         async with ArtikelwerkClient(get_artikelwerk_config()) as client:
             capabilities, context = await client.capabilities(), await client.context()
-            remote_attributes = {str(item["id"]): item for item in context.get("attributes", [])}
+            remote_attributes = {
+                str(item["id"]).strip().casefold(): item
+                for item in context.get("attributes", [])
+            }
             values: dict[str, list] = {}
             for key in product.attributes:
                 definition = state.attribute_config.get(key)
-                stable_id = key.casefold()
-                configured_id = str(getattr(definition, "id", key))
-                remote_id = stable_id if stable_id in remote_attributes else configured_id
+                remote_id = configured_attribute_id(key, definition)
                 if remote_attributes.get(remote_id, {}).get("allowsCustomValue") is False:
                     values[remote_id] = await client.attribute_values(remote_id)
             context["attributeValues"] = values
