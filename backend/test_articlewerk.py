@@ -491,6 +491,29 @@ class ImagePayloadTests(unittest.TestCase):
 
 
 class DatabaseCompatibilityTests(unittest.TestCase):
+    def test_finds_request_payload_for_failed_operation(self):
+        preview = json.dumps({
+            "steps": [
+                {"operation": "set_attribute", "resource_key": "attribute:meta_ean", "payload": {
+                    "attributeId": "meta_ean", "value": "5600781416349",
+                }},
+            ],
+        })
+
+        self.assertEqual(
+            database_service._preview_payload_for_operation(
+                preview, "set_attribute", "attribute:meta_ean",
+            ),
+            {"attributeId": "meta_ean", "value": "5600781416349"},
+        )
+
+    def test_request_payload_lookup_tolerates_invalid_preview(self):
+        self.assertIsNone(
+            database_service._preview_payload_for_operation(
+                "not-json", "set_attribute", "attribute:meta_ean",
+            )
+        )
+
     def test_managed_attribute_lookup_works_with_sqlite(self):
         previous_pool = database_service._pool
         with tempfile.TemporaryDirectory() as directory:

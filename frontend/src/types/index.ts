@@ -683,6 +683,7 @@ export interface ArtikelwerkLogOperation {
   remote_operation_id: string | null;
   error_code: string | null;
   request_id: string | null;
+  request_payload: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

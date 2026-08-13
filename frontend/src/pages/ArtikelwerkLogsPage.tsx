@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, Clock3, Copy, RefreshCw, ScrollText, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, Copy, ExternalLink, RefreshCw, ScrollText, Search } from 'lucide-react';
 import { api } from '../api/client';
-import type { ArtikelwerkLogJob } from '../types';
+import type { ArtikelwerkLogJob, ArtikelwerkLogOperation } from '../types';
 import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { useToast } from '../components/ui/Toast';
 
 const statusStyle: Record<string, string> = {
@@ -36,6 +37,10 @@ export function ArtikelwerkLogsPage() {
   const [search, setSearch] = useState('');
   const [limit, setLimit] = useState(100);
   const [loading, setLoading] = useState(true);
+  const [diagnostic, setDiagnostic] = useState<{
+    job: ArtikelwerkLogJob;
+    operation: ArtikelwerkLogOperation;
+  } | null>(null);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -70,6 +75,25 @@ export function ArtikelwerkLogsPage() {
   const copy = async (value: string) => {
     await navigator.clipboard.writeText(value);
     toast('Request-ID kopiert', 'success');
+  };
+
+  const copyDiagnostic = async () => {
+    if (!diagnostic) return;
+    const { job, operation } = diagnostic;
+    await navigator.clipboard.writeText(JSON.stringify({
+      request_id: operation.request_id,
+      sku: job.root_sku,
+      job_id: job.job_id,
+      operation: operation.operation_type,
+      resource: operation.resource_key,
+      status: operation.status,
+      attempts: operation.attempts,
+      error_code: operation.error_code,
+      error: job.last_error,
+      timestamp: operation.updated_at,
+      payload: operation.request_payload,
+    }, null, 2));
+    toast('Diagnosedaten kopiert', 'success');
   };
 
   return (
@@ -123,7 +147,10 @@ export function ArtikelwerkLogsPage() {
                       {job.operations.length === 0 && <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">Noch kein API-Schritt protokolliert.</td></tr>}
                       {job.operations.map(operation => <tr key={operation.operation_id} className={operation.status === 'failed' ? 'bg-red-50/60 dark:bg-red-950/20' : ''}>
                         <td className="px-3 py-2 font-mono font-medium">{operation.operation_type}</td><td className="px-3 py-2 font-mono text-muted-foreground">{operation.resource_key}</td><td className="px-3 py-2"><StatusBadge status={operation.status} /></td><td className="px-3 py-2">{operation.attempts}</td><td className="px-3 py-2 font-mono text-red-600">{operation.error_code || '–'}</td>
-                        <td className="px-3 py-2">{operation.request_id ? <button className="inline-flex items-center gap-1 font-mono text-indigo-600 hover:underline" onClick={() => copy(operation.request_id!)}>{operation.request_id}<Copy className="h-3 w-3" /></button> : '–'}</td><td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{formatTime(operation.updated_at)}</td>
+                        <td className="px-3 py-2">{operation.request_id ? <span className="inline-flex items-center gap-1">
+                          <button className="inline-flex items-center gap-1 font-mono text-indigo-600 hover:underline" onClick={() => setDiagnostic({ job, operation })} title="Diagnose zu dieser Request-ID öffnen">{operation.request_id}<ExternalLink className="h-3 w-3" /></button>
+                          <button className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={() => copy(operation.request_id!)} title="Request-ID kopieren" aria-label={`Request-ID ${operation.request_id} kopieren`}><Copy className="h-3 w-3" /></button>
+                        </span> : '–'}</td><td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{formatTime(operation.updated_at)}</td>
                       </tr>)}
                     </tbody>
                   </table>
@@ -133,6 +160,55 @@ export function ArtikelwerkLogsPage() {
           );
         })}
       </div>
+
+      <Dialog open={diagnostic !== null} onOpenChange={open => { if (!open) setDiagnostic(null); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+          {diagnostic && <>
+            <DialogHeader>
+              <DialogTitle className="flex flex-wrap items-center gap-2">
+                Request-Diagnose
+                <Badge variant="outline" className="font-mono">{diagnostic.operation.request_id}</Badge>
+              </DialogTitle>
+              <DialogDescription>
+                Diese Request-ID verbindet den Generator-Schritt mit dem gleichnamigen Eintrag im Artikelwerk-Serverprotokoll.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Produkt</p><p className="mt-1 font-mono font-medium">{diagnostic.job.root_sku}</p></div>
+              <div className="rounded-xl border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Zeitpunkt</p><p className="mt-1">{formatTime(diagnostic.operation.updated_at)}</p></div>
+              <div className="rounded-xl border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">API-Schritt</p><p className="mt-1 font-mono font-medium">{diagnostic.operation.operation_type}</p></div>
+              <div className="rounded-xl border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Versuche</p><p className="mt-1">{diagnostic.operation.attempts}</p></div>
+              <div className="rounded-xl border bg-muted/30 p-3 sm:col-span-2"><p className="text-xs text-muted-foreground">Ressource – hier trat der Fehler auf</p><p className="mt-1 break-all font-mono font-medium">{diagnostic.operation.resource_key}</p></div>
+              <div className="rounded-xl border bg-muted/30 p-3 sm:col-span-2"><p className="text-xs text-muted-foreground">Job-ID</p><p className="mt-1 break-all font-mono text-xs">{diagnostic.job.job_id}</p></div>
+            </div>
+
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">Fehlermeldung</p>
+                {diagnostic.operation.error_code && <Badge className="bg-red-100 font-mono text-red-700 dark:bg-red-900 dark:text-red-200">{diagnostic.operation.error_code}</Badge>}
+              </div>
+              <p className="mt-2 break-words font-mono text-xs">{diagnostic.job.last_error || 'Keine zusätzliche Fehlermeldung gespeichert.'}</p>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium">Gesendeter Request-Payload</p>
+              {diagnostic.operation.request_payload
+                ? <pre className="max-h-72 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{JSON.stringify(diagnostic.operation.request_payload, null, 2)}</pre>
+                : <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">Für diesen älteren Eintrag konnte kein Payload aus der gespeicherten Veröffentlichungsvorschau zugeordnet werden.</div>}
+            </div>
+
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
+              Bei einem serverseitigen Fehler kann im Artikelwerk-Protokoll nach <span className="font-mono font-semibold">{diagnostic.operation.request_id}</span> gesucht werden. So gehört der dortige Stacktrace eindeutig zu diesem Produkt, Schritt und Payload.
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => copy(diagnostic.operation.request_id!)}><Copy className="h-4 w-4" /> Request-ID kopieren</Button>
+              <Button onClick={copyDiagnostic}><Copy className="h-4 w-4" /> Diagnose kopieren</Button>
+            </DialogFooter>
+          </>}
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );

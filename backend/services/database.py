@@ -632,6 +632,7 @@ def list_articlewerk_logs(
         cur.execute(
             "SELECT j.job_id, j.root_sku, j.status, j.current_phase, j.progress_current, "
             "j.progress_total, j.last_error, j.created_at, j.started_at, j.finished_at, "
+            "j.preview_json, "
             "o.operation_id, o.operation_type, o.resource_key, o.status, o.attempts, "
             "o.remote_operation_id, o.error_code, o.request_id, o.created_at, o.updated_at "
             "FROM (SELECT * FROM articlewerk_jobs j" + where
@@ -652,18 +653,46 @@ def list_articlewerk_logs(
                 "job_id": job_id, "root_sku": row[1], "status": row[2],
                 "current_phase": row[3], "progress_current": row[4], "progress_total": row[5],
                 "last_error": row[6], "created_at": row[7], "started_at": row[8],
-                "finished_at": row[9], "operations": [],
+                "finished_at": row[9], "preview_json": row[10], "operations": [],
             }
             by_id[job_id] = job
             jobs.append(job)
-        if row[10] is not None:
+        if row[11] is not None:
+            operation_payload = None
+            if row[14] == "failed" or row[18]:
+                operation_payload = _preview_payload_for_operation(
+                    job.get("preview_json"), str(row[12]), str(row[13]),
+                )
             job["operations"].append({
-                "operation_id": row[10], "operation_type": row[11], "resource_key": row[12],
-                "status": row[13], "attempts": row[14], "remote_operation_id": row[15],
-                "error_code": row[16], "request_id": row[17], "created_at": row[18],
-                "updated_at": row[19],
+                "operation_id": row[11], "operation_type": row[12], "resource_key": row[13],
+                "status": row[14], "attempts": row[15], "remote_operation_id": row[16],
+                "error_code": row[17], "request_id": row[18], "created_at": row[19],
+                "updated_at": row[20], "request_payload": operation_payload,
             })
+    for job in jobs:
+        job.pop("preview_json", None)
     return {"items": jobs, "total": total}
+
+
+def _preview_payload_for_operation(
+    preview_json: str | dict | None,
+    operation_type: str,
+    resource_key: str,
+) -> dict | None:
+    """Find the immutable request payload belonging to a persisted operation."""
+    try:
+        preview = json.loads(preview_json) if isinstance(preview_json, str) else preview_json
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(preview, dict) or not isinstance(preview.get("steps"), list):
+        return None
+    for step in preview["steps"]:
+        if not isinstance(step, dict):
+            continue
+        if step.get("operation") == operation_type and step.get("resource_key") == resource_key:
+            payload = step.get("payload")
+            return payload if isinstance(payload, dict) else None
+    return None
 
 
 def list_resumable_articlewerk_jobs() -> list[dict]:
