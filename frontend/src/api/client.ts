@@ -2,6 +2,14 @@ import type { Product, AttributeValue, AttributeConfig, ExportPreview, Stammdate
 
 const BASE = '/api';
 
+function attributeImportForm(file: File, mapping: Record<string, string | null>, mode: string, targetSku?: string, token?: string) {
+  const form = new FormData();
+  form.append('file', file); form.append('mapping', JSON.stringify(mapping)); form.append('mode', mode);
+  if (targetSku) form.append('target_sku', targetSku);
+  if (token) form.append('token', token);
+  return form;
+}
+
 async function request<T>(url: string, options?: RequestInit, retries = 2): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -27,6 +35,14 @@ async function request<T>(url: string, options?: RequestInit, retries = 2): Prom
 }
 
 export const api = {
+  previewProductAttributesXlsx: (file: File, mapping: Record<string, string | null>, mode: string, targetSku?: string) =>
+    request<import('../types').ProductAttributeImportPreview>('/attributes/products/import/preview', {
+      method: 'POST', body: attributeImportForm(file, mapping, mode, targetSku),
+    }),
+  importProductAttributesXlsx: (file: File, mapping: Record<string, string | null>, mode: string, token: string, targetSku?: string) =>
+    request<{ imported: number; products: number; skipped: number; unchanged: number }>('/attributes/products/import/apply', {
+      method: 'POST', body: attributeImportForm(file, mapping, mode, targetSku, token),
+    }, 0),
   health: () => request<{ status: string }>('/health'),
 
   // Artikelwerk

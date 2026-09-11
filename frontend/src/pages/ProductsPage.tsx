@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { WorkspaceHeader } from '../components/layout/WorkspaceHeader';
 import { ProductList } from '../components/products/ProductList';
 import { BulkAttributeModal } from '../components/products/BulkAttributeModal';
+import { AttributeImportDialog } from '../components/products/AttributeImportDialog';
 import { TemplateModal } from '../components/products/TemplateModal';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
@@ -39,6 +40,7 @@ export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showAttributeImport, setShowAttributeImport] = useState(false);
   const [attributeConfig, setAttributeConfig] = useState<AttributeConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -140,6 +142,7 @@ export function ProductsPage() {
         ]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => setShowAttributeImport(true)}>Attribute aus XLSX importieren</Button>
             <Button variant="outline" className="bg-background/70" onClick={() => setShowTemplateModal(true)}><FileText className="mr-2 h-4 w-4" />Vorlagen</Button>
             {selectedSkus.size > 0 && (
               <Button onClick={() => setShowBulkModal(true)}><Edit className="mr-2 h-4 w-4" />{selectedSkus.size} bearbeiten</Button>
@@ -246,6 +249,7 @@ export function ProductsPage() {
         />
       )}
 
+      {showAttributeImport && <AttributeImportDialog onClose={() => setShowAttributeImport(false)} onImported={handleBulkSaved} />}
       {showBulkModal && attributeConfig && (
         <BulkAttributeModal
           selectedSkus={Array.from(selectedSkus)}

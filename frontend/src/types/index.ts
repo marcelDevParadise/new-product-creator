@@ -398,6 +398,14 @@ export interface ImportResult {
   warnings: ImportWarning[];
 }
 
+export interface ProductAttributeImportPreview {
+  token: string;
+  groups: { source: string; count: number; sku: string | null; skipped: boolean }[];
+  rows: { sheet: string; row: number; source: string; sku: string | null; key: string; name: string;
+    value: AttributeValue; old_value: AttributeValue | null; status: 'add' | 'update' | 'unchanged' | 'skipped' | 'error'; message: string }[];
+  errors: number; changes: number; products: number; skipped: number; unchanged: number;
+}
+
 export interface AttributeImportResult {
   imported: number;
   total: number;

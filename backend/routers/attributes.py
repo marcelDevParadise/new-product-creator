@@ -5,7 +5,7 @@ import csv
 import io
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException, UploadFile, Form
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel
 
@@ -467,6 +467,54 @@ def delete_attribute_definition(key: str):
 
 
 # --- Per-product attribute management ---
+
+@router.post('/products/import/preview')
+async def preview_product_attribute_import(
+    file: UploadFile, mapping: str = Form('{}'), mode: str = Form('overwrite'),
+    target_sku: str | None = Form(None),
+):
+    return await _product_attribute_import(file, mapping, mode, target_sku)
+
+
+@router.post('/products/import/apply')
+async def apply_product_attribute_import(
+    file: UploadFile, token: str = Form(...), mapping: str = Form('{}'),
+    mode: str = Form('overwrite'), target_sku: str | None = Form(None),
+):
+    return await _product_attribute_import(file, mapping, mode, target_sku, token)
+
+
+async def _product_attribute_import(file, mapping, mode, target_sku, token=None):
+    from services.attribute_import import MAX_FILE_BYTES, build_preview, apply_preview
+
+    if not file.filename or not file.filename.lower().endswith('.xlsx'):
+        raise HTTPException(400, 'Bitte eine XLSX-Datei auswählen.')
+    content = await file.read(MAX_FILE_BYTES + 1)
+    try:
+        assignments = json.loads(mapping)
+        if not isinstance(assignments, dict) or any(
+            not isinstance(key, str) or (value is not None and not isinstance(value, str))
+            for key, value in assignments.items()
+        ):
+            raise ValueError('Ungültige Produktzuordnung.')
+        preview = build_preview(content, state.products, state.attribute_config, assignments, mode, target_sku)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if token is None:
+        return preview
+    if token != preview['token']:
+        raise HTTPException(409, 'Datei, Zuordnung oder Produktdaten wurden geändert. Bitte die Vorschau erneut laden.')
+    if preview['errors']:
+        raise HTTPException(422, 'Die Vorschau enthält Fehler. Es wurden keine Attribute importiert.')
+    if not preview['changes']:
+        return {'imported': 0, 'products': 0, 'skipped': preview['skipped'], 'unchanged': preview['unchanged']}
+    try:
+        apply_preview(preview, state.products, file.filename)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {'imported': preview['changes'], 'products': preview['products'],
+            'skipped': preview['skipped'], 'unchanged': preview['unchanged']}
+
 
 @router.post("/products/bulk")
 def bulk_update_attributes(body: BulkAttributeUpdate):

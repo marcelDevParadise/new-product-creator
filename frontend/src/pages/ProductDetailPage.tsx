@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useToast } from '../components/ui/Toast';
 import { AttributeWizard } from '../components/products/wizard/AttributeWizard';
+import { AttributeImportDialog } from '../components/products/AttributeImportDialog';
 import { api } from '../api/client';
 import type { Product, AttributeValue, AttributeConfig, ProductHistoryEntry, ArtikelwerkPreview, ArtikelwerkPublication } from '../types';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,6 +20,8 @@ export function ProductDetailPage() {
   const [parentAttributes, setParentAttributes] = useState<Record<string, AttributeValue> | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'attributes' | 'history'>('attributes');
+  const [showAttributeImport, setShowAttributeImport] = useState(false);
+  const [attributesDirty, setAttributesDirty] = useState(false);
   const [history, setHistory] = useState<ProductHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [artikelwerkPreview, setArtikelwerkPreview] = useState<ArtikelwerkPreview | null>(null);
@@ -132,6 +135,7 @@ export function ProductDetailPage() {
           { label: 'VK-Preis', value: product.preis != null ? `${product.preis.toFixed(2)} €` : '–', icon: Banknote, tone: 'violet' },
         ]}
         actions={<>
+          <Button variant="outline" disabled={attributesDirty} title={attributesDirty ? 'Bitte zuerst die Attribute speichern.' : undefined} onClick={() => setShowAttributeImport(true)}>Attribute aus XLSX importieren</Button>
           <Button variant="outline" className="bg-background/70" onClick={() => navigate('/products')}><ChevronLeft className="mr-2 h-4 w-4" />Produkte</Button>
           {product.stammdaten_complete && (
             <Button variant="outline" onClick={handleSmartDefaults} className="shrink-0 gap-1.5 bg-background/70">
@@ -204,11 +208,13 @@ export function ProductDetailPage() {
                     mode="product"
                     attributeConfig={config}
                     initialValues={product.attributes}
+                    onChange={values => setAttributesDirty(JSON.stringify(values) !== JSON.stringify(product.attributes))}
                     productTitle={product.artikelname}
                     inheritedValues={parentAttributes}
                     onSave={async (values) => {
                       const updated = await api.updateAttributes(product.artikelnummer, values);
                       setProduct(updated);
+                      setAttributesDirty(false);
                       toast('Attribute gespeichert', 'success');
                     }}
                   />
@@ -222,6 +228,10 @@ export function ProductDetailPage() {
           )}
         </div>
       </section>
+      {showAttributeImport && <AttributeImportDialog target={product} onClose={() => setShowAttributeImport(false)} onImported={() => {
+        api.getProduct(product.artikelnummer).then(setProduct).catch(e => toast(e.message, 'error'));
+        api.getProductHistory(product.artikelnummer).then(setHistory).catch(e => toast(e.message, 'error'));
+      }} />}
       </div>
 
       <Dialog open={artikelwerkPreview !== null} onOpenChange={open => { if (!open) setArtikelwerkPreview(null); }}>

@@ -58,6 +58,7 @@ vorlagen/ausgabe/
 *.md
 !deploy/ARTIKELWERK-UPDATE-DIAGNOSE.md
 !docs/shopify-attributmodell.md
+!docs/produktattribute-xlsx-import.md
 *.html
 
 attribute/*.json
