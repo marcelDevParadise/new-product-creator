@@ -112,6 +112,8 @@ export function StammdatenEditPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [newSku, setNewSku] = useState('');
+  const [renaming, setRenaming] = useState(false);
   const [f, setF] = useState<Form | null>(null);
   const [dirty, setDirty] = useState(false);
   const [categoryTree, setCategoryTree] = useState<CategoryTree>({});
@@ -183,6 +185,7 @@ export function StammdatenEditPage() {
     api.getProduct(decodeURIComponent(sku))
       .then((p) => {
         setProduct(p);
+        setNewSku(p.artikelnummer);
         setF(initForm(p));
         setSeoKeywords(p.seo_keywords ? p.seo_keywords.split(',').map(k => k.trim()).filter(Boolean) : []);
         setSeoKeywordsText(p.seo_keywords ?? '');
@@ -227,6 +230,22 @@ export function StammdatenEditPage() {
         const { vk } = await api.calculateVk(parsed);
         if (vk != null) setF((prev) => prev ? { ...prev, ek: value, preis: String(vk) } : prev);
       } catch { /* ignore */ }
+    }
+  };
+
+  const handleRename = async () => {
+    if (!product || dirty || renaming) return;
+    setRenaming(true);
+    try {
+      const updated = await api.updateArticleNumber(product.artikelnummer, newSku);
+      setProduct(updated);
+      setArtikelwerkPreview(null);
+      toast('Artikelnummer geändert. Bitte vor der Übertragung erneut prüfen und freigeben.', 'success');
+      navigate(`/stammdaten/${encodeURIComponent(updated.artikelnummer)}`, { replace: true });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Artikelnummer konnte nicht geändert werden', 'error');
+    } finally {
+      setRenaming(false);
     }
   };
 
@@ -432,6 +451,14 @@ export function StammdatenEditPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* ───── Allgemein ───── */}
           <Section title="Allgemein">
+            <Field label="Artikelnummer" hint={dirty ? 'Bitte zuerst die Stammdaten speichern.' : 'Bei fehlgeschlagener Übertragung korrigierbar, solange noch kein Artikel in Artikelwerk angelegt wurde.'}>
+              <div className="flex gap-2">
+                <input aria-label="Artikelnummer" className={`${inputCls} font-mono`} value={newSku} disabled={renaming || saving || dirty || artikelwerkLoading} onChange={(e) => setNewSku(e.target.value)} />
+                <Button type="button" variant="outline" disabled={renaming || saving || dirty || artikelwerkLoading || !newSku.trim() || newSku.trim() === product.artikelnummer} onClick={handleRename}>
+                  {renaming ? 'Wird geändert…' : 'Nummer ändern'}
+                </Button>
+              </div>
+            </Field>
             <Field label="Artikelname" {...fieldInherit('artikelname')}>
               <input className={inputCls} value={f.artikelname} onChange={set('artikelname')} />
             </Field>

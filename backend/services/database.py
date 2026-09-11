@@ -1000,6 +1000,55 @@ def save_product(product: Product) -> None:
         )
 
 
+def rename_product_sku(old_sku: str, new_sku: str) -> None:
+    """Move a local product and its references atomically before remote creation."""
+    with _conn() as conn, conn.cursor() as cur:
+        cur.execute("BEGIN")
+        try:
+            cur.execute("SELECT * FROM products WHERE artikelnummer=%s", (old_sku,))
+            row = cur.fetchone()
+            if row is None:
+                raise ValueError("Produkt nicht gefunden.")
+            columns = [column[0] for column in cur.description]
+            values = list(row)
+            values[columns.index("artikelnummer")] = new_sku
+            cur.execute("SELECT artikelnummer FROM products WHERE artikelnummer=%s", (new_sku,))
+            if cur.fetchone():
+                raise ValueError("Artikelnummer existiert bereits.")
+            cur.execute("SELECT artikelnummer FROM products WHERE parent_sku=%s", (old_sku,))
+            related = {old_sku, *(r[0] for r in cur.fetchall())}
+            parent = row[columns.index("parent_sku")]
+            if parent:
+                related.add(parent)
+            cur.execute("SELECT root_sku FROM articlewerk_jobs WHERE status IN ('queued', 'publishing')")
+            if any(r[0] in related for r in cur.fetchall()):
+                raise ValueError("Die Artikelnummer kann erst nach Ende der laufenden Übertragung geändert werden.")
+            for sku in related:
+                cur.execute("SELECT remote_article_id, status FROM articlewerk_publications WHERE artikelnummer=%s", (sku,))
+                publication = cur.fetchone()
+                if publication and (publication[0] or publication[1] in {"published", "queued", "publishing"}):
+                    raise ValueError("Der Artikel oder seine Variantengruppe ist bereits mit Artikelwerk verknüpft oder wird gerade übertragen.")
+            cur.execute(
+                f"INSERT INTO products ({', '.join(columns)}) VALUES ({', '.join(['%s'] * len(columns))})",
+                values,
+            )
+            for table in ("product_workflow", "workflow_comments", "product_history", "product_warnings", "product_ingredients", "articlewerk_publications"):
+                cur.execute(f"UPDATE {table} SET artikelnummer=%s WHERE artikelnummer=%s", (new_sku, old_sku))
+            cur.execute("UPDATE products SET parent_sku=%s WHERE parent_sku=%s", (new_sku, old_sku))
+            # Historical previews/operations stay immutable; retry builds a fresh preview.
+            cur.execute("UPDATE articlewerk_jobs SET root_sku=%s WHERE root_sku=%s", (new_sku, old_sku))
+            cur.execute("UPDATE product_workflow SET status='in_progress', approved_hash=NULL, approved_at=NULL WHERE artikelnummer=%s", (new_sku,))
+            cur.execute(
+                f"INSERT INTO product_history (artikelnummer, event_type, field, old_value, new_value, created_at) VALUES (%s, 'stammdaten_update', 'artikelnummer', %s, %s, {_NOW_SQL})",
+                (new_sku, old_sku, new_sku),
+            )
+            cur.execute("DELETE FROM products WHERE artikelnummer=%s", (old_sku,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
 def delete_product(artikelnummer: str) -> None:
     """Remove a single product from the database."""
     with _conn() as conn, conn.cursor() as cur:

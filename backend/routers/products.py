@@ -289,6 +289,35 @@ class StammdatenUpdate(BaseModel):
     seo_keywords: str | None = None
 
 
+class ArticleNumberUpdate(BaseModel):
+    artikelnummer: str
+
+
+@router.patch("/{artikelnummer}/artikelnummer")
+def update_article_number(artikelnummer: str, body: ArticleNumberUpdate):
+    from services.database import rename_product_sku
+
+    product = state.get_product(artikelnummer)
+    if product is None:
+        raise HTTPException(404, "Produkt nicht gefunden")
+    new_sku = body.artikelnummer.strip()
+    if not new_sku or any(char.isspace() or ord(char) < 32 or char in '/\\?#' for char in new_sku):
+        raise HTTPException(400, "Bitte eine Artikelnummer ohne Leerzeichen oder /, \\, ? und # eingeben.")
+    if new_sku == artikelnummer:
+        return product
+    try:
+        rename_product_sku(artikelnummer, new_sku)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    del state.products[artikelnummer]
+    product.artikelnummer = new_sku
+    state.products[new_sku] = product
+    for child in state.products.values():
+        if child.parent_sku == artikelnummer:
+            child.parent_sku = new_sku
+    return product
+
+
 @router.patch("/{artikelnummer}/stammdaten")
 def update_stammdaten(artikelnummer: str, body: StammdatenUpdate):
     """Update Stammdaten fields of an existing product."""

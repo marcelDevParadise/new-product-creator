@@ -109,6 +109,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artikelnummern: skus }),
     }),
+  updateArticleNumber: (sku: string, artikelnummer: string) =>
+    request<Product>(`/products/${encodeURIComponent(sku)}/artikelnummer`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artikelnummer }),
+    }),
   updateStammdaten: (sku: string, data: { artikelname?: string; ek?: number | null; preis?: number | null; gewicht?: number | null; hersteller?: string | null; ean?: string | null }) =>
     request<Product>(`/products/${encodeURIComponent(sku)}/stammdaten`, {
       method: 'PATCH',
