@@ -16,6 +16,7 @@ from integrations.artikelwerk.article_numbers import get_next_article_sku
 from integrations.artikelwerk.mapper import build_preview
 from integrations.artikelwerk.normalization import normalized_reference_name, searchable_reference_name
 from integrations.artikelwerk.publisher import (
+    _assert_manufacturer_persisted,
     _create_or_find_manufacturer,
     _create_or_reuse_article,
     _delete_attribute,
@@ -121,6 +122,19 @@ class MapperTests(unittest.TestCase):
         self.assertTrue(preview.valid, preview.issues)
         self.assertEqual([step.operation for step in preview.steps[:2]], ["create_manufacturer", "create_article"])
         self.assertEqual(preview.steps[0].payload, {"name": "Neue Marke"})
+        self.assertEqual(preview.steps[1].payload["manufacturerName"], "Neue Marke")
+
+    def test_rejects_publish_when_new_manufacturer_was_not_persisted(self):
+        with self.assertRaises(ArtikelwerkError) as caught:
+            _assert_manufacturer_persisted(
+                {"manufacturer": None}, "Neue Marke",
+            )
+        self.assertEqual(caught.exception.code, "MANUFACTURER_NOT_PERSISTED")
+
+    def test_accepts_persisted_manufacturer_case_insensitively(self):
+        _assert_manufacturer_persisted(
+            {"manufacturer": "Neue Marke"}, "neue marke",
+        )
 
     def test_uses_exact_configured_attribute_id_even_if_short_legacy_id_exists(self):
         product = Product(artikelnummer="CYL-ATTR", artikelname="Test", attributes={"meta_brand": "Acme"})
@@ -597,6 +611,47 @@ class ClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(searches, ["24B'MOONS CO., LTD."])
         self.assertTrue(result["createErrorReconciled"])
         self.assertEqual(result["manufacturer"]["id"], 1232)
+
+    async def test_confirms_successful_manufacturer_create_against_master_data(self):
+        requests = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request.method)
+            if request.method == "POST":
+                return httpx.Response(201, json={
+                    "operationId": "manufacturer-create-1",
+                    "manufacturer": {"id": 77, "name": "Neue Marke"},
+                })
+            return httpx.Response(200, json={
+                "items": [{"id": 77, "name": "Neue Marke"}],
+            })
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            result = await _create_or_find_manufacturer(
+                client, {"name": "Neue Marke"}, "manufacturer:create:new",
+            )
+
+        self.assertEqual(requests, ["POST", "GET"])
+        self.assertTrue(result["manufacturerVerified"])
+        self.assertEqual(result["manufacturer"]["id"], 77)
+
+    async def test_rejects_successful_create_without_persisted_manufacturer(self):
+        async def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                return httpx.Response(201, json={
+                    "manufacturer": {"id": 77, "name": "Neue Marke"},
+                })
+            return httpx.Response(200, json={"items": []})
+
+        config = ArtikelwerkConfig("https://example.test/api/integrations/v1", "aw_secret", 5, True)
+        async with ArtikelwerkClient(config, transport=httpx.MockTransport(handler)) as client:
+            with self.assertRaises(ArtikelwerkError) as caught:
+                await _create_or_find_manufacturer(
+                    client, {"name": "Neue Marke"}, "manufacturer:create:new",
+                )
+
+        self.assertEqual(caught.exception.code, "MANUFACTURER_NOT_PERSISTED")
 
     async def test_deletes_managed_attribute_with_fresh_article_etag(self):
         requests = []

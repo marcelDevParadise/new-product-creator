@@ -125,6 +125,10 @@ def build_preview(
         if manufacturer_id is not None:
             article_payload["manufacturerId"] = int(manufacturer_id)
         elif context.get("manufacturerNeedsCreate"):
+            # Keep the manufacturer name on the article request as a second,
+            # transactional safeguard. Artikelwerk resolves or creates it in
+            # tHersteller before writing tArtikel.kHersteller.
+            article_payload["manufacturerName"] = str(product.hersteller).strip()
             steps.append(PublicationStep(
                 operation="create_manufacturer", resource_key=f"manufacturer:{product.hersteller}",
                 payload={"name": product.hersteller},

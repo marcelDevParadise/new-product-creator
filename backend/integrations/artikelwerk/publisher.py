@@ -84,6 +84,21 @@ def _manufacturer_id(response: dict[str, Any]) -> str | None:
     return str(value) if value is not None else None
 
 
+def _assert_manufacturer_persisted(article: dict[str, Any], expected_name: str | None) -> None:
+    """Reject a publish that did not persist the requested JTL manufacturer."""
+    if not expected_name:
+        return
+    actual_name = article.get("manufacturer")
+    if normalized_reference_name(actual_name or "") == normalized_reference_name(expected_name):
+        return
+    raise ArtikelwerkError(
+        f"Hersteller '{expected_name}' wurde nach der Artikelübertragung nicht in JTL bestätigt.",
+        status_code=502,
+        code="MANUFACTURER_NOT_PERSISTED",
+        details={"expected": expected_name, "actual": actual_name},
+    )
+
+
 def _article_search_items(result: Any, depth: int = 0) -> list[dict[str, Any]] | None:
     """Parse known article search envelopes; None means an unsafe unknown shape."""
     if depth > 3:
@@ -345,29 +360,46 @@ async def _create_or_find_manufacturer(
     client: ArtikelwerkClient, payload: dict[str, Any], key: str,
 ) -> dict[str, Any]:
     try:
-        return await client.create_manufacturer(payload, key)
+        response = await client.create_manufacturer(payload, key)
     except ArtikelwerkError as exc:
         # A 5xx may occur after the SQL transaction was committed but before
         # the response reached us. Reconcile by name before marking the job as
         # failed; the same strategy also handles a concurrent 409 create.
         if exc.status_code != 409 and exc.status_code < 500:
             raise
-        result = await client.search_manufacturers(
-            searchable_reference_name(payload["name"]), page_size=100,
-        )
-        items = result.get("items", []) if isinstance(result, dict) else result
-        matches = [
-            item for item in items if isinstance(item, dict)
-            and normalized_reference_name(item.get("name", ""))
-            == normalized_reference_name(payload["name"])
-        ] if isinstance(items, list) else []
+        matches = await _find_manufacturer_matches(client, payload["name"])
         if len(matches) != 1:
             raise
         return {
             "manufacturer": matches[0],
             "createErrorReconciled": True,
+            "manufacturerVerified": True,
             "originalRequestId": exc.request_id,
         }
+    matches = await _find_manufacturer_matches(client, payload["name"])
+    if len(matches) != 1:
+        raise ArtikelwerkError(
+            f"Hersteller '{payload['name']}' wurde nach erfolgreicher Anlage nicht im "
+            "Artikelwerk-Herstellerstamm bestätigt.",
+            status_code=502,
+            code="MANUFACTURER_NOT_PERSISTED",
+            details={"expected": payload["name"], "matches": len(matches)},
+        )
+    return {**response, "manufacturer": matches[0], "manufacturerVerified": True}
+
+
+async def _find_manufacturer_matches(
+    client: ArtikelwerkClient, name: str,
+) -> list[dict[str, Any]]:
+    result = await client.search_manufacturers(
+        searchable_reference_name(name), page_size=100,
+    )
+    items = result.get("items", []) if isinstance(result, dict) else result
+    return [
+        item for item in items if isinstance(item, dict)
+        and normalized_reference_name(item.get("name", ""))
+        == normalized_reference_name(name)
+    ] if isinstance(items, list) else []
 
 
 def _image_path(source: str) -> Path:
@@ -542,7 +574,11 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                     if remote_article_id:
                         completed += 1
                         continue
-                    if manufacturer_id:
+                    # A new manufacturer's name remains on the article request
+                    # so Artikelwerk can resolve/create tHersteller inside the
+                    # same transaction as tArtikel. The separately created ID
+                    # is retained for updating an already existing article.
+                    if manufacturer_id and not payload.get("manufacturerName"):
                         payload["manufacturerId"] = int(manufacturer_id)
                     response = await _execute_operation(
                         client=client, job_id=job_id, sku=preview.sku, step=step, payload=payload, idempotent=True,
@@ -685,13 +721,17 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
                     tenant_ids = create_step.payload.get("tenantIds", []) if create_step else []
                     if tenant_ids:
                         current = await client.get_article(remote_article_id, int(tenant_ids[0]))
+                        expected_manufacturer = create_step.payload.get("manufacturerName") if create_step else None
+                        _assert_manufacturer_persisted(current.data, expected_manufacturer)
                         synced_snapshot = current.data
                         synced_revision = (
                             (current.etag or "").strip('"')
                             or str(current.data.get("revision", {}).get("rowVersion") or "")
                             or None
                         )
-                except ArtikelwerkError:
+                except ArtikelwerkError as exc:
+                    if exc.code == "MANUFACTURER_NOT_PERSISTED":
+                        raise
                     # The writes succeeded. Missing read scope or a transient
                     # snapshot read must not turn that into a failed publish.
                     logger.warning(
