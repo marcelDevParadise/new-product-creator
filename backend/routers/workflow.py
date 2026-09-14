@@ -163,7 +163,7 @@ def workflow_board():
             }),
             _validation_for_product(product, validation),
         )
-        for product in state.get_all_products()
+        for product in state.get_active_products()
     ]
     assignees = sorted({
         item["assignee"] for item in items if item.get("assignee")

@@ -17,7 +17,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from main import app  # noqa: E402
 from models.product import Product  # noqa: E402
-from integrations.artikelwerk.publisher import run_publication_queue  # noqa: E402
+from integrations.artikelwerk.publisher import _run_publication, run_publication_queue  # noqa: E402
+from integrations.artikelwerk.schemas import PublicationPreview, PublicationStep  # noqa: E402
 from routers.articlewerk import _article_number_sort_key, _require_current_workflow_approval  # noqa: E402
 from services import database  # noqa: E402
 from services.workflow import publication_fingerprint  # noqa: E402
@@ -105,6 +106,108 @@ class WorkflowTests(unittest.TestCase):
             detail = client.get("/api/workflow/products/WF-001")
             self.assertEqual(detail.status_code, 200)
             self.assertEqual(detail.json()["comments"][0]["body"], "Bereit zur Prüfung")
+
+    def test_archived_products_are_excluded_from_workflow_board(self) -> None:
+        state.archive_product("WF-001")
+
+        with TestClient(app) as client:
+            board = client.get("/api/workflow/board")
+
+        self.assertEqual(board.status_code, 200)
+        self.assertEqual(board.json()["items"], [])
+
+    def test_successful_publication_archives_product_and_variants(self) -> None:
+        published = Product(
+            artikelnummer="WF-PUBLISH",
+            artikelname="Zu veröffentlichendes Produkt",
+            is_parent=True,
+        )
+        state.add_product(published)
+        child = Product(
+            artikelnummer="WF-PUBLISH-A",
+            artikelname="Workflow Variante",
+            parent_sku="WF-PUBLISH",
+        )
+        state.add_product(child)
+        preview = PublicationPreview(
+            sku="WF-PUBLISH",
+            is_group=True,
+            valid=True,
+            issues=[],
+            steps=[],
+            unsupported_fields=[],
+        )
+
+        class ClientContext:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        with (
+            patch("integrations.artikelwerk.publisher.ArtikelwerkClient", return_value=ClientContext()),
+            patch("integrations.artikelwerk.publisher.get_artikelwerk_config", return_value=object()),
+        ):
+            asyncio.run(_run_publication("successful-job", preview))
+
+        self.assertTrue(state.get_product("WF-PUBLISH").exported)
+        self.assertTrue(state.get_product("WF-PUBLISH-A").exported)
+        self.assertEqual(database.get_product_workflow("WF-PUBLISH")["status"], "published")
+        self.assertEqual(database.get_articlewerk_publication("WF-PUBLISH")["status"], "published")
+        with TestClient(app) as client:
+            visible_skus = {
+                item["artikelnummer"]
+                for item in client.get("/api/workflow/board").json()["items"]
+            }
+        self.assertNotIn("WF-PUBLISH", visible_skus)
+        self.assertNotIn("WF-PUBLISH-A", visible_skus)
+
+    def test_failed_publication_does_not_archive_product(self) -> None:
+        failed_product = Product(
+            artikelnummer="WF-FAIL",
+            artikelname="Fehlschlagendes Produkt",
+        )
+        state.add_product(failed_product)
+        preview = PublicationPreview(
+            sku="WF-FAIL",
+            is_group=False,
+            valid=True,
+            issues=[],
+            steps=[PublicationStep(
+                operation="create_article",
+                resource_key="article",
+                payload={"tenantIds": [1]},
+            )],
+            unsupported_fields=[],
+        )
+
+        class ClientContext:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, traceback):
+                return False
+
+        with (
+            patch("integrations.artikelwerk.publisher.ArtikelwerkClient", return_value=ClientContext()),
+            patch("integrations.artikelwerk.publisher.get_artikelwerk_config", return_value=object()),
+            patch(
+                "integrations.artikelwerk.publisher._execute_operation",
+                AsyncMock(side_effect=RuntimeError("Simulierter Veröffentlichungsfehler")),
+            ),
+        ):
+            asyncio.run(_run_publication("failed-job", preview))
+
+        self.assertFalse(state.get_product("WF-FAIL").exported)
+        self.assertEqual(database.get_articlewerk_publication("WF-FAIL")["status"], "failed")
+        self.assertEqual(database.get_product_workflow("WF-FAIL")["status"], "error")
+        with TestClient(app) as client:
+            visible_skus = {
+                item["artikelnummer"]
+                for item in client.get("/api/workflow/board").json()["items"]
+            }
+        self.assertIn("WF-FAIL", visible_skus)
 
     def test_bulk_workflow_status_update_moves_all_selected_products(self) -> None:
         second = Product(

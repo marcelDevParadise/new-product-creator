@@ -187,13 +187,13 @@ function WorkflowLane({
           <Badge variant="secondary" className="tabular-nums">{items.length}</Badge>
         </div>
         {!manualDropAllowed && (
-          <p className="mt-2 text-[10px] text-indigo-600">Wird automatisch nach erfolgreicher Veröffentlichung gesetzt.</p>
+          <p className="mt-2 text-[10px] text-indigo-600">Erfolgreich veröffentlichte Produkte werden automatisch archiviert.</p>
         )}
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
         {items.length === 0 ? (
           <div className="flex min-h-28 items-center justify-center rounded-2xl border border-dashed px-4 text-center text-xs text-muted-foreground">
-            {manualDropAllowed ? 'Produkte hier ablegen' : 'Wird nach erfolgreicher Veröffentlichung befüllt'}
+            {manualDropAllowed ? 'Produkte hier ablegen' : 'Erfolgreiche Veröffentlichungen wechseln direkt ins Archiv'}
           </div>
         ) : items.map((item) => (
           <WorkflowCard

@@ -19,6 +19,8 @@ from integrations.artikelwerk.schemas import PublicationPreview, PublicationStep
 from services.database import (
     get_articlewerk_operation,
     get_articlewerk_publication,
+    log_activity,
+    log_product_history,
     reset_deleted_articlewerk_publication,
     save_articlewerk_operation,
     set_workflow_publication_status,
@@ -36,6 +38,37 @@ logger = logging.getLogger(__name__)
 _SENSITIVE_ERROR_KEYS = {
     "authorization", "api_key", "apikey", "password", "secret", "token", "access_token", "refresh_token",
 }
+
+
+def _archive_successfully_published_product(artikelnummer: str) -> int:
+    """Archive the published product and, for a parent, all published variants."""
+    from state import state
+
+    product = state.get_product(artikelnummer)
+    if not product:
+        return 0
+    products = [product]
+    if product.is_parent:
+        products.extend(state.get_variants(artikelnummer))
+
+    archived = 0
+    for item in products:
+        if item.exported:
+            continue
+        state.archive_product(item.artikelnummer)
+        log_product_history(
+            item.artikelnummer,
+            "archived",
+            detail="Nach erfolgreicher Artikelwerk-Veröffentlichung automatisch archiviert",
+        )
+        archived += 1
+    if archived:
+        log_activity(
+            "products_auto_archived",
+            f"{archived} Produkt{'e' if archived != 1 else ''} nach erfolgreicher Veröffentlichung archiviert",
+            archived,
+        )
+    return archived
 
 
 def _payload_hash(payload: dict[str, Any]) -> str:
@@ -757,6 +790,7 @@ async def _run_publication(job_id: str, preview: PublicationPreview) -> None:
         )
         update_articlewerk_job(job_id, status="published", phase="complete", progress=len(preview.steps))
         set_workflow_publication_status(preview.sku, "published")
+        _archive_successfully_published_product(preview.sku)
     except ArtikelwerkError as exc:
         status = "partial" if remote_article_id else "failed"
         error_text = _artikelwerk_error_text(exc)
