@@ -70,6 +70,7 @@ export function StammdatenPage({ poppers = false }: { poppers?: boolean }) {
   const [newGewicht, setNewGewicht] = useState('');
   const [newHersteller, setNewHersteller] = useState('');
   const [newEan, setNewEan] = useState('');
+  const [newWarengruppe, setNewWarengruppe] = useState(poppers ? 'Poppers' : '');
   const [addError, setAddError] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -324,7 +325,7 @@ export function StammdatenPage({ poppers = false }: { poppers?: boolean }) {
     }
     try {
       await api.createProduct({
-        interne_warengruppe: poppers ? 'Poppers' : null,
+        interne_warengruppe: newWarengruppe || null,
         artikelnummer: newSku.trim(),
         artikelname: newName.trim(),
         ek: newEk ? parseFloat(newEk.replace(',', '.')) : null,
@@ -335,6 +336,7 @@ export function StammdatenPage({ poppers = false }: { poppers?: boolean }) {
       });
       setNewSku(''); setNewName(''); setNewEk(''); setNewPreis('');
       setNewGewicht(''); setNewHersteller(''); setNewEan('');
+      setNewWarengruppe(poppers ? 'Poppers' : '');
       setShowAddForm(false);
       toast('Produkt angelegt', 'success');
       navigate(`/stammdaten/${encodeURIComponent(newSku.trim())}`);
@@ -569,6 +571,16 @@ export function StammdatenPage({ poppers = false }: { poppers?: boolean }) {
       {showAddForm && (
         <div className="space-y-3 rounded-3xl border border-indigo-500/25 bg-indigo-500/5 p-5 shadow-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label htmlFor="new-warengruppe" className="block text-xs font-medium text-gray-500 mb-1">Interne Warengruppe</label>
+              <select id="new-warengruppe" value={newWarengruppe} onChange={(e) => setNewWarengruppe(e.target.value)}
+                aria-describedby="new-warengruppe-hint"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-background focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                <option value="">Normale Produkte</option>
+                <option value="Poppers">Poppers</option>
+              </select>
+              <p id="new-warengruppe-hint" className="mt-1 text-xs text-gray-500">Nur zur internen Einteilung, wird nicht übertragen.</p>
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Artikelnummer *</label>
               <input type="text" value={newSku} onChange={(e) => setNewSku(e.target.value)} placeholder="z.B. CYL-00999"
