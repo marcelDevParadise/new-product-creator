@@ -76,7 +76,7 @@ function Field({ label, children, hint, inherited, parentValue, onClearOwn }: {
 
 type Form = {
   artikelname: string;
-  ek: string; preis: string; gewicht: string; hersteller: string; ean: string;
+  ek: string; preis: string; gewicht: string; hersteller: string; ean: string; interne_warengruppe: string;
   laenge: string; breite: string; hoehe: string;
   verkaufseinheit: string; inhalt_menge: string; inhalt_einheit: string;
   grundpreis_ausweisen: boolean;
@@ -93,6 +93,7 @@ function initForm(p: Product): Form {
   const n = (v: number | null | undefined) => (v != null ? String(v) : '');
   return {
     artikelname: p.artikelname, ek: n(p.ek), preis: n(p.preis), gewicht: n(p.gewicht), hersteller: s(p.hersteller), ean: s(p.ean),
+    interne_warengruppe: s(p.interne_warengruppe),
     laenge: n(p.laenge), breite: n(p.breite), hoehe: n(p.hoehe),
     verkaufseinheit: n(p.verkaufseinheit), inhalt_menge: n(p.inhalt_menge), inhalt_einheit: s(p.inhalt_einheit),
     grundpreis_ausweisen: p.grundpreis_ausweisen,
@@ -285,6 +286,7 @@ export function StammdatenEditPage() {
         artikelname: f.artikelname,
         ek: num(f.ek), preis: num(f.preis), gewicht: num(f.gewicht),
         hersteller: str(f.hersteller), ean: str(f.ean),
+        interne_warengruppe: str(f.interne_warengruppe),
         laenge: num(f.laenge), breite: num(f.breite), hoehe: num(f.hoehe),
         verkaufseinheit: num(f.verkaufseinheit), inhalt_menge: num(f.inhalt_menge), inhalt_einheit: str(f.inhalt_einheit),
         grundpreis_ausweisen: f.grundpreis_ausweisen,
@@ -364,7 +366,7 @@ export function StammdatenEditPage() {
           ]}
           actions={
             <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" className="bg-background/70" onClick={() => navigate('/stammdaten')}><ChevronLeft className="mr-2 h-4 w-4" />Stammdaten</Button>
+            <Button variant="outline" className="bg-background/70" onClick={() => navigate(product.interne_warengruppe?.trim().toLowerCase() === 'poppers' ? '/poppers' : '/stammdaten')}><ChevronLeft className="mr-2 h-4 w-4" />{product.interne_warengruppe?.trim().toLowerCase() === 'poppers' ? 'Poppers' : 'Stammdaten'}</Button>
             <Button variant="outline" className="bg-background/70" onClick={() => navigate('/workflow')}><KanbanSquare className="mr-2 h-4 w-4" />Workflow</Button>
             {!product.parent_sku && (
               <Button
@@ -472,6 +474,10 @@ export function StammdatenEditPage() {
             </div>
             <Field label="Hersteller" {...fieldInherit('hersteller')}>
               <input className={inputCls} value={f.hersteller} onChange={set('hersteller')} />
+            </Field>
+            <Field label="Interne Warengruppe" hint="Nur zur internen Einteilung, wird nicht übertragen. Leer = normales Produkt.">
+              <input className={inputCls} value={f.interne_warengruppe} onChange={set('interne_warengruppe')} list="interne-warengruppen" placeholder="Warengruppe eingeben oder Poppers wählen" />
+              <datalist id="interne-warengruppen"><option value="Poppers" /></datalist>
             </Field>
             <Field label="GTIN / EAN" {...fieldInherit('ean')}>
               <input className={`${inputCls} font-mono`} value={f.ean} onChange={set('ean')} placeholder="z.B. 4260605481234" />

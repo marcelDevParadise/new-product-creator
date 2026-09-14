@@ -12,6 +12,7 @@ export interface Product {
   preis: number | null;
   gewicht: number | null;
   hersteller: string | null;
+  interne_warengruppe?: string | null;
   ean: string | null;
   // Maße
   laenge: number | null;

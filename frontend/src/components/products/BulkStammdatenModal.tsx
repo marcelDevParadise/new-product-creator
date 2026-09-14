@@ -16,6 +16,7 @@ function getCategoryOptions(tree: CategoryTree, path: string[]): string[] {
 }
 
 const BULK_FIELDS = [
+  { key: 'interne_warengruppe', label: 'Interne Warengruppe', type: 'text' },
   { key: 'hersteller', label: 'Hersteller', type: 'text' },
   { key: 'ek', label: 'EK (Netto)', type: 'number' },
   { key: 'preis', label: 'VK (Brutto)', type: 'number' },
@@ -127,6 +128,8 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
         </div>
 
         <div className="flex-1 overflow-auto p-5 space-y-3">
+          <datalist id="bulk-warengruppen"><option value="Poppers" /></datalist>
+          <p className="text-xs text-gray-500">Interne Warengruppen werden nicht übertragen. „Poppers“ ordnet die Auswahl der Poppers-Ansicht zu; ein leeres Feld entfernt die Zuordnung.</p>
           <p className="text-xs text-gray-500 mb-3">
             Wähle die Felder aus, die du ändern möchtest. Nur ausgewählte Felder werden überschrieben.
           </p>
@@ -202,6 +205,7 @@ export function BulkStammdatenModal({ selectedSkus, onClose, onSaved }: Props) {
                 ) : (
                   <input
                     type="text"
+                    list={field.key === 'interne_warengruppe' ? 'bulk-warengruppen' : undefined}
                     value={getStringValue(field.key)}
                     onChange={(e) => setValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
                     disabled={!isSelected}

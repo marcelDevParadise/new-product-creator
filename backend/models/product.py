@@ -11,6 +11,7 @@ class Product(BaseModel):
     gewicht: float | None = None
     hersteller: str | None = None
     ean: str | None = None
+    interne_warengruppe: str | None = None
     # Maße
     laenge: float | None = None
     breite: float | None = None

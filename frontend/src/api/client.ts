@@ -106,7 +106,7 @@ export const api = {
       body: form,
     });
   },
-  createProduct: (data: { artikelnummer: string; artikelname: string; ek?: number | null; preis?: number | null; gewicht?: number | null; hersteller?: string | null; ean?: string | null }) =>
+  createProduct: (data: { artikelnummer: string; artikelname: string; ek?: number | null; preis?: number | null; gewicht?: number | null; hersteller?: string | null; ean?: string | null; interne_warengruppe?: string | null }) =>
     request<Product>('/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -131,7 +131,7 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artikelnummer }),
     }),
-  updateStammdaten: (sku: string, data: { artikelname?: string; ek?: number | null; preis?: number | null; gewicht?: number | null; hersteller?: string | null; ean?: string | null }) =>
+  updateStammdaten: (sku: string, data: { artikelname?: string; ek?: number | null; preis?: number | null; gewicht?: number | null; hersteller?: string | null; ean?: string | null; interne_warengruppe?: string | null }) =>
     request<Product>(`/products/${encodeURIComponent(sku)}/stammdaten`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

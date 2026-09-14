@@ -92,6 +92,7 @@ const router = createBrowserRouter([
       { path: '/products', element: <ProductsPage /> },
       { path: '/products/:sku', element: <ProductDetailPage /> },
       { path: '/stammdaten', element: <StammdatenPage /> },
+      { path: '/poppers', element: <StammdatenPage key="poppers" poppers /> },
       { path: '/stammdaten/:sku', element: <StammdatenEditPage /> },
       { path: '/content/:sku', element: <ContentEditPage /> },
       { path: '/attributes', element: <AttributesPage /> },

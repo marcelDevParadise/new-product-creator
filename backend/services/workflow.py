@@ -34,6 +34,7 @@ def publication_fingerprint(product: Product, children: list[Product] | None = N
         data = item.model_dump(mode="json")
         # Local list/archive state is not part of the Artikelwerk payload.
         data.pop("exported", None)
+        data.pop("interne_warengruppe", None)
         return data
 
     payload = {

@@ -54,7 +54,7 @@ function compareByArtikelnummer(a: Product, b: Product) {
   return a.artikelnummer.localeCompare(b.artikelnummer, undefined, { numeric: true, sensitivity: 'base' });
 }
 
-export function StammdatenPage() {
+export function StammdatenPage({ poppers = false }: { poppers?: boolean }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [archivedProducts, setArchivedProducts] = useState<Product[]>([]);
   const [workflowBySku, setWorkflowBySku] = useState<Map<string, WorkflowItem>>(new Map());
@@ -145,6 +145,7 @@ export function StammdatenPage() {
       list = list.filter(
         (p) => p.artikelnummer.toLowerCase().includes(q) || p.artikelname.toLowerCase().includes(q) ||
           (p.hersteller && p.hersteller.toLowerCase().includes(q)) ||
+          (p.interne_warengruppe && p.interne_warengruppe.toLowerCase().includes(q)) ||
           (p.ean && p.ean.toLowerCase().includes(q))
       );
     }
@@ -168,7 +169,7 @@ export function StammdatenPage() {
     }
     const rows: GroupedRow[] = [];
     for (const p of filteredProducts) {
-      if (childSet.has(p.artikelnummer)) continue; // children rendered under parent
+      if (childSet.has(p.artikelnummer) && parentSet.has(p.parent_sku!)) continue;
       if (parentSet.has(p.artikelnummer)) {
         const children = childMap.get(p.artikelnummer) || [];
         rows.push({ type: 'parent', product: p, childCount: children.length });
@@ -203,8 +204,9 @@ export function StammdatenPage() {
         api.getProducts(true),
         api.getWorkflowBoard(),
       ]);
-      setProducts(active);
-      setArchivedProducts(archived);
+      const inSection = (p: Product) => (p.interne_warengruppe?.trim().toLowerCase() === 'poppers') === poppers;
+      setProducts(active.filter(inSection));
+      setArchivedProducts(archived.filter(inSection));
       setWorkflowBySku(new Map(workflow.items.map(item => [item.artikelnummer, item])));
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Produkte konnten nicht geladen werden', 'error');
@@ -217,11 +219,10 @@ export function StammdatenPage() {
 
   const handleClear = async () => {
     try {
-      await api.clearProducts();
+      await api.deleteProducts(products.map(p => p.artikelnummer));
       setProducts([]);
-      setArchivedProducts([]);
-      toast('Alle Produkte gelöscht', 'success');
-      navigate('/import');
+      setSelectedSkus(new Set());
+      toast('Alle aktiven Produkte dieser Ansicht gelöscht', 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Löschen fehlgeschlagen', 'error');
     }
@@ -323,6 +324,7 @@ export function StammdatenPage() {
     }
     try {
       await api.createProduct({
+        interne_warengruppe: poppers ? 'Poppers' : null,
         artikelnummer: newSku.trim(),
         artikelname: newName.trim(),
         ek: newEk ? parseFloat(newEk.replace(',', '.')) : null,
@@ -388,8 +390,8 @@ export function StammdatenPage() {
       <div className="mx-auto w-full max-w-[1920px] space-y-5 p-4 md:p-6 xl:px-8 xl:py-7 2xl:px-10">
       <WorkspaceHeader
         eyebrow="Produktverwaltung"
-        title="Stammdaten"
-        description="Grunddaten, Variantenbeziehungen und Produktstatus zentral verwalten."
+        title={poppers ? 'Poppers' : 'Stammdaten'}
+        description={poppers ? 'Artikel der internen Warengruppe Poppers verwalten.' : 'Normale Produkte verwalten. Poppers findest du im eigenen Menüpunkt.'}
         icon={ClipboardEdit}
         stats={[
           { label: 'Aktive Produkte', value: products.length, icon: Package, tone: 'indigo' },
@@ -691,6 +693,7 @@ export function StammdatenPage() {
                       <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                         {p.artikelname}
                       </div>
+                      {p.interne_warengruppe && <div className="text-xs text-gray-500">Warengruppe: {p.interne_warengruppe}</div>}
                       <div className="mt-1.5">
                         <WorkflowStatusBadge item={workflowBySku.get(p.artikelnummer)} />
                       </div>
@@ -809,6 +812,7 @@ export function StammdatenPage() {
                       </span>
                     </td>
                     <td className="px-4 py-2 text-gray-700 dark:text-gray-200 truncate max-w-[250px]">
+                      {p.interne_warengruppe && <div className="text-xs text-gray-500">Warengruppe: {p.interne_warengruppe}</div>}
                       <span className="inline-flex items-center gap-2">
                         {p.artikelname}
                         {isParent && (
@@ -1046,7 +1050,7 @@ export function StammdatenPage() {
 
       {showClearConfirm && (
         <ConfirmDialog
-          title="Alle Produkte löschen?"
+          title="Alle aktiven Produkte dieser Ansicht löschen?"
           message={`Es werden ${products.length} aktive Produkte unwiderruflich gelöscht.`}
           confirmLabel="Alle löschen"
           variant="danger"

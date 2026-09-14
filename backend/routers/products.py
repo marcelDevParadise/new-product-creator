@@ -240,6 +240,7 @@ def unarchive_products(body: DeleteRequest):
 
 
 class StammdatenUpdate(BaseModel):
+    interne_warengruppe: str | None = None
     artikelname: str | None = None
     ek: float | None = None
     preis: float | None = None
@@ -370,6 +371,7 @@ class BulkStammdatenUpdate(BaseModel):
 def bulk_update_stammdaten(body: BulkStammdatenUpdate):
     """Update Stammdaten fields for multiple products at once."""
     ALLOWED_FIELDS = {
+        "interne_warengruppe",
         "hersteller", "ean", "ek", "preis", "gewicht",
         "laenge", "breite", "hoehe",
         "verkaufseinheit", "inhalt_menge", "inhalt_einheit",
@@ -383,6 +385,11 @@ def bulk_update_stammdaten(body: BulkStammdatenUpdate):
     fields = {k: v for k, v in body.fields.items() if k in ALLOWED_FIELDS}
     if not fields:
         raise HTTPException(400, "Keine gültigen Felder angegeben")
+    if "interne_warengruppe" in fields:
+        group = fields["interne_warengruppe"]
+        if group is not None and not isinstance(group, str):
+            raise HTTPException(422, "Interne Warengruppe muss Text sein")
+        fields["interne_warengruppe"] = group.strip() or None if group is not None else None
 
     updated = 0
     for sku in body.artikelnummern:

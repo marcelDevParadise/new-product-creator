@@ -31,6 +31,7 @@ const sections: NavSection[] = [
     items: [
       { to: '/import', label: 'Import', icon: Upload },
       { to: '/stammdaten', label: 'Stammdaten', icon: ClipboardList },
+      { to: '/poppers', label: 'Poppers', icon: FlaskConical },
       { to: '/products', label: 'Attribute', icon: Package },
       { to: '/variants', label: 'Varianten', icon: GitBranch },
       { to: '/bundles', label: 'Bundles', icon: Package },

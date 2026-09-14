@@ -446,6 +446,7 @@ def delete_supplier(supplier_id: int) -> tuple[bool, str | None, int]:
 def _migrate_product_columns(cur: psycopg.Cursor) -> None:
     """Add new Stammdaten columns to existing products table (idempotent)."""
     migrations = [
+        ("interne_warengruppe", "TEXT"),
         ("preis", "DOUBLE PRECISION"),
         ("gewicht", "DOUBLE PRECISION"),
         ("hersteller", "TEXT"),
@@ -906,7 +907,7 @@ def load_all_products() -> dict[str, Product]:
             "bild_1, bild_2, bild_3, bild_4, bild_5, bild_6, bild_7, bild_8, bild_9, "
             "kategorie_1, kategorie_2, kategorie_3, kategorie_4, kategorie_5, kategorie_6, "
             "kurzbeschreibung, beschreibung, url_pfad, title_tag, meta_description, seo_keywords, "
-            "parent_sku, is_parent, variant_attributes "
+            "parent_sku, is_parent, variant_attributes, interne_warengruppe "
             "FROM products"
         )
         rows = cur.fetchall()
@@ -960,6 +961,7 @@ def load_all_products() -> dict[str, Product]:
             parent_sku=row[44],
             is_parent=bool(row[45]) if row[45] is not None else False,
             variant_attributes=json.loads(row[46]) if row[46] else {},
+            interne_warengruppe=row[47],
         )
     return products
 
@@ -976,6 +978,7 @@ def save_product(product: Product) -> None:
         "kategorie_1", "kategorie_2", "kategorie_3", "kategorie_4", "kategorie_5", "kategorie_6",
         "kurzbeschreibung", "beschreibung", "url_pfad", "title_tag", "meta_description", "seo_keywords",
         "parent_sku", "is_parent", "variant_attributes",
+        "interne_warengruppe",
     ]
     placeholders = ", ".join(["%s"] * len(cols))
     col_list = ", ".join(cols)
@@ -991,6 +994,7 @@ def save_product(product: Product) -> None:
         product.kategorie_1, product.kategorie_2, product.kategorie_3, product.kategorie_4, product.kategorie_5, product.kategorie_6,
         product.kurzbeschreibung, product.beschreibung, product.url_pfad, product.title_tag, product.meta_description, product.seo_keywords,
         product.parent_sku, int(product.is_parent), json.dumps(product.variant_attributes),
+        product.interne_warengruppe,
     )
     with _conn() as conn, conn.cursor() as cur:
         cur.execute(
