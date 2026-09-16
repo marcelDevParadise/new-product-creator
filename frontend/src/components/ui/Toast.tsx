@@ -25,9 +25,10 @@ export function useToast(): ToastContextValue {
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) => void }) {
   useEffect(() => {
+    if (toast.type === 'error') return;
     const timer = setTimeout(() => onRemove(toast.id), 4000);
     return () => clearTimeout(timer);
-  }, [toast.id, onRemove]);
+  }, [toast.id, toast.type, onRemove]);
 
   const styles: Record<ToastType, { bg: string; border: string; text: string; icon: typeof CheckCircle }> = {
     success: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', icon: CheckCircle },
@@ -40,11 +41,13 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) =
 
   return (
     <div
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${s.bg} ${s.border} ${s.text} animate-slide-in`}
+      role={toast.type === 'error' ? 'alert' : 'status'}
+      className={`flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg ${s.bg} ${s.border} ${s.text} animate-slide-in`}
     >
       <Icon className="w-4 h-4 flex-shrink-0" />
-      <span className="text-sm font-medium flex-1">{toast.message}</span>
+      <span className="text-sm font-medium flex-1 whitespace-pre-wrap break-words max-h-[60vh] overflow-y-auto select-text">{toast.message}</span>
       <button
+        aria-label="Meldung schließen"
         onClick={() => onRemove(toast.id)}
         className="p-0.5 opacity-60 hover:opacity-100 transition-opacity"
       >
@@ -70,7 +73,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ toast: addToast }}>
       {children}
       {/* Toast container — fixed top-right */}
-      <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+      <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 w-[min(42rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto">
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onRemove={removeToast} />
         ))}

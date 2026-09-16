@@ -2,6 +2,29 @@ import type { Product, AttributeValue, AttributeConfig, ExportPreview, Stammdate
 
 const BASE = '/api';
 
+function errorDetails(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (!detail || typeof detail !== 'object') return '';
+  const data = detail as Record<string, unknown>;
+  const lines = [typeof data.message === 'string' ? data.message : ''];
+  if (typeof data.sku === 'string') lines.push(`Produkt: ${data.sku}`);
+  if (typeof data.source === 'string') lines.push(`Quelle: ${data.source}`);
+  if (Array.isArray(data.issues)) {
+    for (const issue of data.issues) {
+      if (!issue || typeof issue !== 'object') continue;
+      lines.push(`${issue.severity === 'warning' ? 'Warnung' : 'Fehler'} · ${issue.field || 'Allgemein'} · ${issue.code || ''}: ${issue.message || ''}`);
+    }
+  }
+  if (Array.isArray(data.failures)) {
+    for (const failure of data.failures) {
+      lines.push(`${failure.sku} (HTTP ${failure.status})\n${errorDetails(failure.detail)}`);
+    }
+  }
+  if (typeof data.code === 'string') lines.push(`Code: ${data.code}`);
+  if (typeof data.requestId === 'string') lines.push(`Request-ID: ${data.requestId}`);
+  return lines.filter(Boolean).join('\n');
+}
+
 function attributeImportForm(file: File, mapping: Record<string, string | null>, mode: string, targetSku?: string, token?: string) {
   const form = new FormData();
   form.append('file', file); form.append('mapping', JSON.stringify(mapping)); form.append('mode', mode);
@@ -17,9 +40,7 @@ async function request<T>(url: string, options?: RequestInit, retries = 2): Prom
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         const detail = body.detail;
-        const message = typeof detail === 'string'
-          ? detail
-          : detail?.message || body.error || `Request failed: ${res.status}`;
+        const message = errorDetails(detail) || body.error || `Request failed: ${res.status}`;
         throw new Error(message);
       }
       return res.json();

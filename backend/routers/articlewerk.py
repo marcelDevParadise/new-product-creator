@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import uuid
+import logging
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -36,6 +37,7 @@ from state import state
 
 
 router = APIRouter(prefix="/api/articlewerk", tags=["articlewerk"])
+logger = logging.getLogger("uvicorn.error.articlewerk.preview")
 
 
 class BulkPublicationRequest(BaseModel):
@@ -174,6 +176,7 @@ async def _remote_contract() -> tuple[dict, dict]:
 
 
 async def _preview(sku: str) -> PublicationPreview:
+    stage = "Produktdaten"
     product = state.get_product(sku)
     if not product:
         raise HTTPException(404, "Produkt nicht gefunden.")
@@ -182,7 +185,10 @@ async def _preview(sku: str) -> PublicationPreview:
     settings = get_artikelwerk_settings()
     try:
         async with ArtikelwerkClient(get_artikelwerk_config()) as client:
-            capabilities, context = await client.capabilities(), await client.context()
+            stage = "Artikelwerk-Freischaltungen"
+            capabilities = await client.capabilities()
+            stage = "Artikelwerk-Stammdaten"
+            context = await client.context()
             remote_attributes = {
                 str(item["id"]).strip().casefold(): item
                 for item in context.get("attributes", [])
@@ -192,17 +198,27 @@ async def _preview(sku: str) -> PublicationPreview:
                 definition = state.attribute_config.get(key)
                 remote_id = configured_attribute_id(key, definition)
                 if remote_attributes.get(remote_id, {}).get("allowsCustomValue") is False:
+                    stage = f"Artikelwerk-Auswahlwerte: attributes.{key} -> {remote_id}"
                     values[remote_id] = await client.attribute_values(remote_id)
             context["attributeValues"] = values
+            stage = "Hersteller-, Lieferanten- und Kategoriezuordnung"
             await _resolve_create_references(client, product, context, settings)
     except ArtikelwerkError as exc:
-        raise _http_error(exc) from exc
+        logger.warning("Vorschau SKU=%s Quelle=%s HTTP=%s Code=%s RequestId=%s Fehler=%s",
+                       sku, stage, exc.status_code, exc.code, exc.request_id, str(exc))
+        error = _http_error(exc)
+        error.detail.update(sku=sku, source=stage)
+        raise error from exc
     children = state.get_variants(sku) if product.is_parent else []
-    return build_preview(
+    preview = build_preview(
         product, children=children, attribute_config=state.attribute_config,
         context=context, capabilities=capabilities, settings=settings,
         managed_attribute_ids=get_articlewerk_managed_attribute_ids(product.artikelnummer),
     )
+    for issue in preview.issues:
+        logger.warning("Vorschau SKU=%s Quelle=Veröffentlichungsprüfung Schwere=%s Code=%s Feld=%s Fehler=%s",
+                       sku, issue.severity, issue.code, issue.field or "(allgemein)", issue.message)
+    return preview
 
 
 def _require_current_workflow_approval(sku: str) -> None:
@@ -233,6 +249,8 @@ async def _prepare_publication(sku: str) -> PublicationPreview:
             422,
             {
                 "message": f"Die Veröffentlichungsvorschau für {sku} enthält Fehler.",
+                "sku": sku,
+                "source": "Veröffentlichungsprüfung",
                 "issues": [issue.model_dump() for issue in preview.issues],
             },
         )
@@ -325,7 +343,18 @@ async def publish_products_bulk(body: BulkPublicationRequest, background_tasks: 
 
     # Validate the complete batch before persisting any job. A rejected item
     # therefore never leaves a partially queued selection behind.
-    prepared = [(sku, await _prepare_publication(sku)) for sku in ordered_skus]
+    prepared = []
+    failures = []
+    for sku in ordered_skus:
+        try:
+            prepared.append((sku, await _prepare_publication(sku)))
+        except HTTPException as exc:
+            failures.append({"sku": sku, "status": exc.status_code, "detail": exc.detail})
+    if failures:
+        raise HTTPException(422, {
+            "message": "Veröffentlichung abgebrochen. Es wurden keine Produkte eingeplant.",
+            "failures": failures,
+        })
     jobs = [_persist_publication_job(sku, preview) for sku, preview in prepared]
     background_tasks.add_task(
         run_publication_queue,

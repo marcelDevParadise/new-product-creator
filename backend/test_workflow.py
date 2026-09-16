@@ -266,6 +266,27 @@ class WorkflowTests(unittest.TestCase):
             ["ABC-3", "ABC-20", "CYL-001", "cyl-2", "CYL-10"],
         )
 
+    def test_bulk_publication_reports_all_errors_without_queuing(self) -> None:
+        prepare = AsyncMock(side_effect=[
+            HTTPException(422, {"message": "Ungültiger Wert", "issues": [
+                {"code": "INVALID_ATTRIBUTE_VALUE", "field": "attributes.material", "message": "Liste erwartet"},
+            ]}),
+            object(),
+            HTTPException(409, "Freigabe fehlt"),
+        ])
+        with patch("routers.articlewerk._prepare_publication", prepare), patch(
+            "routers.articlewerk._persist_publication_job"
+        ) as persist, TestClient(app) as client:
+            response = client.post("/api/articlewerk/products/publish-bulk", json={
+                "skus": ["CYL-00582", "CYL-00576", "CYL-00577"],
+            })
+        self.assertEqual(response.status_code, 422)
+        failures = response.json()["detail"]["failures"]
+        self.assertEqual([item["sku"] for item in failures], ["CYL-00576", "CYL-00582"])
+        self.assertEqual(failures[0]["detail"]["issues"][0]["field"], "attributes.material")
+        self.assertEqual(prepare.await_count, 3)
+        persist.assert_not_called()
+
     def test_bulk_publication_runner_preserves_queue_order(self) -> None:
         publications = [("job-1", object()), ("job-2", object()), ("job-3", object())]
         runner = AsyncMock(side_effect=[RuntimeError("Testfehler"), None, None])
