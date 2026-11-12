@@ -1,0 +1,50 @@
+# Laeuft bei jedem Versions-Tag (z. B. aus deploy/release.ps1). Der Deploy-Hub deployt erst,
+# wenn dieser Lauf gruen ist. Die Backend-Tests brauchen einen laufenden Server mit
+# PostgreSQL und laufen deshalb hier nicht mit; geprueft werden Syntax und Frontend-Build.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Keine Datenbankdateien im Release
+        run: |
+          if git ls-files | grep -Eqi '\.(db|sqlite|sqlite3|db3|sdb|s3db)(-wal|-shm)?$'; then
+            echo "Datenbankdateien duerfen nicht versioniert werden:"
+            git ls-files | grep -Ei '\.(db|sqlite|sqlite3|db3|sdb|s3db)(-wal|-shm)?$'
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - name: Python-Syntax pruefen
+        run: python -m compileall -q backend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend bauen
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build

@@ -25,6 +25,8 @@ else
 	echo "==> Detached HEAD ($(git describe --tags --always)) - ueberspringe git pull"
 fi
 
+# "::step::<id>"-Zeilen melden dem Deploy-Hub auf dem Pi den aktuellen Schritt.
+echo "::step::deps"
 echo "==> Backend-Dependencies (falls geaendert)"
 "${VENV_DIR}/bin/pip" install -r backend/requirements.txt
 
@@ -48,12 +50,14 @@ if ! grep -q '^ARTIKELWERK_BASE_URL=.' backend/.env || ! grep -q '^ARTIKELWERK_A
 fi
 sudo -u "${RUN_USER}" env IMAGE_LIBRARY_ROOT=/srv/images /usr/local/bin/rebuild-image-index || true
 
+echo "::step::frontend"
 echo "==> Frontend neu bauen"
 cd frontend
 npm ci
 NODE_OPTIONS="--max-old-space-size=2048" npm run build
 cd ..
 
+echo "::step::services"
 echo "==> systemd-Unit und Caddyfile aktualisieren"
 sed -e "s|__USER__|${RUN_USER}|g" -e "s|__REPO__|${REPO_DIR}|g" \
 	"${REPO_DIR}/deploy/attribut-generator.service" \
@@ -67,7 +71,14 @@ sudo install -m 0644 \
 	/etc/systemd/system/attribut-generator-update.timer
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now attribut-generator-update.timer
+# Uebernimmt der zentrale Deploy-Hub die Releases, darf der alte Tag-Poller nicht
+# zusaetzlich laufen (sonst zwei Deploys gleichzeitig). Markierung: .deployhub-managed
+if [ -f "${REPO_DIR}/.deployhub-managed" ]; then
+	echo "==> Deploy-Hub ist zustaendig: alten Update-Timer deaktivieren"
+	sudo systemctl disable --now attribut-generator-update.timer 2>/dev/null || true
+else
+	sudo systemctl enable --now attribut-generator-update.timer
+fi
 
 # Einen eventuell noch vorhandenen Cron-Eintrag exakt für dieses Update-Skript
 # entfernen. Andere Cronjobs des Benutzers bleiben unverändert.
@@ -88,9 +99,11 @@ fi
 sed -e "s|__REPO__|${REPO_DIR}|g" "${REPO_DIR}/deploy/Caddyfile" \
 	| sudo tee /etc/caddy/Caddyfile > /dev/null
 
+echo "::step::restart"
 echo "==> Backend-Service neu starten"
 sudo systemctl restart attribut-generator.service
 
+echo "::step::health"
 echo "==> Lokalen Backend-Start pruefen"
 BACKEND_READY=0
 for _ in $(seq 1 30); do

@@ -14,6 +14,12 @@ TAG_PATTERN="${TAG_PATTERN:-v* deploy-*}"
 STATE_FILE="${REPO_DIR}/.last-deployed-tag"
 LOCK_FILE="/tmp/attribut-generator-deploy.lock"
 
+# Releases laufen ueber den zentralen Deploy-Hub; dieser Poller bleibt dann still.
+if [ -f "${REPO_DIR}/.deployhub-managed" ]; then
+	echo "[$(date '+%F %T')] Deploy-Hub ist zustaendig - nichts zu tun."
+	exit 0
+fi
+
 # Verhindert parallele Deployments, auch während der Cron-zu-systemd-Migration.
 exec 9>"${LOCK_FILE}"
 if ! flock -n 9; then

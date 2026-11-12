@@ -5,7 +5,8 @@ param(
 	[string]$Remote = "origin",
 	[string]$PiHost = "marcel@100.87.118.91",
 	[string]$PiRepoPath = "/home/marcel/new-product-creator",
-	[int]$DeployTimeoutSeconds = 900,
+	# Deploy-Hub wartet zuerst auf die GitHub Action, daher mehr Zeit als frueher.
+	[int]$DeployTimeoutSeconds = 1800,
 	[ValidateSet("patch", "minor", "major")]
 	[string]$Bump = "patch",
 	[switch]$SkipDeployWait
@@ -267,5 +268,5 @@ if (-not $SkipDeployWait) {
 
 Write-Host ""
 Write-Host "Release '$tag' erfolgreich abgeschlossen." -ForegroundColor Green
-Write-Host "Live-Logs:" -ForegroundColor DarkGray
-Write-Host "  ssh $PiHost sudo journalctl -u attribut-generator-update.service -n 80 -f" -ForegroundColor DarkGray
+Write-Host "Live-Logs im Deploy-Hub:" -ForegroundColor DarkGray
+Write-Host "  https://raspberrypi.tail61b019.ts.net:10443/#/p/produktwerkstatt" -ForegroundColor DarkGray

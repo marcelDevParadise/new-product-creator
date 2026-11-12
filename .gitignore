@@ -25,6 +25,7 @@ ideen/
 vorlagen/
 
 # Pi-Laufzeit-Dateien
+.deployhub-managed
 .last-deployed-tag
 backend/.env
 backend/data/settings.local.json
