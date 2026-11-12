@@ -123,5 +123,5 @@ echo "==> Caddy reloaden"
 sudo systemctl reload caddy || sudo systemctl restart caddy
 
 echo "OK: Update fertig."
-sudo systemctl status attribut-generator.service --no-pager -l | head -n 12
-sudo systemctl status attribut-generator-update.timer --no-pager -l | head -n 8
+sudo systemctl status attribut-generator.service --no-pager -l | head -n 12 || true
+sudo systemctl status attribut-generator-update.timer --no-pager -l | head -n 8 || true
